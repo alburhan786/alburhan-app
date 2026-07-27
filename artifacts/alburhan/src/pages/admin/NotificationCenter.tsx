@@ -33,7 +33,12 @@ interface Campaign {
   error?: string; sent_at: string;
 }
 interface FCMStatus {
-  configured: boolean; unique_subscribers: number; total_tokens: number;
+  configured: boolean;
+  project_id: string | null;
+  unique_subscribers: number;
+  total_tokens: number;
+  missing_server_keys?: string[];
+  last_test_at: string | null;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -447,19 +452,31 @@ export default function NotificationCenter() {
                     <div className="font-semibold text-gray-900 flex items-center gap-2">
                       Firebase Cloud Messaging
                       {fcmStatus?.configured
-                        ? <span className="text-[11px] bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold">CONNECTED</span>
+                        ? <span className="text-[11px] bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 font-bold">✓ CONFIGURED</span>
                         : <span className="text-[11px] bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-bold">NOT CONFIGURED</span>
                       }
                     </div>
-                    {fcmStatus?.configured
-                      ? <p className="text-sm text-emerald-700 mt-0.5">
-                          <b>{fcmStatus.unique_subscribers}</b> subscribers &nbsp;·&nbsp; <b>{fcmStatus.total_tokens}</b> total tokens
+                    {fcmStatus?.configured ? (
+                      <div className="mt-1 space-y-0.5">
+                        <p className="text-sm text-emerald-700">
+                          <b>{fcmStatus.unique_subscribers}</b> subscribers &nbsp;·&nbsp; <b>{fcmStatus.total_tokens}</b> devices
                         </p>
-                      : <p className="text-sm text-amber-700 mt-0.5">
-                          Add <b>FIREBASE_PROJECT_ID</b>, <b>FIREBASE_CLIENT_EMAIL</b>, <b>FIREBASE_PRIVATE_KEY</b>,
-                          and <b>VITE_FIREBASE_*</b> keys to Replit Secrets to enable FCM.
+                        <p className="text-xs text-emerald-600 font-mono">
+                          Project: {fcmStatus.project_id || "—"}
                         </p>
-                    }
+                        <p className="text-xs text-gray-500">
+                          FCM Status: <span className="text-emerald-600 font-semibold">Active</span>
+                          {fcmStatus.last_test_at && (
+                            <> &nbsp;·&nbsp; Last push: {new Date(fcmStatus.last_test_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</>
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-amber-700 mt-0.5">
+                        Add <b>FIREBASE_PROJECT_ID</b>, <b>FIREBASE_CLIENT_EMAIL</b>, <b>FIREBASE_PRIVATE_KEY</b>,
+                        and <b>VITE_FIREBASE_*</b> keys to Replit Secrets to enable FCM.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button
@@ -475,6 +492,14 @@ export default function NotificationCenter() {
               {!fcmStatus?.configured && (
                 <div className="mt-3 bg-white/70 rounded-lg p-3 text-xs text-gray-600 space-y-1 border border-amber-200">
                   <p className="font-semibold text-gray-800">🔧 Setup checklist:</p>
+                  {fcmStatus?.missing_server_keys && fcmStatus.missing_server_keys.length > 0 && (
+                    <div className="mb-1.5">
+                      <p className="text-red-700 font-semibold">Missing secrets:</p>
+                      <ul className="list-disc ml-4 font-mono text-[11px] text-red-700">
+                        {fcmStatus.missing_server_keys.map(k => <li key={k}>{k}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   <ol className="list-decimal ml-4 space-y-0.5">
                     <li>Create a Firebase project at console.firebase.google.com</li>
                     <li>Go to Project Settings → Service accounts → Generate new private key</li>

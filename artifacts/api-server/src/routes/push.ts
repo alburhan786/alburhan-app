@@ -164,16 +164,21 @@ router.delete("/unsubscribe", requireAuth as any, async (req, res) => {
 // ── Admin: FCM configuration status ──────────────────────────────────────────
 router.get("/fcm-status", requireAdmin as any, async (_req, res) => {
   try {
-    // Detect exactly which server-side keys are missing
-    const serverKeys = [
-      { key: "FIREBASE_PROJECT_ID",   value: process.env.FIREBASE_PROJECT_ID   || "" },
-      { key: "FIREBASE_CLIENT_EMAIL", value: process.env.FIREBASE_CLIENT_EMAIL || "" },
-      { key: "FIREBASE_PRIVATE_KEY",  value: process.env.FIREBASE_PRIVATE_KEY  || "" },
+    // Use env-var presence check — same guard that getAccessToken() uses.
+    // We do NOT call isFirebaseConfigured() here because that makes a live
+    // Google OAuth network round-trip which can fail/timeout even when the
+    // keys are correctly injected (esbuild static replacement).
+    const projectId   = process.env.FIREBASE_PROJECT_ID   || "";
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || "";
+    const privateKey  = process.env.FIREBASE_PRIVATE_KEY  || "";
+    const configured  = !!(projectId && clientEmail && privateKey);
+    const missingServerKeys: string[] = [
+      ...(!projectId   ? ["FIREBASE_PROJECT_ID"]   : []),
+      ...(!clientEmail ? ["FIREBASE_CLIENT_EMAIL"] : []),
+      ...(!privateKey  ? ["FIREBASE_PRIVATE_KEY"]  : []),
     ];
-    const missingServerKeys = serverKeys.filter(k => !k.value).map(k => k.key);
 
-    const [configured, subRes, byTypeRes] = await Promise.all([
-      isFirebaseConfigured(),
+    const [subRes, byTypeRes, lastTestRes] = await Promise.all([
       pool.query(`
         SELECT COUNT(DISTINCT COALESCE(user_id, customer_id))::int AS unique_subs,
                COUNT(*)::int AS total_tokens
@@ -187,13 +192,21 @@ router.get("/fcm-status", requireAdmin as any, async (_req, res) => {
         WHERE token IS NOT NULL AND length(token) > 10
         GROUP BY user_type ORDER BY users DESC
       `).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT MAX(created_at) AS last_test_at
+        FROM notification_logs
+        WHERE channel = 'push'
+      `).catch(() => ({ rows: [{}] })),
     ]);
+
     res.json({
       configured,
+      project_id:          configured ? projectId : null,
       missing_server_keys: missingServerKeys,
-      unique_subscribers: subRes.rows[0]?.unique_subs || 0,
-      total_tokens:       subRes.rows[0]?.total_tokens || 0,
-      by_user_type:       byTypeRes.rows,
+      unique_subscribers:  subRes.rows[0]?.unique_subs   || 0,
+      total_tokens:        subRes.rows[0]?.total_tokens  || 0,
+      by_user_type:        byTypeRes.rows,
+      last_test_at:        lastTestRes.rows[0]?.last_test_at || null,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

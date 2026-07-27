@@ -26,9 +26,12 @@ const AUDIENCE_OPTIONS = [
 
 interface FcmStatus {
   configured: boolean;
+  project_id: string | null;
   unique_subscribers: number;
   total_tokens: number;
   by_user_type: { user_type: string; users: number }[];
+  missing_server_keys?: string[];
+  last_test_at: string | null;
 }
 
 interface Campaign {
@@ -235,6 +238,22 @@ export default function PushCenter() {
                       </>
                     )}
                   </div>
+                )}
+
+                {status.configured && (
+                  <>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 space-y-0.5">
+                      <p className="text-xs text-emerald-700 font-mono">
+                        <span className="font-semibold text-emerald-800">Project:</span> {status.project_id || "—"}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        FCM Status: <span className="text-emerald-700 font-semibold">Active</span>
+                        {status.last_test_at && (
+                          <> &nbsp;·&nbsp; Last push: {new Date(status.last_test_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</>
+                        )}
+                      </p>
+                    </div>
+                  </>
                 )}
 
                 {status.configured && (
