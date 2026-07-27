@@ -7,6 +7,7 @@
 - [Service worker caches Vite dev modules](sw-caches-vite-dev-modules.md) — public/sw.js cache-first intercepts /src/ Vite modules; edits invisible until SW bypasses those paths + bumps CACHE version
 - [Admin pages missing AdminLayout](admin-layout-missing-pages.md) — 8 admin pages had no sidebar/breadcrumb; AdminRoute never adds layout; new pages must explicitly use AdminLayout or run grep -rL to audit
 - [Analytics Phase D routes](analytics-phase-d.md) — analytics.ts at /api/analytics; marketing_campaigns table auto-migrated; BookingFunnel/RevenueAnalytics/AiForecast at /admin/funnel|revenue|forecast
+- [VPS correct deployment paths](vps-deploy-correct-paths.md) — exec cwd=/root; API bundle → /var/www/alburhan/artifacts/api-server/dist/index.cjs; frontend tar → extract to /root/artifacts/alburhan/dist/
 - [adminRole null → read_only root cause](adminrole-null-fix.md) — admin users with NULL admin_role get "read_only" by default, blocking all requireModuleAccess routes; fix: default to "admin" when role="admin" in auth.ts requireAuth
 - [api-settings requireSuperAdmin scope](api-settings-superadmin-scope.md) — requireSuperAdmin in api-settings.ts must accept "admin" OR "super_admin"; strict super_admin-only blocks all admin users from Communication Center tests
 - [reminder_logs timestamp column](reminder-logs-sent-at.md) — reminder_logs uses sent_at (NOT created_at); any index on reminder_logs timestamp must reference sent_at DESC

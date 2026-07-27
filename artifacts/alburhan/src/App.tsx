@@ -132,6 +132,7 @@ import NotificationTemplates from "@/pages/admin/NotificationTemplates";
 import WhatsAppTemplateManager from "@/pages/admin/WhatsAppTemplateManager";
 import BotBeeDashboard from "@/pages/admin/BotBeeDashboard";
 import SocialMediaCenter from "@/pages/admin/SocialMediaCenter";
+import SocialIntegrationHub from "@/pages/admin/SocialIntegrationHub";
 import MetaHealth from "@/pages/admin/MetaHealth";
 import MetaStatus from "@/pages/admin/MetaStatus";
 import OAuthHub from "@/pages/admin/OAuthHub";
@@ -433,6 +434,7 @@ function Router() {
       <Route path="/admin/inbox" component={() => <AdminRoute component={OmnichannelInbox} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
       <Route path="/admin/botbee-dashboard" component={() => <AdminRoute component={BotBeeDashboard} />} />
+      <Route path="/admin/social-hub" component={() => <AdminRoute component={SocialIntegrationHub} />} />
       <Route path="/admin/social-media" component={() => <AdminRoute component={SocialMediaCenter} />} />
       <Route path="/admin/meta-health" component={() => <AdminRoute component={MetaHealth} />} />
       <Route path="/admin/meta-status" component={() => <AdminRoute component={MetaStatus} />} />

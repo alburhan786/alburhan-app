@@ -1,0 +1,1118 @@
+MASTER TASK: COMPLETE SOCIAL MEDIA INTEGRATION FOR AL BURHAN ERP
+
+You are a senior full-stack SaaS engineer, Meta API specialist, CRM architect, security engineer, workflow automation expert, and production operations engineer.
+
+PROJECT:
+Al Burhan Tours & Travels ERP/CRM
+
+PRODUCTION DOMAIN:
+alburhantravels.com
+
+OBJECTIVE:
+Audit, complete, secure, deploy, and verify the full Social Media Integration Suite inside the existing Al Burhan ERP.
+
+The final system must capture enquiries, messages, comments, lead forms, campaign attribution, and customer activity from supported social platforms and connect them to the existing CRM, Lead Pipeline, Customer 360, Omnichannel Inbox, Lead-to-Booking flow, notifications, audit logs, and analytics.
+
+IMPORTANT:
+Do not assume that any social integration is already complete merely because routes, tables, UI cards, or mock handlers exist.
+
+First inspect the real production code, database, credentials status, Meta permissions, webhook subscriptions, provider responses, and live event logs.
+
+Do not build duplicate modules.
+
+Do not remove or break:
+
+- Super Admin login
+- Customer login
+- Admin, Branch, Agent, Finance roles
+- CRM Phase A and Phase B
+- Phase C Omnichannel Inbox
+- Phase D Executive Analytics
+- Booking management
+- Lead-to-booking conversion
+- BotBee WhatsApp integration
+- Meta Cloud API WhatsApp
+- SMS
+- Email
+- Push notifications
+- Agreements
+- Invoices
+- Payments
+- Customer 360
+- Notification Center
+- Existing VPS and PM2 deployment
+
+Create a checkpoint before making changes.
+
+==================================================
+1. INITIAL PRODUCTION AUDIT
+==================================================
+
+Inspect and document:
+
+- Existing social integration pages
+- Existing Meta OAuth code
+- Existing webhook routes
+- Existing Facebook Lead Ads support
+- Existing Messenger support
+- Existing Instagram support
+- Existing comment automation
+- Existing Omnichannel Inbox
+- Existing CRM lead creation
+- Existing campaign analytics
+- Existing BotBee integration
+- Existing Meta Cloud API integration
+- Existing database tables
+- Existing environment variables
+- Existing permissions and role guards
+- Existing deployment path
+- Existing PM2 process
+- Existing VPS bundle
+- Existing webhook event logs
+
+For every claimed feature, classify it as:
+
+- Production verified
+- Implemented but not configured
+- Partially implemented
+- UI only
+- Mock API
+- Broken
+- Missing
+- Blocked by external permission
+- Unsupported by official API
+
+Provide the audit before making major architectural changes.
+
+==================================================
+2. SOCIAL INTEGRATION CENTER
+==================================================
+
+Create or upgrade:
+
+Admin
+→ Communication & Marketing
+→ Social Media Integration
+
+Provide cards for:
+
+1. Facebook Pages
+2. Facebook Messenger
+3. Instagram Business
+4. Instagram Direct Messages
+5. Facebook Lead Ads
+6. Instagram Lead Ads
+7. Facebook Comments
+8. Instagram Comments
+9. WhatsApp Business
+10. Google Business Profile
+11. YouTube
+12. LinkedIn
+13. X
+14. Website Forms
+15. Website Live Chat
+16. Email Enquiries
+
+Each integration card must display:
+
+- Platform
+- Connected account
+- Account ID
+- Page ID
+- Business ID
+- Connection status
+- Permission status
+- Token status
+- Token expiry
+- Webhook status
+- Last successful event
+- Last synchronization
+- Leads received
+- Messages received
+- Comments received
+- Error count
+- Connect
+- Reconnect
+- Test
+- Sync
+- Disable
+- Disconnect
+- View logs
+- View permissions
+- Configure automation
+
+Statuses:
+
+- Connected
+- Not Connected
+- Permission Pending
+- Token Expired
+- Webhook Failed
+- Configuration Required
+- Partially Available
+- Unsupported
+- Disabled
+- Healthy
+
+Never expose secrets in frontend responses or logs.
+
+==================================================
+3. META OAUTH
+==================================================
+
+Implement or repair secure Meta OAuth.
+
+Admin flow:
+
+1. Click Connect Meta.
+2. Sign in with Facebook.
+3. Validate OAuth state.
+4. Grant required permissions.
+5. Select Facebook Page.
+6. Detect linked Instagram Business Account.
+7. Confirm Lead Ads access.
+8. Confirm Messenger access.
+9. Confirm Instagram messaging access where available.
+10. Save tokens securely.
+11. Subscribe webhooks.
+12. Run connection tests.
+13. Show missing permissions.
+
+Create or verify routes such as:
+
+GET /api/integrations/meta/connect
+GET /api/integrations/meta/callback
+GET /api/integrations/meta/accounts
+POST /api/integrations/meta/select-accounts
+POST /api/integrations/meta/test
+POST /api/integrations/meta/sync
+POST /api/integrations/meta/reconnect
+POST /api/integrations/meta/disconnect
+GET /api/integrations/meta/permissions
+GET /api/integrations/meta/logs
+
+Use the project’s existing route conventions.
+
+Do not invent endpoints if equivalent routes already exist.
+
+Required security:
+
+- OAuth state validation
+- CSRF protection
+- Token encryption
+- Secure server-side storage
+- Token refresh handling
+- Permission checks
+- Audit logging
+- Secret masking
+
+Environment variables:
+
+META_APP_ID=
+META_APP_SECRET=
+META_REDIRECT_URI=
+META_WEBHOOK_VERIFY_TOKEN=
+META_API_VERSION=
+META_BUSINESS_ID=
+
+Do not hard-code credentials.
+
+==================================================
+4. META WEBHOOKS
+==================================================
+
+Create or repair:
+
+GET /api/webhooks/meta
+POST /api/webhooks/meta
+
+GET must verify the webhook challenge correctly.
+
+POST must:
+
+- Validate webhook signature
+- Reject invalid requests
+- Respond quickly
+- Queue heavy processing
+- Store the external event ID
+- Prevent duplicate processing
+- Support retries
+- Record processing status
+- Mask sensitive payload data
+- Use a correlation ID
+- Preserve raw event metadata safely where permitted
+
+Webhook event statuses:
+
+- Received
+- Validated
+- Queued
+- Processing
+- Completed
+- Failed
+- Retrying
+- Duplicate
+- Ignored
+- Policy Blocked
+
+Subscribe only to events permitted by the active Meta app and approved permissions.
+
+==================================================
+5. FACEBOOK AND INSTAGRAM LEAD ADS
+==================================================
+
+When a lead form is submitted:
+
+1. Receive webhook event.
+2. Retrieve full lead details.
+3. Map fields.
+4. Normalize mobile and email.
+5. Check duplicates.
+6. Create or update customer.
+7. Create CRM lead.
+8. Save attribution.
+9. Assign executive.
+10. Create follow-up.
+11. Send permitted welcome message.
+12. Notify admin and assigned executive.
+13. Display in Lead Pipeline.
+14. Display in Customer 360.
+15. Display in campaign analytics.
+
+Capture:
+
+- Lead ID
+- Form ID
+- Page ID
+- Instagram account ID
+- Campaign ID and name
+- Ad Set ID and name
+- Ad ID and name
+- Platform
+- Submission time
+- Full name
+- Mobile
+- WhatsApp
+- Email
+- City
+- State
+- Country
+- Language
+- Package interest
+- Travel month
+- Traveller count
+- Budget
+- Passport availability
+- Customer message
+- Consent
+- UTM parameters
+- Source
+- Medium
+- Campaign
+
+Lead source values:
+
+- Facebook Lead Ad
+- Instagram Lead Ad
+- Facebook Messenger
+- Instagram Direct
+- Facebook Comment
+- Instagram Comment
+- WhatsApp
+- Website
+- Google Business
+- Email
+- Manual
+- Referral
+- Branch
+- Agent
+
+==================================================
+6. FACEBOOK MESSENGER
+==================================================
+
+Complete two-way Messenger support where official permissions allow.
+
+Support:
+
+- Incoming text
+- Outgoing text
+- Images
+- Documents
+- Audio where supported
+- Postbacks
+- Referral events
+- Delivery status
+- Read status
+- Conversation assignment
+- Internal notes
+- Quick replies
+- AI reply suggestions
+- Customer matching
+- Lead creation
+- Lead activity timeline
+- Staff takeover
+- Conversation close/reopen
+
+Every Messenger enquiry must enter the existing Omnichannel Inbox.
+
+==================================================
+7. INSTAGRAM DIRECT MESSAGES
+==================================================
+
+Complete Instagram messaging support where official API permissions allow.
+
+Support:
+
+- Incoming DMs
+- Outgoing replies
+- Media
+- Story mentions where supported
+- Message status
+- Account matching
+- Lead creation
+- Assignment
+- Customer 360 linkage
+- Activity timeline
+- AI response suggestions
+- Human takeover
+
+If a required permission is unavailable or pending approval:
+
+- Do not fake success.
+- Show Permission Pending.
+- Keep the module disabled safely.
+- Provide exact Meta approval instructions.
+- Continue supporting all already-approved features.
+
+==================================================
+8. COMMENT AUTOMATION
+==================================================
+
+Create or complete Facebook and Instagram comment automation.
+
+Admin can configure:
+
+- Platform
+- Page/account
+- Post
+- Keyword
+- Match type
+- Public reply
+- Private reply
+- Lead creation
+- Tag
+- Assignment rule
+- Follow-up workflow
+- Cooldown
+- Active status
+- Approval required
+- Working hours
+- Exclusion list
+
+Example keywords:
+
+- Hajj
+- Umrah
+- Price
+- Package
+- Details
+- Interested
+- Visa
+- Call me
+- Send details
+- Ramadan
+- Ziyarat
+
+Automation flow:
+
+Comment received
+→ Validate platform event
+→ Check duplicate/cooldown
+→ Create or update lead
+→ Save post and campaign attribution
+→ Send permitted public response
+→ Send permitted private reply
+→ Assign executive
+→ Create follow-up
+→ Notify team
+→ Add activity timeline entry
+
+Safeguards:
+
+- No duplicate replies
+- No spam-like behaviour
+- Configurable cooldown
+- Staff takeover stops automation
+- STOP/opt-out support
+- Rate limits
+- Complete audit logs
+
+==================================================
+9. OMNICHANNEL INBOX
+==================================================
+
+Upgrade the existing inbox to support:
+
+- WhatsApp
+- Messenger
+- Instagram Direct
+- Facebook comments
+- Instagram comments
+- Email
+- Website live chat
+- SMS replies where provider supports them
+
+Required features:
+
+- Real-time stream
+- Search
+- Filters
+- Unread count
+- Channel badges
+- Assigned staff
+- Lead stage
+- Priority
+- Tags
+- Message history
+- Attachments
+- Voice notes
+- Images
+- Documents
+- Delivery/read status
+- Internal notes
+- Mentions
+- Quick replies
+- Templates
+- AI suggestions
+- Staff takeover
+- Assign/transfer
+- Snooze
+- Open/resolve
+- Merge duplicate contacts
+- Convert to lead
+- Convert lead to booking
+- Customer 360 panel
+- Payment status
+- Booking history
+- Agreement
+- Invoice
+- Receipt
+- Visa
+- Ticket
+- Hotel voucher
+
+Do not create a second inbox.
+
+Extend the existing Phase C inbox.
+
+==================================================
+10. WHATSAPP PROVIDERS
+==================================================
+
+Preserve both:
+
+- BotBee
+- Meta WhatsApp Cloud API
+
+Use a provider abstraction.
+
+Required interface:
+
+- Send text
+- Send template
+- Send image
+- Send audio
+- Send document
+- Send interactive message
+- Trigger bot flow
+- Retrieve templates
+- Retrieve delivery status
+- Retrieve conversations
+- Process incoming webhook
+- Process status webhook
+- Assign team member
+- Set custom fields
+
+Do not auto-copy one provider token into another provider configuration unless explicitly required and technically valid.
+
+Do not log tokens.
+
+Respect WhatsApp template and customer service window policies.
+
+==================================================
+11. WEBSITE LEAD CAPTURE
+==================================================
+
+Create secure embeddable lead forms.
+
+Form types:
+
+- Hajj enquiry
+- Umrah enquiry
+- Ramadan Umrah
+- Ziyarat
+- Visa
+- Air ticket
+- General enquiry
+- Callback request
+
+Features:
+
+- Mobile responsive
+- Spam protection
+- Consent checkbox
+- UTM tracking
+- Package preselection
+- Branch routing
+- Lead assignment
+- Duplicate control
+- Thank-you page
+- WhatsApp confirmation
+- Email confirmation
+- Admin notification
+
+Every form must create a CRM lead and campaign attribution record.
+
+==================================================
+12. GOOGLE BUSINESS PROFILE
+==================================================
+
+Add integration only for actions available through official Google APIs.
+
+Potential features:
+
+- Business profile account connection
+- Review monitoring
+- Review alerts
+- Review response workflow
+- Click-to-call attribution
+- Website click attribution
+- Direction request reporting where available
+- Lead source attribution
+
+Do not claim support for messaging if the current official API does not provide it.
+
+Mark unsupported features clearly.
+
+==================================================
+13. YOUTUBE
+==================================================
+
+Add official YouTube integration for:
+
+- Channel connection
+- Video list
+- Comment monitoring
+- Comment reply where allowed
+- Lead keyword detection
+- Campaign links
+- UTM attribution
+- YouTube lead source
+- Performance reporting
+
+Do not scrape YouTube.
+
+==================================================
+14. LINKEDIN AND X
+==================================================
+
+Implement only features supported by official APIs and approved app permissions.
+
+Possible capabilities:
+
+- Account connection
+- Post publishing
+- Scheduled publishing
+- Campaign link tracking
+- Lead attribution
+- Basic analytics
+- Comment monitoring where available
+
+Do not use unofficial browser automation.
+
+If API approval is unavailable, show:
+
+- Configuration Required
+- Permission Pending
+- Unsupported
+
+==================================================
+15. CONTENT CALENDAR
+==================================================
+
+Build a Social Media Content Calendar.
+
+Support only officially available publishing capabilities.
+
+Features:
+
+- Draft
+- Review
+- Approval
+- Schedule
+- Platform selection
+- Caption
+- Media
+- Video
+- Campaign
+- Package
+- CTA
+- UTM builder
+- Preview
+- Publish
+- Retry
+- Failure reason
+- Audit history
+
+Statuses:
+
+- Draft
+- Pending Approval
+- Approved
+- Scheduled
+- Publishing
+- Published
+- Failed
+- Cancelled
+
+Roles:
+
+- Content Creator
+- Marketing Manager
+- Admin Approver
+- Super Admin
+
+Do not mark content as published unless the platform confirms it.
+
+==================================================
+16. AI SOCIAL MEDIA ASSISTANT
+==================================================
+
+Add AI assistance but require human control.
+
+Features:
+
+- Caption suggestions
+- English/Hindi/Urdu variants
+- Hajj/Umrah campaign ideas
+- Reply suggestions
+- Comment classification
+- Lead intent classification
+- Sentiment indicator
+- Suggested next action
+- Package recommendation
+- Campaign summary
+
+Do not auto-publish AI-generated content without approval.
+
+Do not auto-send AI replies where the administrator has not enabled automation.
+
+==================================================
+17. SOCIAL MEDIA ANALYTICS
+==================================================
+
+Create Social Media Analytics under Phase D analytics.
+
+Track where officially available:
+
+- Leads
+- Qualified leads
+- Bookings
+- Revenue
+- Conversion rate
+- Response time
+- Cost per lead
+- Cost per booking
+- Campaign ROI
+- Agent performance
+- Channel performance
+- Comment-to-lead conversion
+- Message-to-booking conversion
+- Website-form conversion
+- Source attribution
+- Ad spend
+- Reach
+- Impressions
+- Engagement
+- Clicks
+
+Use Indian currency formatting:
+
+₹1,25,000
+
+Provide filters:
+
+- Date
+- Channel
+- Campaign
+- Package
+- Branch
+- Executive
+- Lead stage
+- City
+- Source
+
+==================================================
+18. DUPLICATE LEAD CONTROL
+==================================================
+
+Check duplicates using:
+
+- Normalized mobile
+- WhatsApp
+- Email
+- Meta lead ID
+- Platform user ID
+- Existing customer ID
+
+If duplicate:
+
+- Add event to existing timeline
+- Update latest source
+- Add campaign attribution
+- Notify assigned executive
+- Avoid duplicate customer
+- Avoid duplicate follow-up
+- Allow controlled merge
+- Preserve merge audit trail
+
+==================================================
+19. CONSENT AND OPT-OUT
+==================================================
+
+Store:
+
+- WhatsApp consent
+- SMS consent
+- Email consent
+- Marketing consent
+- Privacy consent
+- Consent source
+- Consent time
+- IP where applicable
+- User agent where applicable
+- Campaign/form source
+
+Support:
+
+- STOP keyword
+- Do-not-contact flag
+- Suppression list
+- Channel-specific opt-out
+- Data export request
+- Data deletion request
+- Consent audit history
+
+Automatic marketing must stop immediately after opt-out.
+
+==================================================
+20. DATABASE
+==================================================
+
+Audit existing tables first.
+
+Create only missing structures.
+
+Possible tables:
+
+- social_integrations
+- social_accounts
+- oauth_tokens
+- webhook_subscriptions
+- webhook_events
+- webhook_logs
+- social_conversations
+- social_messages
+- social_comments
+- social_posts
+- scheduled_posts
+- social_leads
+- campaign_attribution
+- communication_consents
+- opt_out_records
+- integration_health
+- provider_errors
+- background_jobs
+- dead_letter_jobs
+
+Every new table must follow the project engineering standard.
+
+Use:
+
+tenant_id TEXT NOT NULL DEFAULT 'default'
+
+for tenant readiness, but do not implement full tenant isolation in this task.
+
+Use:
+
+- Foreign keys
+- Unique constraints
+- Indexes
+- Timestamps
+- Soft deletion where needed
+- Audit fields
+- Idempotency keys
+
+==================================================
+21. SECURITY
+==================================================
+
+Implement:
+
+- OAuth state validation
+- CSRF protection
+- Secure cookies
+- Token encryption
+- Webhook signature validation
+- Request validation
+- Rate limiting
+- Replay protection
+- Idempotency
+- Role checks
+- Backend authorization
+- Audit logs
+- Secret masking
+- Retry with exponential backoff
+- Dead-letter queue
+- Safe error messages
+- Correlation IDs
+
+Never expose:
+
+- App secrets
+- Access tokens
+- Refresh tokens
+- Webhook secrets
+- Passwords
+- OTP values
+- SMTP passwords
+- Payment credentials
+- Full passport data
+
+==================================================
+22. ROLE PERMISSIONS
+==================================================
+
+Super Admin:
+- Full access
+
+Admin:
+- Integrations, inbox, leads, campaigns, reports
+
+Marketing Manager:
+- Content, campaigns, analytics, templates
+
+Branch Manager:
+- Branch leads and conversations
+
+Sales Executive:
+- Assigned leads and conversations
+
+Customer Support:
+- Assigned conversations
+
+Finance:
+- Revenue and payment-related data only
+
+Agent:
+- Own referred leads only
+
+Enforce all permissions on backend APIs.
+
+==================================================
+23. INTEGRATION HEALTH DASHBOARD
+==================================================
+
+Create or upgrade:
+
+Admin
+→ Integration Health
+
+Show:
+
+- Meta App
+- Facebook Page
+- Instagram Business
+- Messenger
+- Lead Ads
+- WhatsApp BotBee
+- WhatsApp Cloud API
+- Google Business
+- YouTube
+- LinkedIn
+- X
+- Email
+- SMS
+- Website forms
+- Webhook status
+- Token expiry
+- Last event
+- Failed event count
+- Pending jobs
+- Delivery success rate
+- Lead sync health
+
+Actions:
+
+- Test connection
+- Test webhook
+- Refresh permissions
+- Sync now
+- Retry failed event
+- Reconnect
+- Disable
+- Download diagnostics
+
+Diagnostics must hide secrets.
+
+==================================================
+24. TEST MODE
+==================================================
+
+Add a clear Test Mode.
+
+Test Mode must:
+
+- Avoid contacting real customers
+- Use approved test accounts/numbers
+- Mark records as test
+- Display Test Mode badge
+- Use test campaigns
+- Allow safe cleanup
+- Prevent live broadcasts
+- Prevent accidental mass messaging
+
+==================================================
+25. TESTING
+==================================================
+
+Add automated tests for:
+
+- Meta OAuth
+- OAuth state
+- Webhook verification
+- Webhook signature
+- Duplicate webhook event
+- Facebook lead creation
+- Instagram lead creation
+- Messenger inbound message
+- Instagram inbound message
+- Comment automation
+- Duplicate lead matching
+- Lead assignment
+- Follow-up creation
+- Inbox conversation creation
+- Attachment handling
+- Voice note handling
+- Customer 360 linking
+- Lead-to-booking conversion
+- Opt-out
+- Role permissions
+- Token encryption
+- Retry queue
+- Campaign attribution
+- Analytics calculations
+
+==================================================
+26. IMPLEMENTATION ORDER
+==================================================
+
+PHASE 1:
+Audit all existing social functionality.
+
+PHASE 2:
+Fix Meta OAuth and webhooks.
+
+PHASE 3:
+Complete Lead Ads and CRM mapping.
+
+PHASE 4:
+Complete Messenger and Instagram Direct.
+
+PHASE 5:
+Complete comment automation.
+
+PHASE 6:
+Integrate everything into existing Omnichannel Inbox.
+
+PHASE 7:
+Complete content calendar and supported publishing.
+
+PHASE 8:
+Complete analytics and campaign attribution.
+
+PHASE 9:
+Complete consent, permissions, security, health dashboard, and logs.
+
+PHASE 10:
+Run automated and live production tests.
+
+Do not jump between phases without recording status.
+
+==================================================
+27. PRODUCTION ACCEPTANCE TEST
+==================================================
+
+Do not mark complete based only on build success.
+
+Test end to end:
+
+1. Super Admin logs in.
+2. Social Integration page opens.
+3. Connected accounts display correctly.
+4. Meta OAuth works.
+5. Webhook verification succeeds.
+6. Test Facebook lead creates CRM lead.
+7. Test Instagram lead creates CRM lead.
+8. Messenger message enters Omnichannel Inbox.
+9. Instagram DM enters Omnichannel Inbox where permission allows.
+10. Facebook comment automation runs.
+11. Instagram comment automation runs where permission allows.
+12. Lead is deduplicated.
+13. Lead is assigned.
+14. Follow-up is created.
+15. Conversation links to Customer 360.
+16. Lead converts to booking.
+17. Attribution appears in analytics.
+18. Opt-out stops automation.
+19. Unauthorized users cannot access integration settings.
+20. Direct page refresh works.
+21. VPS and PM2 remain stable.
+22. Existing WhatsApp, SMS, email, booking and finance functionality still works.
+
+==================================================
+28. FINAL REPORT
+==================================================
+
+Provide:
+
+1. Existing features found
+2. Features repaired
+3. Features newly implemented
+4. Features pending external approval
+5. Unsupported features
+6. Meta permissions required
+7. OAuth redirect URL
+8. Webhook URL
+9. Environment variable list
+10. Database changes
+11. Files modified
+12. APIs added
+13. UI routes added
+14. Test results
+15. Production verification
+16. Security checklist
+17. Deployment details
+18. PM2 status
+19. Known limitations
+20. Rollback instructions
+21. Checkpoint/commit reference
+
+Do not claim “Social Media Integration Complete” unless the real production workflows have been tested end to end.
+
+Where external platform permissions are pending, clearly report:
+
+“Code complete, activation pending platform approval.”
+
+Preserve all existing working ERP functionality.

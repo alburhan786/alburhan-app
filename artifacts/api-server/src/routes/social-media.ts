@@ -86,6 +86,10 @@ async function ensureTables() {
     "ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal'",
     "ADD COLUMN IF NOT EXISTS assigned_branch VARCHAR(100)",
     "ADD COLUMN IF NOT EXISTS auto_reply_sent BOOLEAN DEFAULT false",
+    "ADD COLUMN IF NOT EXISTS travel_month VARCHAR(50)",
+    "ADD COLUMN IF NOT EXISTS travellers_count INTEGER",
+    "ADD COLUMN IF NOT EXISTS meta_lead_id VARCHAR(255)",
+    "ADD COLUMN IF NOT EXISTS utm_params JSONB",
   ];
   for (const col of cols) {
     await pool.query(`ALTER TABLE leads ${col}`).catch(() => {});
@@ -777,19 +781,201 @@ router.post("/webhook/meta", async (req, res) => {
           continue; // handled — don't fall through to leadgen check
         }
 
-        // Lead Ads
+        // ── Lead Ads: full field retrieval from Graph API ────────────────────
         if (change.field === "leadgen" && change.value) {
+          const leadgenId = String(change.value.leadgen_id || Date.now());
+          const pageId_   = String(change.value.page_id || "unknown");
+          const formId    = String(change.value.form_id || "");
+
+          // Fetch page access token for lead retrieval
+          let leadToken: string | null = null;
+          try {
+            const tkR = await pool.query(
+              `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_leads' LIMIT 1`
+            );
+            if (tkR.rows[0]) leadToken = decryptExtra(tkR.rows[0].extra_fields_encrypted).page_access_token || null;
+          } catch {}
+
+          // Retrieve full lead data from Graph API
+          let leadFields: Record<string, string> = {};
+          let adData: Record<string, string> = {};
+          if (leadToken) {
+            try {
+              const gr = await fetch(
+                `https://graph.facebook.com/v19.0/${leadgenId}?fields=id,created_time,field_data,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,is_organic&access_token=${leadToken}`,
+                { signal: AbortSignal.timeout(10000) }
+              );
+              const gd = await gr.json() as any;
+              if (gd.field_data) {
+                for (const f of gd.field_data) {
+                  leadFields[String(f.name).toLowerCase().replace(/\s+/g, "_")] = Array.isArray(f.values) ? f.values[0] : String(f.values || "");
+                }
+              }
+              adData = {
+                ad_id: gd.ad_id || "", ad_name: gd.ad_name || "",
+                adset_id: gd.adset_id || "", adset_name: gd.adset_name || "",
+                campaign_id: gd.campaign_id || "", campaign_name: gd.campaign_name || "",
+                form_id: gd.form_id || formId,
+              };
+            } catch (e: any) {
+              console.warn("[LeadAds] Graph field retrieval failed:", e.message);
+            }
+          }
+
+          // Map common field_data keys to CRM lead fields
+          const fullName   = leadFields.full_name || leadFields.name || leadFields.first_name
+                           ? `${leadFields.first_name||""} ${leadFields.last_name||""}`.trim() || leadFields.full_name || "Facebook Lead"
+                           : "Facebook Lead";
+          const mobile     = (leadFields.phone_number || leadFields.mobile || leadFields.whatsapp || "").replace(/\D/g, "").slice(-10) || null;
+          const email      = leadFields.email || leadFields.email_address || null;
+          const city       = leadFields.city || leadFields.location || null;
+          const budget     = leadFields.budget || leadFields.price_range || null;
+          const pkgInterest= leadFields.package_interest || leadFields.package || leadFields.service || null;
+          const travelMonth= leadFields.travel_month || leadFields.preferred_travel_date || null;
+          const travellers = leadFields.number_of_travellers || leadFields.travelers || leadFields.group_size || null;
+          const message    = leadFields.message || leadFields.query || leadFields.notes || null;
+
+          const msgText = `Facebook Lead Ad — ${fullName}${mobile ? ` · ${mobile}` : ""}${pkgInterest ? ` · ${pkgInterest}` : ""} [Campaign: ${adData.campaign_name||formId}]`;
+
           const insertR = await pool.query(`
-            INSERT INTO social_messages (platform,message_id,sender_id,message_text,message_type,raw_data,direction)
-            VALUES ($1,$2,$3,$4,$5,$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
-          `, ["facebook_leads", String(change.value.leadgen_id||Date.now()),
-              String(change.value.page_id||"unknown"), `Lead from form ${change.value.form_id}`, "lead", JSON.stringify(change.value)]);
+            INSERT INTO social_messages (platform,message_id,sender_id,sender_name,sender_phone,message_text,message_type,raw_data,direction)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'incoming') ON CONFLICT DO NOTHING RETURNING id
+          `, ["facebook_leads", leadgenId, pageId_, fullName, mobile, msgText, "lead",
+              JSON.stringify({ ...change.value, field_data: leadFields, ad_data: adData })]);
+
           if (insertR.rows[0]) {
-            await autoCreateLeadFromMessage({
+            const newLeadId = await autoCreateLeadFromMessage({
               id: insertR.rows[0].id, platform: "facebook_leads",
-              sender_id: String(change.value.page_id||Date.now()),
-              message_text: `Facebook Lead Ad submission — Form ${change.value.form_id}`,
+              sender_id: leadgenId,
+              sender_name: fullName,
+              sender_phone: mobile || undefined,
+              message_text: msgText,
             });
+            // Enrich the created lead with form data
+            if (newLeadId && (email || city || budget || pkgInterest || travelMonth || travellers || Object.keys(adData).length)) {
+              await pool.query(`
+                UPDATE leads SET
+                  email       = COALESCE(NULLIF($2,''), email),
+                  city        = COALESCE(NULLIF($3,''), city),
+                  budget      = COALESCE(NULLIF($4,''), budget),
+                  package_interest = COALESCE(NULLIF($5,''), package_interest),
+                  travel_month     = COALESCE(NULLIF($6,''), travel_month),
+                  travellers_count = COALESCE(NULLIF($7,'')::int, travellers_count),
+                  meta_lead_id = $8,
+                  utm_params   = COALESCE(utm_params, $9::jsonb),
+                  updated_at   = NOW()
+                WHERE id = $1
+              `, [
+                newLeadId, email || "", city || "", budget || "",
+                pkgInterest || "", travelMonth || "",
+                travellers && !isNaN(parseInt(travellers)) ? parseInt(travellers) : null,
+                leadgenId,
+                JSON.stringify({ ad_id: adData.ad_id, ad_name: adData.ad_name, campaign_id: adData.campaign_id, campaign_name: adData.campaign_name, form_id: adData.form_id }),
+              ]).catch(() => {});
+            }
+          }
+          console.log(`[LeadAds] leadgen_id=${leadgenId} name="${fullName}" mobile=${mobile||"?"} campaign="${adData.campaign_name||formId}"`);
+        }
+
+        // ── Comment / Feed events → Comment Automation Rules ─────────────────
+        if (change.field === "feed" && change.value?.item === "comment" && change.value?.verb === "add") {
+          const commentId   = String(change.value.comment_id || change.value.id || "");
+          const commentText = String(change.value.message || "");
+          const senderId    = String(change.value.from?.id || "");
+          const senderName  = String(change.value.from?.name || "User");
+          const postId      = String(change.value.post_id || change.value.parent_id || "");
+          const platform    = object === "instagram" ? "instagram" : "facebook_page";
+
+          console.log(`[CommentWebhook] platform=${platform} comment="${commentText.slice(0,80)}" from=${senderName}`);
+
+          // Dedup: skip if we've already seen this comment
+          const dupCheck = await pool.query(
+            `SELECT id FROM social_messages WHERE message_id=$1 LIMIT 1`, [commentId]
+          );
+          if (dupCheck.rows[0]) continue;
+
+          // Log the comment
+          await pool.query(`
+            INSERT INTO social_messages (platform,message_id,sender_id,sender_name,message_text,message_type,raw_data,direction)
+            VALUES ($1,$2,$3,$4,$5,'comment',$6,'incoming') ON CONFLICT DO NOTHING
+          `, [platform, commentId, senderId, senderName, commentText, JSON.stringify(change.value)]).catch(() => {});
+
+          // Load active comment automation rules for this platform
+          let rules: any[] = [];
+          try {
+            const rr = await pool.query(
+              `SELECT * FROM comment_automation_rules WHERE is_active=true AND (platform=$1 OR platform='all') ORDER BY created_at`,
+              [platform]
+            );
+            rules = rr.rows;
+          } catch {}
+
+          for (const rule of rules) {
+            const keywords: string[] = rule.keywords || [];
+            if (!keywords.length) continue;
+
+            // Check cooldown: skip if same sender was triggered within cooldown_minutes
+            if (rule.last_triggered_at && rule.cooldown_minutes > 0) {
+              const lastMs = new Date(rule.last_triggered_at).getTime();
+              const cooldownMs = (rule.cooldown_minutes || 60) * 60 * 1000;
+              if (Date.now() - lastMs < cooldownMs) continue;
+            }
+
+            // Keyword match
+            const lowerText = commentText.toLowerCase();
+            const matched = rule.match_type === "all"
+              ? keywords.every((kw: string) => lowerText.includes(kw.toLowerCase()))
+              : keywords.some((kw: string) => lowerText.includes(kw.toLowerCase()));
+            if (!matched) continue;
+
+            console.log(`[CommentAutomation] rule "${rule.rule_name}" matched comment from ${senderName}`);
+
+            // Load page token for reply
+            let fbToken: string | null = null;
+            try {
+              const tr = await pool.query(
+                `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform=$1 LIMIT 1`, [platform]
+              );
+              fbToken = tr.rows[0] ? decryptExtra(tr.rows[0].extra_fields_encrypted).page_access_token || null : null;
+            } catch {}
+
+            // Post public comment reply
+            if (rule.public_reply?.trim() && fbToken && commentId) {
+              try {
+                const replyText = rule.public_reply.replace(/\{\{name\}\}/gi, senderName);
+                await fetch(`https://graph.facebook.com/v19.0/${commentId}/comments`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ message: replyText, access_token: fbToken }),
+                  signal: AbortSignal.timeout(8000),
+                });
+                console.log(`[CommentAutomation] Public reply posted on comment ${commentId}`);
+              } catch (e: any) {
+                console.warn("[CommentAutomation] Public reply failed:", e.message);
+              }
+            }
+
+            // Create CRM lead if configured
+            if (rule.create_lead) {
+              const smR = await pool.query(
+                `SELECT id FROM social_messages WHERE message_id=$1 LIMIT 1`, [commentId]
+              );
+              if (smR.rows[0]) {
+                await autoCreateLeadFromMessage({
+                  id: smR.rows[0].id, platform,
+                  sender_id: senderId, sender_name: senderName,
+                  message_text: commentText,
+                }).catch(() => {});
+              }
+            }
+
+            // Update rule trigger stats
+            await pool.query(
+              `UPDATE comment_automation_rules SET trigger_count=COALESCE(trigger_count,0)+1, last_triggered_at=NOW(), updated_at=NOW() WHERE id=$1`,
+              [rule.id]
+            ).catch(() => {});
+
+            break; // Only fire first matching rule per comment
           }
         }
       }
@@ -2237,6 +2423,229 @@ router.get("/oauth/google/callback", async (req: any, res: any) => {
     res.redirect(`/admin/social-oauth?connected=google&account=${encodeURIComponent(user.name || user.email)}`);
   } catch (e: any) {
     res.redirect(`/admin/social-oauth?error=${encodeURIComponent(e.message)}`);
+  }
+});
+
+// ── GET /oauth/meta/pages — List Facebook Pages accessible via token ─────────
+router.get("/oauth/meta/pages", requireAdmin as any, async (_req: any, res: any) => {
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  try {
+    // Load user token from oauth_connections or platform config
+    let token: string | null = null;
+    try {
+      const ocR = await pool.query(
+        `SELECT access_token FROM oauth_connections WHERE provider='meta' ORDER BY connected_at DESC LIMIT 1`
+      );
+      if (ocR.rows[0]?.access_token) token = decrypt(ocR.rows[0].access_token);
+    } catch {}
+    if (!token) {
+      const cfgR = await pool.query(
+        `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_page' LIMIT 1`
+      );
+      if (cfgR.rows[0]) token = decryptExtra(cfgR.rows[0].extra_fields_encrypted).page_access_token || null;
+    }
+    if (!token) return void res.status(400).json({ ok: false, error: "No Meta token found. Connect via OAuth Hub first." });
+
+    // Fetch pages
+    const resp = await fetch(
+      `${GRAPH}/me/accounts?fields=id,name,access_token,category,instagram_business_account{id,name,username}&access_token=${token}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    const data = await resp.json() as any;
+    if (data.error) return void res.status(400).json({ ok: false, error: data.error.message, code: data.error.code });
+
+    const pages = (data.data || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      access_token_preview: p.access_token ? maskVal(p.access_token) : null,
+      has_token: !!p.access_token,
+      instagram_account_id: p.instagram_business_account?.id || null,
+      instagram_username: p.instagram_business_account?.username || null,
+    }));
+
+    res.json({ ok: true, pages, count: pages.length });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /oauth/meta/save-page — Save selected page tokens from OAuth ─────────
+router.post("/oauth/meta/save-page", requireAdmin as any, async (req: any, res: any) => {
+  const { page_id, page_name, instagram_account_id, instagram_username } = req.body;
+  const GRAPH = "https://graph.facebook.com/v19.0";
+  if (!page_id) return void res.status(400).json({ ok: false, error: "page_id required" });
+
+  try {
+    // Get user token
+    let userToken: string | null = null;
+    const ocR = await pool.query(
+      `SELECT access_token FROM oauth_connections WHERE provider='meta' ORDER BY connected_at DESC LIMIT 1`
+    );
+    if (ocR.rows[0]?.access_token) userToken = decrypt(ocR.rows[0].access_token);
+    if (!userToken) return void res.status(400).json({ ok: false, error: "No Meta OAuth token. Connect via OAuth Hub first." });
+
+    // Get page-specific access token
+    const pagesR = await fetch(
+      `${GRAPH}/me/accounts?fields=id,access_token&access_token=${userToken}`, { signal: AbortSignal.timeout(10000) }
+    );
+    const pagesData = await pagesR.json() as any;
+    const page = (pagesData.data || []).find((p: any) => p.id === page_id);
+    if (!page?.access_token) return void res.status(400).json({ ok: false, error: `Page ${page_id} not found or token unavailable` });
+
+    const pageToken = page.access_token;
+    const encToken  = encrypt(pageToken);
+
+    // Save to all Meta FB platforms
+    const metaPlatforms = ["facebook_page", "facebook_messenger", "facebook_leads"];
+    for (const platform of metaPlatforms) {
+      const existing = await pool.query(`SELECT id, extra_fields_encrypted FROM social_platform_configs WHERE platform=$1`, [platform]);
+      const extra = existing.rows[0] ? decryptExtra(existing.rows[0].extra_fields_encrypted) : {};
+      extra.page_access_token = pageToken;
+      extra.page_id = page_id;
+      if (instagram_account_id) extra.instagram_account_id = instagram_account_id;
+      const encExtra = encrypt(JSON.stringify(extra));
+      if (existing.rows[0]) {
+        await pool.query(
+          `UPDATE social_platform_configs SET api_key_encrypted=$1, extra_fields_encrypted=$2, enabled=true, status='configured', updated_at=NOW() WHERE platform=$3`,
+          [encToken, encExtra, platform]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO social_platform_configs (platform,enabled,api_key_encrypted,extra_fields_encrypted,status) VALUES ($1,true,$2,$3,'configured')`,
+          [platform, encToken, encExtra]
+        );
+      }
+    }
+
+    // Save Instagram if present
+    if (instagram_account_id) {
+      const igPlatforms = ["instagram", "instagram_dm"];
+      for (const platform of igPlatforms) {
+        const existing = await pool.query(`SELECT id, extra_fields_encrypted FROM social_platform_configs WHERE platform=$1`, [platform]);
+        const extra = existing.rows[0] ? decryptExtra(existing.rows[0].extra_fields_encrypted) : {};
+        extra.page_access_token = pageToken;
+        extra.instagram_account_id = instagram_account_id;
+        extra.instagram_username = instagram_username || "";
+        const encExtra = encrypt(JSON.stringify(extra));
+        if (existing.rows[0]) {
+          await pool.query(
+            `UPDATE social_platform_configs SET api_key_encrypted=$1, extra_fields_encrypted=$2, enabled=true, status='configured', updated_at=NOW() WHERE platform=$3`,
+            [encToken, encExtra, platform]
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO social_platform_configs (platform,enabled,api_key_encrypted,extra_fields_encrypted,status) VALUES ($1,true,$2,$3,'configured')`,
+            [platform, encToken, encExtra]
+          );
+        }
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: `✅ Page "${page_name||page_id}" saved. Facebook Page, Messenger, Lead Ads${instagram_account_id ? ", Instagram Business, Instagram DM" : ""} configured.`,
+      page_id, instagram_account_id: instagram_account_id || null,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── GET /social-media/integration-status — 16-channel status summary ─────────
+router.get("/integration-status", requireAdmin as any, async (_req: any, res: any) => {
+  try {
+    // Load all platform configs
+    const cfgR = await pool.query(`SELECT * FROM social_platform_configs`);
+    const cfgMap: Record<string, any> = {};
+    for (const row of cfgR.rows) {
+      const extra = decryptExtra(row.extra_fields_encrypted);
+      cfgMap[row.platform] = { ...row, extra };
+    }
+
+    // Lead counts per platform (last 30 days)
+    const leadCntR = await pool.query(
+      `SELECT platform, COUNT(*) cnt FROM social_messages WHERE direction='incoming' AND created_at > NOW()-INTERVAL '30 days' GROUP BY platform`
+    );
+    const leadMap: Record<string, number> = {};
+    for (const r of leadCntR.rows) leadMap[r.platform] = parseInt(r.cnt);
+
+    // Error counts per platform (last 7 days)
+    const errR = await pool.query(
+      `SELECT platform, COUNT(*) cnt FROM social_messages WHERE status='error' AND created_at > NOW()-INTERVAL '7 days' GROUP BY platform`
+    );
+    const errMap: Record<string, number> = {};
+    for (const r of errR.rows) errMap[r.platform] = parseInt(r.cnt);
+
+    // Last sync times
+    const lastR = await pool.query(
+      `SELECT platform, MAX(created_at) last_at FROM social_messages WHERE direction='incoming' GROUP BY platform`
+    );
+    const lastMap: Record<string, string> = {};
+    for (const r of lastR.rows) lastMap[r.platform] = r.last_at;
+
+    // OAuth connections
+    const oauthR = await pool.query(`SELECT provider, platform, connected_at, token_expiry FROM oauth_connections`).catch(() => ({ rows: [] }));
+    const oauthMap: Record<string, any> = {};
+    for (const r of oauthR.rows) oauthMap[`${r.provider}:${r.platform}`] = r;
+
+    function platformStatus(keys: string[]): string {
+      for (const k of keys) {
+        const c = cfgMap[k];
+        if (c?.status === "connected" || c?.status === "configured") return c.webhook_verified ? "healthy" : "configured";
+      }
+      return "not_connected";
+    }
+
+    const PLATFORMS = [
+      { id: "facebook_page",    label: "Facebook Pages",        icon: "facebook",   keys: ["facebook_page"] },
+      { id: "facebook_messenger", label: "Facebook Messenger",  icon: "messenger",  keys: ["facebook_messenger"] },
+      { id: "instagram",        label: "Instagram Business",     icon: "instagram",  keys: ["instagram"] },
+      { id: "instagram_dm",     label: "Instagram Direct",       icon: "instagram",  keys: ["instagram_dm"] },
+      { id: "facebook_leads",   label: "Facebook Lead Ads",      icon: "facebook",   keys: ["facebook_leads"] },
+      { id: "instagram_leads",  label: "Instagram Lead Ads",     icon: "instagram",  keys: ["instagram", "instagram_dm"] },
+      { id: "fb_comments",      label: "Facebook Comments",      icon: "facebook",   keys: ["facebook_page"] },
+      { id: "ig_comments",      label: "Instagram Comments",     icon: "instagram",  keys: ["instagram"] },
+      { id: "whatsapp",         label: "WhatsApp Business",      icon: "whatsapp",   keys: ["whatsapp_botbee", "whatsapp_meta"] },
+      { id: "google_business",  label: "Google Business Profile",icon: "google",     keys: ["google_business"] },
+      { id: "youtube",          label: "YouTube",                icon: "youtube",    keys: ["youtube"] },
+      { id: "linkedin",         label: "LinkedIn",               icon: "linkedin",   keys: ["linkedin"] },
+      { id: "twitter_x",        label: "X (Twitter)",            icon: "x",          keys: ["twitter_x", "twitter"] },
+      { id: "website_form",     label: "Website Forms",          icon: "web",        keys: ["website_contact", "website_booking"] },
+      { id: "website_livechat", label: "Website Live Chat",      icon: "chat",       keys: ["website_livechat", "website_ai_chat"] },
+      { id: "email_enquiry",    label: "Email Enquiries",        icon: "email",      keys: ["smtp_email"] },
+    ];
+
+    const channels = PLATFORMS.map(p => {
+      const allKeys = p.keys;
+      const cfg = allKeys.map(k => cfgMap[k]).find(Boolean);
+      const msgCount = allKeys.reduce((s, k) => s + (leadMap[k] || 0), 0);
+      const errCount = allKeys.reduce((s, k) => s + (errMap[k] || 0), 0);
+      const lastSync = allKeys.map(k => lastMap[k]).filter(Boolean).sort().reverse()[0] || null;
+      const oauthConn = oauthMap[`meta:${p.id}`] || oauthMap[`google:${p.id}`] || null;
+      let status = "not_connected";
+      if (p.id === "whatsapp") {
+        const wa = cfgMap["whatsapp_meta"] || cfgMap["whatsapp_botbee"];
+        status = wa ? "healthy" : "not_connected";
+      } else {
+        status = platformStatus(allKeys);
+      }
+      return {
+        id: p.id, label: p.label, icon: p.icon,
+        status,
+        connected: status !== "not_connected",
+        webhook_verified: cfg?.webhook_verified || false,
+        last_sync: lastSync,
+        messages_30d: msgCount,
+        errors_7d: errCount,
+        token_expiry: oauthConn?.token_expiry || cfg?.extra?.token_expiry || null,
+        account_id: cfg?.extra?.page_id || cfg?.extra?.instagram_account_id || cfg?.extra?.phone_number_id || null,
+      };
+    });
+
+    res.json({ ok: true, channels, updated_at: new Date().toISOString() });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
