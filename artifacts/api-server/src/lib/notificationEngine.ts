@@ -1218,7 +1218,28 @@ export async function retryNotification(logId: string): Promise<{ success: boole
     let providerResponse: unknown = null;
 
     if (channel === "whatsapp") {
-      const result = await sendWhatsApp(log.recipient, message);
+      const { sendTemplate: bbSendTemplate, sendText: bbSendText } = await import("./botbee.js");
+      const reqPayload = log.request_payload as any;
+      const storedTemplateId = reqPayload?.template_id?.toString() || reqPayload?.template_name;
+      const storedVars = reqPayload?.variables &&
+        typeof reqPayload.variables === "object" &&
+        !Array.isArray(reqPayload.variables)
+          ? reqPayload.variables as Record<string, string>
+          : undefined;
+      let result: any;
+      if (storedTemplateId) {
+        // Template retry: always use BotBee template API + original named vars
+        result = await bbSendTemplate(log.recipient, storedTemplateId, {
+          eventType: log.event_type,
+          forceTemplateApi: true,
+          variables: storedVars,
+          bookingId: log.booking_id,
+          customerId: log.customer_id,
+        });
+      } else {
+        // Plain text retry — falls back to text API (may fail outside 24h)
+        result = await bbSendText(log.recipient, message, { eventType: log.event_type });
+      }
       status = result.ok ? "sent" : "failed"; providerResponse = result;
     } else if (channel === "sms") {
       const smsLib = await import("./sms.js");

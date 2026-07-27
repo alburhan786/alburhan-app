@@ -1,0 +1,281 @@
+CRITICAL PRODUCTION BLOCKER
+
+Ignore previous PASS reports.
+
+The production system is still failing.
+
+Do NOT rely on unit tests or e2e mocks.
+
+Use ONE REAL BOOKING in production and trace every notification.
+
+========================================
+CURRENT FAILURES
+========================================
+
+1. WhatsApp variables are NOT substituted.
+
+Customers receive:
+
+#!Name!#
+#!BookingID!#
+#!PackageContent!#
+#!Amount!#
+#!Agreement!#
+#!Download!#
+#!Paymenturllink!#
+
+These placeholders MUST NEVER reach customers.
+
+2. SMS
+
+Many notification events never arrive.
+
+3. Email
+
+No production emails are received.
+
+4. Push Notifications
+
+Customers receive nothing.
+
+5. Dashboard notifications
+
+Some workflow events create no notification.
+
+========================================
+TRACE THE ENTIRE PIPELINE
+========================================
+
+Booking Database
+
+↓
+
+Notification Event
+
+↓
+
+Notification Engine
+
+↓
+
+Variable Resolver
+
+↓
+
+Template Renderer
+
+↓
+
+WhatsApp
+
+↓
+
+SMS
+
+↓
+
+Email
+
+↓
+
+Push
+
+↓
+
+Dashboard
+
+Audit every stage.
+
+========================================
+WHATSAPP
+========================================
+
+Log the EXACT payload sent to BotBee.
+
+Verify every placeholder is replaced BEFORE API call.
+
+Log:
+
+Booking ID
+
+Rendered message
+
+Variables object
+
+BotBee payload
+
+API response
+
+If any placeholder remains,
+
+FAIL the notification.
+
+Never send it.
+
+========================================
+SMS
+========================================
+
+Audit every workflow event.
+
+booking_submitted
+
+booking_approved
+
+payment_pending
+
+payment_received
+
+invoice_ready
+
+agreement_ready
+
+agreement_signed
+
+documents_required
+
+documents_verified
+
+visa_issued
+
+ticket_ready
+
+hotel_assigned
+
+room_allocation
+
+departure
+
+return
+
+Verify:
+
+DLT template
+
+Template ID
+
+Rendered body
+
+Fast2SMS response
+
+Delivery response
+
+========================================
+EMAIL
+========================================
+
+Check SMTP.
+
+Verify:
+
+SMTP_HOST
+
+SMTP_PORT
+
+SMTP_USERNAME
+
+SMTP_PASSWORD
+
+FROM_EMAIL
+
+Queue worker
+
+Mail logs
+
+Send a REAL email.
+
+Confirm it reaches the inbox.
+
+Log SMTP transaction.
+
+========================================
+PUSH
+========================================
+
+Verify Firebase.
+
+Check:
+
+Device Token
+
+FCM credentials
+
+Push queue
+
+Delivery logs
+
+Send a real push notification.
+
+========================================
+DASHBOARD
+========================================
+
+Every event must create:
+
+Unread notification
+
+Badge count
+
+Clickable notification
+
+Correct URL
+
+========================================
+FAIL SAFELY
+========================================
+
+If any required variable is missing:
+
+DO NOT SEND.
+
+Log:
+
+Template
+
+Booking ID
+
+Missing field
+
+Retry automatically after data exists.
+
+========================================
+FINAL REPORT
+========================================
+
+Provide a table:
+
+Notification
+
+Rendered Message
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+Dashboard
+
+PASS / FAIL
+
+Include the ACTUAL rendered WhatsApp payload showing:
+
+Customer Name
+
+Booking ID
+
+Package
+
+Amount
+
+Agreement Number
+
+Payment Link
+
+Download Link
+
+No unresolved placeholders.
+
+Do not declare production complete until every real notification works successfully.

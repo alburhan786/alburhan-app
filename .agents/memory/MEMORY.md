@@ -10,6 +10,8 @@
 - [reminder_logs timestamp column](reminder-logs-sent-at.md) — reminder_logs uses sent_at (NOT created_at); any index on reminder_logs timestamp must reference sent_at DESC
 - [Lead Intelligence module](lead-intelligence.md) — leads table has score/score_factors/dedup cols; computeLeadScore in enterprise.ts; GET /leads does LEFT JOIN social_messages for conversation_count; lead_assignment_rules table for auto-assign
 - [DB pool init — override guard](db-pool-init-override.md) — lib/db Pool created at module-init; env reader must use unconditional `process.env[key]=val` (not !process.env[key]) or PM2's 16-char placeholder wins
+- [WhatsApp retry engine fix](wa-retry-engine-fix.md) — retries must use forceTemplateApi:true + stored variables from request_payload; plain-text (no templateId) retries mark permanently_failed immediately
+- [SMS missing DLT templates](sms-missing-dlt-templates.md) — agreement_ready/signed/partial_payment have no DLT IDs; custom_sms 211277 invalid; 9 working templates listed (219801-219805, 214139, 214142-214144, 214148)
 - [BotBee variable substitution — definitive](botbee-named-variables.md) — send NAMED OBJECT matching variable_map keys; flat arrays get wamid but #!Name!# stays unsubstituted; forceTemplateApi:true required in all ERP sends
 - [hajj_groups schema](hajj-groups-schema.md) — column is group_name (NOT name); g.name in any JOIN causes "column does not exist" error
 - [OTP DLT production configuration](otp-dlt-config.md) — sender=ALBURH (NOT ABURHA), template=164844; migration endpoints to configure + test; pre-send validation required

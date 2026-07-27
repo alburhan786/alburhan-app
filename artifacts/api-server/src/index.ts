@@ -2778,13 +2778,31 @@ async function start() {
 
             const reqPayload = log.request_payload as any;
             const templateId = reqPayload?.template_id || reqPayload?.template?.id;
-            const message = log.message;
             let result: any;
             if (templateId) {
-              result = await sendTemplate(log.recipient, String(templateId), { eventType: log.event_type });
-            } else if (message) {
-              result = await sendText(log.recipient, message.replace(/^\[template(?:_id)?[^\]]*\] /, ""), { eventType: log.event_type });
-            } else { continue; }
+              // Re-use original named variables so BotBee substitutes #!VarName!# correctly.
+              // Always force template API — plain text (session) retries always fail outside 24h.
+              const origVars = reqPayload?.variables &&
+                typeof reqPayload.variables === "object" &&
+                !Array.isArray(reqPayload.variables)
+                  ? reqPayload.variables as Record<string, string>
+                  : undefined;
+              result = await sendTemplate(log.recipient, String(templateId), {
+                eventType: log.event_type,
+                forceTemplateApi: true,
+                variables: origVars,
+                bookingId: log.booking_id,
+                customerId: log.customer_id,
+              });
+            } else {
+              // No template ID — was a plain text send; text API always fails outside 24h.
+              // Mark permanently_failed immediately rather than burning retries.
+              await pool.query(
+                `UPDATE notification_logs SET status='permanently_failed', updated_at=NOW() WHERE id=$1`,
+                [log.id]
+              ).catch(() => {});
+              continue;
+            }
 
             // If this attempt itself returned a permanent error, mark done immediately
             const resultMsg = result?.errorMessage || JSON.stringify(result);
