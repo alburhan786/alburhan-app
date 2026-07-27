@@ -179,3 +179,20 @@ Packages have a `details` JSONB column for structured fields:
 
 Run after changing openapi.yaml:
 `pnpm --filter @workspace/api-spec run codegen`
+
+## User Preferences
+
+### Engineering Standards (applies to every task, no exceptions)
+
+> "No more isolated features. Every new feature must be production-ready, modular, documented, tested, and integrated with the existing ERP. Avoid duplicate code. Keep the architecture ready for future SaaS multi-tenancy, but do not implement multi-tenancy until the ERP is stable."
+
+In practice this means:
+
+1. **Production-ready** — full error handling, input validation, meaningful HTTP status codes, no silent failures or empty catch blocks.
+2. **Modular** — new logic goes in its own lib/service file; routes stay thin (call a function, return a response); no 500-line route handlers.
+3. **Documented** — every non-trivial function gets a JSDoc comment explaining what it does, its params, and what it returns. Schema changes get a migration comment.
+4. **Tested before delivery** — smoke-test every new endpoint on VPS (curl or Playwright); do not hand work back to the user without verifying it works end-to-end.
+5. **Integrated** — new features must hook into the existing notification engine, timeline, audit log, and admin sidebar. No feature is "done" if it's unreachable from the UI.
+6. **No duplicate code** — before writing a new helper, grep for an existing one. Reuse `pool.query`, `apiFetch`, `useToast`, existing Zod schemas, etc.
+7. **Tenant-ready architecture** — new DB tables must include a `tenant_id TEXT NOT NULL DEFAULT 'default'` column; new API routes must thread `req.tenantId` (defaulting to `'default'`) through to queries. Do NOT implement tenant isolation logic yet — just keep the column there.
+8. **Prioritise business value** — no cosmetic-only changes unless the user explicitly asks.
