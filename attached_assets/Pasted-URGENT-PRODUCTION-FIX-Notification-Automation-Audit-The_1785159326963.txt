@@ -1,0 +1,130 @@
+URGENT PRODUCTION FIX – Notification Automation Audit
+
+The notification engine is NOT production ready.
+
+Problems found:
+
+1. SMS template variables are mapped incorrectly.
+   Example:
+   Booking ID displays ₹15,22,500 instead of ABT2026000007.
+   Total Amount is empty.
+   Package Name missing.
+   Payment Link missing.
+
+2. Customer is NOT receiving many required SMS notifications:
+   - Booking Received
+   - Booking Approved
+   - Pending Payment Reminder
+   - Payment Received
+   - Booking Confirmation
+   - Agreement Ready
+   - Agreement Signed
+   - Document Upload Reminder
+   - Document Approved
+   - Visa Approved
+   - Air Ticket Ready
+   - Hotel Assigned
+   - Hotel Voucher Ready
+   - Room Allocation
+   - Pilgrim ID Card
+   - Departure Reminder
+   - Return Reminder
+   - Refund (if applicable)
+
+3. WhatsApp templates are not being triggered correctly.
+   Verify every BotBee/Meta template:
+   - Variables populate correctly.
+   - No placeholder text.
+   - Correct template name.
+   - Correct language.
+   - Delivery status logged.
+
+4. Email automation is not working.
+   Verify SMTP configuration.
+   Generate and send:
+   - Invoice PDF
+   - Receipt PDF
+   - Agreement PDF
+   - Visa PDF
+   - Ticket PDF
+   - Hotel Voucher PDF
+   - Room Allocation PDF
+   - Pilgrim ID Card PDF
+
+5. Push notifications are missing.
+   Verify Firebase Cloud Messaging.
+   Customer should receive push notifications for every booking status update.
+
+6. Dashboard notifications are missing.
+   Every booking event must automatically appear in the customer dashboard.
+
+7. Verify notification workflow for every booking status:
+   Booking Submitted
+   Booking Approved
+   Payment Pending
+   Payment Received
+   Agreement Generated
+   Agreement Signed
+   Documents Uploaded
+   Documents Approved
+   Visa Approved
+   Ticket Uploaded
+   Hotel Assigned
+   Voucher Generated
+   Room Allocated
+   Departure Reminder
+   Return Reminder
+
+For every event, automatically send:
+✓ WhatsApp
+✓ SMS
+✓ Email
+✓ Push Notification
+✓ Dashboard Notification
+
+8. Verify template variable mapping.
+
+Correct mapping:
+
+Customer Name → customer.fullName
+Booking ID → booking.bookingId
+Invoice Number → invoice.invoiceNumber
+Package Name → package.name
+Package Type → package.category
+Departure Date → package.departureDate
+Return Date → package.returnDate
+Total Amount → booking.totalAmount
+Paid Amount → booking.paidAmount
+Pending Amount → booking.pendingAmount
+Payment Link → payment.paymentUrl
+Invoice Link → invoice.downloadUrl
+Agreement Link → agreement.downloadUrl
+Visa Link → visa.downloadUrl
+Ticket Link → ticket.downloadUrl
+Voucher Link → hotelVoucher.downloadUrl
+Dashboard Link → customer.dashboardUrl
+
+9. Never send a notification if required data is missing.
+Instead:
+- Log the missing field.
+- Retry after the data becomes available.
+- Record the failure reason.
+
+10. Perform a real production booking test.
+
+Create a test booking and verify every notification channel.
+
+Provide a final audit table showing:
+
+Booking Event
+SMS
+WhatsApp
+Email
+Push
+Dashboard
+PDF Generated
+Delivery Status
+
+Mark PASS or FAIL for each event.
+
+Do not mark production complete until every notification is verified with real delivery.

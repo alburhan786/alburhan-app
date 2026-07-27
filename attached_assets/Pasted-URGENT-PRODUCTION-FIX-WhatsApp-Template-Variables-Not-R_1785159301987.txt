@@ -1,0 +1,101 @@
+URGENT PRODUCTION FIX – WhatsApp Template Variables Not Replacing
+
+The WhatsApp message is delivered successfully, but the template variables are not being replaced.
+
+Current message received:
+
+#!Name!#
+#!BookingID!#
+#!PackageContent!#
+#!Amount!#
+#!Paymenturllink!#
+
+Instead of actual booking information.
+
+This is NOT a WhatsApp delivery issue.
+This is a backend template rendering issue.
+
+Tasks:
+
+1. Find every function responsible for sending booking approval WhatsApp messages.
+2. Before calling BotBee/Meta API, populate all template variables from the booking record.
+
+Required variables:
+
+Customer Name
+Booking ID
+Package Name
+Package Type
+Departure Date
+Return Date
+Total Amount
+Paid Amount
+Pending Amount
+Payment Link
+Invoice Link
+Agreement Link
+Customer Dashboard Link
+Agency Name
+Support Number
+
+Example expected message:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh Mohammed Altaf,
+
+Alhamdulillah! ✅
+
+Your booking has been APPROVED.
+
+📋 Booking ID: ABT2026000123
+
+📦 Package:
+Ramadan Umrah 2027 – Premium
+
+💰 Total Amount:
+₹1,80,000
+
+💳 Pending Amount:
+₹90,000
+
+Please complete your payment using the secure link below.
+
+🔗 https://alburhantravels.com/payment/ABT2026000123
+
+You can also download your invoice and view your booking from your customer dashboard.
+
+📞 +91 9893225590
+
+Jazak Allah Khair.
+Al Burhan Tours & Travels
+
+Requirements:
+
+• Never send placeholder text such as:
+  #!BookingID!#
+  #!Amount!#
+  #!PackageContent!#
+  #!Paymenturllink!#
+
+• If any value is missing, log the exact missing field and do not send an incomplete message.
+
+• Verify all WhatsApp templates:
+  - Booking Received
+  - Booking Approved
+  - Payment Received
+  - Agreement Ready
+  - OTP
+  - Document Upload
+  - Visa Approved
+  - Ticket Ready
+  - Hotel Voucher
+  - Room Allocation
+  - Departure Reminder
+  - Return Reminder
+
+• Verify SMS and Email use the same data source so every communication contains identical booking information.
+
+Finally, perform a real production booking test and provide:
+- Raw payload sent to BotBee/Meta
+- Variables before rendering
+- Final rendered message
+- Delivery status

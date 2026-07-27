@@ -959,6 +959,27 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
               amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : undefined,
             });
             break;
+          case "agreement_ready":
+            result = await smsLib.sendAgreementReadySMS({
+              ...smsCtx,
+              agreementNumber: (ctx as any).agreementNumber,
+              agreementUrl: (ctx as any).agreementUrl,
+            });
+            break;
+          case "agreement_signed":
+            result = await smsLib.sendAgreementSignedSMS({
+              ...smsCtx,
+              agreementNumber: (ctx as any).agreementNumber,
+            });
+            break;
+          case "room_assigned":
+          case "room_allocation":
+            result = await smsLib.sendRoomAllocationSMS({
+              ...smsCtx,
+              hotelName: (ctx as any).hotelName || ctx.hotelName,
+              roomNumber: (ctx as any).roomNumber || ctx.roomNumber,
+            });
+            break;
           default: {
             result = await smsLib.sendCustomSMS({ mobile: ctx.customerMobile, message });
             break;

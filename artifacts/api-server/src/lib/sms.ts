@@ -28,7 +28,9 @@ function getConfig() {
       partial_payment:       ex.partial_payment_tid       || ex.payment_received_tid || ex.notify_template_id || "",
       pending_payment:       ex.pending_payment_tid       || ex.notify_template_id || "",
       invoice_created:       ex.invoice_created_tid       || ex.notify_template_id || "",
+      agreement_ready:       ex.agreement_ready_tid       || ex.notify_template_id || "",
       agreement_signed:      ex.agreement_signed_tid      || ex.notify_template_id || "",
+      room_allocation:       ex.room_allocation_tid       || ex.notify_template_id || "",
       ticket_issued:         ex.ticket_issued_tid         || ex.notify_template_id || "",
       visa_issued:           ex.visa_issued_tid           || ex.notify_template_id || "",
       hotel_voucher:         ex.hotel_voucher_issued_tid  || ex.notify_template_id || "",
@@ -50,7 +52,9 @@ function getConfig() {
       partial_payment:       ex.partial_payment_sender       || globalSender,
       pending_payment:       ex.pending_payment_sender       || globalSender,
       invoice_created:       ex.invoice_created_sender       || globalSender,
+      agreement_ready:       ex.agreement_ready_sender       || globalSender,
       agreement_signed:      ex.agreement_signed_sender      || globalSender,
+      room_allocation:       ex.room_allocation_sender       || globalSender,
       ticket_issued:         ex.ticket_issued_sender         || globalSender,
       visa_issued:           ex.visa_issued_sender           || globalSender,
       hotel_voucher:         ex.hotel_voucher_sender         || globalSender,
@@ -668,6 +672,33 @@ export async function sendEidGreeting(ctx: { mobile: string; customerName: strin
     ctx.mobile, tids.eid_greeting,
     [ctx.customerName, "Al Burhan Tours & Travels", ""],
     { eventType: "feedback_request", message: `Eid greeting to ${ctx.customerName}`, customerId: ctx.customerId, senderOverride: senders.eid_greeting }
+  );
+}
+
+export async function sendAgreementReadySMS(ctx: BookingCtx & { agreementNumber?: string; agreementUrl?: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
+  return sendDLT(
+    ctx.mobile, tids.agreement_ready,
+    [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber],
+    { eventType: "agreement_ready", message: `Agreement ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_ready }
+  );
+}
+
+export async function sendAgreementSignedSMS(ctx: BookingCtx & { agreementNumber?: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
+  return sendDLT(
+    ctx.mobile, tids.agreement_signed,
+    [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber],
+    { eventType: "agreement_signed", message: `Agreement signed for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_signed }
+  );
+}
+
+export async function sendRoomAllocationSMS(ctx: BookingCtx & { hotelName?: string; roomNumber?: string }): Promise<SMSResult> {
+  const { tids, senders } = await resolveConfig();
+  return sendDLT(
+    ctx.mobile, tids.room_allocation,
+    [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel", ctx.roomNumber || "-"],
+    { eventType: "room_allocation", message: `Room allocated for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.room_allocation }
   );
 }
 

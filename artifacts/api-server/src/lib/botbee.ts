@@ -249,6 +249,7 @@ export const TEMPLATE_BODIES: Record<string, string> = {
   "410030": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nWelcome to the Kingdom of Saudi Arabia.\n\nAlhamdulillah, we pray that your Hajj/Umrah journey is filled with peace, blessings, and acceptance.\n\nIf you require any assistance during your stay, please contact our team.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
   "410031": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah!\n\nWelcome back to India.\n\nWe pray that Allah (SWT) accepts your Hajj/Umrah, forgives your sins, and grants you countless blessings.\n\nThank you for travelling with Al Burhan Tours & Travels.\n\nJazak Allah Khair.",
   "410040": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\n🕌 Hajj {{2}} Bookings Are Now Open!\n\nBook your Hajj journey with Al Burhan Tours & Travels.\n\n✅ Government Approved Services\n✅ Comfortable Accommodation\n✅ Experienced Tour Guides\n✅ Complete Visa & Travel Assistance\n\n📞 Contact: +91 9893225590\n🌐 www.alburhantravels.online\n\nReserve your seat today and begin your sacred journey with confidence.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
+  "409897": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nJazak Allah Khair for choosing Al Burhan Tours & Travels!\n\nWe have received your booking request.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Total Amount: ₹ {{4}}\n\nOur team will review and confirm your booking within 24 hours.\n\nFor queries: +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
 };
 
 /**
@@ -328,21 +329,39 @@ export async function sendTemplate(
     try {
       const { isMetaWapiConfigured, sendMetaTemplate } = await import("./metaWapi.js");
       if (isMetaWapiConfigured()) {
-        // Reverse-map numeric template ID → approved Meta template name
-        const tplEntry = Object.values(ABT_TEMPLATES).find(v => v.id === templateId);
-        const templateName = tplEntry?.name || templateId;
-        const varValues = namedVars ? Object.values(namedVars).map(v => String(v ?? "-")) : [];
-        const metaResult = await sendMetaTemplate(to, templateName, varValues, {
-          eventType: opts?.eventType,
-          bookingId: opts?.bookingId,
-          customerId: opts?.customerId,
-          customerName: opts?.customerName,
-        });
-        if (metaResult.ok) {
-          console.log(`[BotBee] Meta Cloud API ✅ ${templateName} → ${to} (wamid=${metaResult.messageId})`);
-          return { ok: true, provider: "MetaCloudAPI" as any, endpoint: metaResult.endpoint, messageId: metaResult.messageId };
+        // Look up the APPROVED Meta template name from DB (event_type is the reliable key).
+        // Fallback chain: DB approved → ABT_TEMPLATES local name → skip Meta.
+        // The local ABT_TEMPLATES[key].name (e.g. "booking_approved") often doesn't match
+        // the Meta-registered name — always prefer the DB value after syncMetaTemplates().
+        let metaTemplateName: string | null = null;
+        if (opts?.eventType) {
+          try {
+            const { pool: dbPool } = await import("@workspace/db");
+            const dbr = await dbPool.query(
+              `SELECT template_name FROM meta_templates WHERE event_type=$1 AND status='APPROVED' ORDER BY synced_at DESC LIMIT 1`,
+              [opts.eventType]
+            );
+            if (dbr.rows.length > 0) metaTemplateName = dbr.rows[0].template_name;
+          } catch {}
         }
-        console.warn(`[BotBee] Meta Cloud API failed (${metaResult.errorMessage}), falling back to BotBee text API`);
+        if (!metaTemplateName) {
+          const tplEntry = Object.values(ABT_TEMPLATES).find(v => v.id === templateId);
+          metaTemplateName = tplEntry?.name || null;
+        }
+        if (metaTemplateName) {
+          const varValues = namedVars ? Object.values(namedVars).map(v => String(v ?? "-")) : [];
+          const metaResult = await sendMetaTemplate(to, metaTemplateName, varValues, {
+            eventType: opts?.eventType,
+            bookingId: opts?.bookingId,
+            customerId: opts?.customerId,
+            customerName: opts?.customerName,
+          });
+          if (metaResult.ok) {
+            console.log(`[BotBee] Meta Cloud API ✅ ${metaTemplateName} → ${to} (wamid=${metaResult.messageId})`);
+            return { ok: true, provider: "MetaCloudAPI" as any, endpoint: metaResult.endpoint, messageId: metaResult.messageId };
+          }
+          console.warn(`[BotBee] Meta Cloud API failed (${metaResult.errorMessage}), falling back to BotBee text API`);
+        }
       }
     } catch (metaErr: any) {
       console.warn(`[BotBee] Meta Cloud API import/call error:`, metaErr?.message);
@@ -453,20 +472,17 @@ export async function sendTemplate(
     console.warn(`[BotBee] sendTemplate WARN: template ${templateId} sent with NO variables — all #!VarName!# placeholders will remain unsubstituted`);
   }
 
-  // Named object for BotBee CRM substitution of #!VarName!# in mixed_body_text.
-  // Components array for BotBee's Meta Cloud API routing ({{N}} substitution in body_content).
-  const flatValues = namedVars ? Object.values(namedVars).map(v => String(v ?? "-")) : undefined;
-  const components = flatValues?.length ? [{
-    type: "body",
-    parameters: flatValues.map(text => ({ type: "text", text })),
-  }] : undefined;
-
+  // CRITICAL — named variables ONLY, no components array.
+  // BotBee substitutes #!VarName!# in mixed_body_text when variables is a NAMED OBJECT
+  // matching the template's variable_map keys exactly.
+  // Sending components alongside variables causes BotBee to prefer the Meta components
+  // routing path which does NOT apply #!Name!# substitution in OBA delivery —
+  // the recipient then sees the raw "#!Name!#" placeholder text.
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(namedVars ? { variables: namedVars } : {}),
-    ...(components ? { components } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
@@ -474,7 +490,6 @@ export async function sendTemplate(
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(namedVars ? { variables: namedVars } : {}),
-    ...(components ? { components } : {}),
   };
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
