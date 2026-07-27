@@ -57,6 +57,8 @@ async function ensureTables() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_messages_platform ON social_messages(platform)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_messages_status ON social_messages(status)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_social_messages_lead ON social_messages(lead_text_id)`);
+  // Deduplication: unique constraint on message_id (non-null only)
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_social_messages_message_id_uniq ON social_messages(message_id) WHERE message_id IS NOT NULL`);
 
   // ── Lead assignment rules ──────────────────────────────────────────────────
   await pool.query(`
@@ -116,7 +118,8 @@ const PLATFORM_TO_SOURCE: Record<string, string> = {
   whatsapp_meta: "whatsapp",
   facebook_page: "facebook",
   facebook_messenger: "messenger",
-  facebook_leads: "facebook_ads",
+  facebook_leads: "facebook_leads",
+  facebook_comments: "facebook_leads",
   instagram: "instagram",
   instagram_dm: "instagram",
   telegram_bot: "telegram",
@@ -796,9 +799,19 @@ router.post("/webhook/meta", async (req, res) => {
             if (tkR.rows[0]) leadToken = decryptExtra(tkR.rows[0].extra_fields_encrypted).page_access_token || null;
           } catch {}
 
-          // Retrieve full lead data from Graph API
+          // Baseline ad data from webhook payload (always available)
           let leadFields: Record<string, string> = {};
-          let adData: Record<string, string> = {};
+          let adData: Record<string, string> = {
+            ad_id: String(change.value.adgroup_id || change.value.ad_id || ""),
+            ad_name: String(change.value.ad_name || ""),
+            adset_id: String(change.value.adset_id || ""),
+            adset_name: String(change.value.adset_name || ""),
+            campaign_id: String(change.value.campaign_id || ""),
+            campaign_name: String(change.value.campaign_name || ""),
+            form_id: formId,
+          };
+
+          // Enrich from Graph API if token available
           if (leadToken) {
             try {
               const gr = await fetch(
@@ -811,12 +824,14 @@ router.post("/webhook/meta", async (req, res) => {
                   leadFields[String(f.name).toLowerCase().replace(/\s+/g, "_")] = Array.isArray(f.values) ? f.values[0] : String(f.values || "");
                 }
               }
-              adData = {
-                ad_id: gd.ad_id || "", ad_name: gd.ad_name || "",
-                adset_id: gd.adset_id || "", adset_name: gd.adset_name || "",
-                campaign_id: gd.campaign_id || "", campaign_name: gd.campaign_name || "",
-                form_id: gd.form_id || formId,
-              };
+              // Override with richer Graph API data where available
+              if (gd.ad_id) adData.ad_id = gd.ad_id;
+              if (gd.ad_name) adData.ad_name = gd.ad_name;
+              if (gd.adset_id) adData.adset_id = gd.adset_id;
+              if (gd.adset_name) adData.adset_name = gd.adset_name;
+              if (gd.campaign_id) adData.campaign_id = gd.campaign_id;
+              if (gd.campaign_name) adData.campaign_name = gd.campaign_name;
+              if (gd.form_id) adData.form_id = gd.form_id;
             } catch (e: any) {
               console.warn("[LeadAds] Graph field retrieval failed:", e.message);
             }
@@ -861,15 +876,19 @@ router.post("/webhook/meta", async (req, res) => {
                   package_interest = COALESCE(NULLIF($5,''), package_interest),
                   travel_month     = COALESCE(NULLIF($6,''), travel_month),
                   travellers_count = COALESCE(NULLIF($7,'')::int, travellers_count),
-                  meta_lead_id = $8,
-                  utm_params   = COALESCE(utm_params, $9::jsonb),
-                  updated_at   = NOW()
+                  meta_lead_id     = $8,
+                  campaign_name    = COALESCE(NULLIF($9,''), campaign_name),
+                  form_id          = COALESCE(NULLIF($10,''), form_id),
+                  utm_params       = COALESCE(utm_params, $11::jsonb),
+                  updated_at       = NOW()
                 WHERE id = $1
               `, [
                 newLeadId, email || "", city || "", budget || "",
                 pkgInterest || "", travelMonth || "",
                 travellers && !isNaN(parseInt(travellers)) ? parseInt(travellers) : null,
                 leadgenId,
+                adData.campaign_name || "",
+                adData.form_id || "",
                 JSON.stringify({ ad_id: adData.ad_id, ad_name: adData.ad_name, campaign_id: adData.campaign_id, campaign_name: adData.campaign_name, form_id: adData.form_id }),
               ]).catch(() => {});
             }
