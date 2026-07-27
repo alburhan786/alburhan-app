@@ -87,6 +87,7 @@ import OTPDebug from "@/pages/admin/OTPDebug";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
+import SocialLeadPipeline from "@/pages/admin/SocialLeadPipeline";
 import KYCPage from "@/pages/customer/KYC";
 import FeedbackPage from "@/pages/public/FeedbackPage";
 import FeedbackManager from "@/pages/admin/FeedbackManager";
@@ -434,6 +435,7 @@ function Router() {
       <Route path="/admin/inbox" component={() => <AdminRoute component={OmnichannelInbox} />} />
       <Route path="/admin/communication-center" component={() => <AdminRoute component={CommunicationCenter} />} />
       <Route path="/admin/botbee-dashboard" component={() => <AdminRoute component={BotBeeDashboard} />} />
+      <Route path="/admin/social-lead-pipeline" component={() => <AdminRoute component={SocialLeadPipeline} />} />
       <Route path="/admin/social-hub" component={() => <AdminRoute component={SocialIntegrationHub} />} />
       <Route path="/admin/social-media" component={() => <AdminRoute component={SocialMediaCenter} />} />
       <Route path="/admin/meta-health" component={() => <AdminRoute component={MetaHealth} />} />

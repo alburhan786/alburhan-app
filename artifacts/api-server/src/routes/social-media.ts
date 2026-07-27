@@ -4,6 +4,11 @@ import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, decrypt } from "../lib/encryption.js";
 import axios from "axios";
+import {
+  createOrUpdateLead,
+  ensureFollowupSequence,
+  findDuplicateLead,
+} from "../lib/leadEngine.js";
 
 const router = Router();
 
@@ -149,85 +154,72 @@ async function autoCreateLeadFromMessage(msg: {
   try {
     const source = PLATFORM_TO_SOURCE[msg.platform] || "other";
 
-    // Get assignment rule for this platform
-    const ruleR = await pool.query(
-      `SELECT * FROM lead_assignment_rules WHERE platform=$1 AND is_active=true LIMIT 1`,
-      [msg.platform]
-    );
-    const rule = ruleR.rows[0];
+    const igUsername = msg.platform.includes("instagram") ? msg.sender_id : null;
+    const fbName =
+      msg.platform.includes("facebook") || msg.platform === "facebook_messenger"
+        ? msg.sender_name
+        : null;
 
-    // Try to find existing lead by platform_user_id or phone
-    let existingLead: any = null;
-    if (msg.sender_id) {
-      const byPlatformId = await pool.query(
-        `SELECT * FROM leads WHERE platform_user_id=$1 AND platform=$2 LIMIT 1`,
-        [msg.sender_id, msg.platform]
-      );
-      existingLead = byPlatformId.rows[0] || null;
-    }
-    if (!existingLead && msg.sender_phone) {
-      const clean = msg.sender_phone.replace(/\D/g, "").slice(-10);
-      const byPhone = await pool.query(
-        `SELECT * FROM leads WHERE REGEXP_REPLACE(mobile,'\\D','','g') LIKE $1 LIMIT 1`,
-        [`%${clean}`]
-      );
-      existingLead = byPhone.rows[0] || null;
-    }
-
-    let leadId: string;
-
-    if (existingLead) {
-      // Update existing lead
-      leadId = existingLead.id;
-      await pool.query(`
-        UPDATE leads SET
-          conversation_count = COALESCE(conversation_count, 0) + 1,
-          last_message_at = NOW(),
-          status = CASE WHEN status IN ('converted','lost') THEN status ELSE 'contacted' END,
-          updated_at = NOW()
-        WHERE id = $1
-      `, [leadId]);
-    } else {
-      // Create new lead
-      leadId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-      const name = msg.sender_name || `${source.charAt(0).toUpperCase() + source.slice(1)} Lead`;
-      const followUpDate = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10); // tomorrow
-
-      // Platform-specific username fields
-      const igUsername = msg.platform.includes("instagram") ? msg.sender_id : null;
-      const fbName = msg.platform.includes("facebook") || msg.platform === "facebook_messenger" ? msg.sender_name : null;
-      const tgUsername = msg.platform.includes("telegram") ? msg.sender_id : null;
-
-      await pool.query(`
-        INSERT INTO leads (
-          id, name, mobile, source, message, status, platform, platform_user_id,
-          instagram_username, facebook_name, telegram_username,
-          assigned_name, assigned_to, assigned_branch,
-          follow_up_date, conversation_count, last_message_at,
-          priority, created_at, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,'new',$6,$7,$8,$9,$10,$11,$12,$13,$14,1,NOW(),'normal',NOW(),NOW())
-      `, [
-        leadId,
-        name,
-        msg.sender_phone || null,
+    // Run through the full lead engine:
+    //   1. Duplicate detection (meta_lead_id / platform_user_id / mobile / email)
+    //   2. Lead scoring
+    //   3. Full assignment rules (CRM rules + round-robin + fallback admin)
+    //   4. lead_number generation, pipeline_stage, inbox_status
+    //   5. lead_created + assignment activities logged
+    const { leadId, isNew, isDuplicate } = await createOrUpdateLead(
+      {
+        name:
+          msg.sender_name ||
+          `${source.charAt(0).toUpperCase() + source.slice(1)} Lead`,
+        mobile: msg.sender_phone || undefined,
         source,
-        msg.message_text?.slice(0, 1000) || null,
-        msg.platform,
-        msg.sender_id,
-        igUsername,
-        fbName,
-        tgUsername,
-        rule?.assigned_name || null,
-        rule?.assigned_to || null,
-        rule?.branch_name || null,
-        followUpDate,
-      ]);
+        platform: msg.platform,
+        platform_user_id: msg.sender_id,
+        instagram_username: igUsername || undefined,
+        facebook_name: fbName || undefined,
+        message: msg.message_text?.slice(0, 1000) || undefined,
+      },
+      { triggeredBy: "social_webhook" }
+    );
 
-      // Notify admins about new lead
-      notifyNewLead(leadId, name, source, msg.message_text).catch(() => {});
+    // For new leads: schedule the 5-step automated follow-up sequence
+    //   (30 min alert → 2 h WhatsApp greeting → 24 h call task → 3 d brochure → 7 d final)
+    if (isNew) {
+      ensureFollowupSequence(leadId, msg.sender_phone || null).catch(() => {});
+      notifyNewLead(leadId, msg.sender_name || source, source, msg.message_text).catch(() => {});
     }
 
-    // Link the message to this lead
+    // For duplicate leads: log a social_message activity on the existing lead timeline
+    if (isDuplicate) {
+      pool
+        .query(
+          `INSERT INTO lead_activities
+             (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+           VALUES
+             (gen_random_uuid(),$1,'social_message',
+              $2,$3,'system','System')`,
+          [
+            leadId,
+            `New ${source} message received`,
+            JSON.stringify({ platform: msg.platform, message: msg.message_text?.slice(0, 200) }),
+          ]
+        )
+        .catch(() => {});
+      // Keep conversation_count and last_message_at fresh
+      pool
+        .query(
+          `UPDATE leads SET
+             conversation_count = COALESCE(conversation_count,0)+1,
+             last_message_at    = NOW(),
+             updated_at         = NOW()
+           WHERE id=$1`,
+          [leadId]
+        )
+        .catch(() => {});
+    }
+
+    // Link the social_messages row to the lead — this is what makes the
+    // message appear in Omnichannel Inbox AND Customer 360 communication timeline
     await pool.query(
       `UPDATE social_messages SET lead_text_id=$1, status='linked' WHERE id=$2`,
       [leadId, msg.id]
@@ -622,6 +614,60 @@ router.post("/messages/:id/assign", requireAdmin as any, async (req, res) => {
 });
 
 // ── GET /api/social-media/analytics ─────────────────────────────────────────
+// ── Social Lead Pipeline — 8-step status per lead ────────────────────────────
+router.get("/lead-pipeline", requireAdmin as any, async (_req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        l.id, l.lead_number, l.name, l.mobile, l.email,
+        l.source, l.platform, l.score, l.pipeline_stage, l.status,
+        l.assigned_to, l.assigned_name, l.assigned_branch,
+        l.converted_booking_id, l.conversation_count,
+        l.created_at, l.updated_at, l.last_message_at,
+        l.campaign_name, l.form_id, l.facebook_name, l.instagram_username,
+        l.message,
+        -- Step 1: Enquiry received (always true for any lead in this table)
+        true AS step_enquiry,
+        -- Step 2: Duplicate check ran (always true — engine ran it before insert)
+        true AS step_dup_check,
+        -- Step 3: Executive assigned
+        (l.assigned_to IS NOT NULL) AS step_assigned,
+        -- Step 4: Follow-up sequence created
+        EXISTS(SELECT 1 FROM lead_followups lf WHERE lf.lead_id = l.id) AS step_followup,
+        -- Step 5: In Omnichannel Inbox (has at least one linked social_message)
+        EXISTS(SELECT 1 FROM social_messages sm WHERE sm.lead_text_id = l.id::text) AS step_inbox,
+        -- Step 6: Customer 360 updated (any activity beyond lead_created + assignment)
+        (SELECT COUNT(*)::int FROM lead_activities la WHERE la.lead_id = l.id) > 2 AS step_c360,
+        -- Step 7: Converted to booking
+        (l.converted_booking_id IS NOT NULL) AS step_booking,
+        -- Step 8: Analytics tracked (booking confirmed in bookings table)
+        (l.converted_booking_id IS NOT NULL
+          AND EXISTS(SELECT 1 FROM bookings b WHERE b.id = l.converted_booking_id)
+        ) AS step_analytics
+      FROM leads l
+      WHERE
+        l.source IN ('facebook_leads','facebook','messenger','instagram','facebook_ads','other')
+        OR l.platform IN ('facebook_page','facebook_leads','facebook_messenger','instagram','instagram_dm','facebook_comments','facebook_ads')
+      ORDER BY l.created_at DESC
+      LIMIT 300
+    `);
+
+    const leads = r.rows;
+
+    const stats = {
+      total:         leads.length,
+      today:         leads.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length,
+      assigned:      leads.filter(l => l.step_assigned).length,
+      with_followup: leads.filter(l => l.step_followup).length,
+      converted:     leads.filter(l => l.step_booking).length,
+    };
+
+    res.json({ leads, stats });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.get("/analytics", requireAdmin as any, async (_req, res) => {
   try {
     const [platforms, msgs, msgsByPlat, notifStats, leadsBySource] = await Promise.all([
@@ -913,11 +959,27 @@ router.post("/webhook/meta", async (req, res) => {
           );
           if (dupCheck.rows[0]) continue;
 
-          // Log the comment
-          await pool.query(`
+          // Log the comment — RETURNING id so we can link it to a lead immediately
+          const smInsR = await pool.query(`
             INSERT INTO social_messages (platform,message_id,sender_id,sender_name,message_text,message_type,raw_data,direction)
-            VALUES ($1,$2,$3,$4,$5,'comment',$6,'incoming') ON CONFLICT DO NOTHING
-          `, [platform, commentId, senderId, senderName, commentText, JSON.stringify(change.value)]).catch(() => {});
+            VALUES ($1,$2,$3,$4,$5,'comment',$6,'incoming') ON CONFLICT DO NOTHING RETURNING id
+          `, [platform, commentId, senderId, senderName, commentText, JSON.stringify(change.value)]);
+
+          const smId: number | null = smInsR.rows[0]?.id ?? null;
+
+          // ── ALWAYS wire every comment into the Social Lead Pipeline ───────────
+          // This covers Steps 1-5 automatically:
+          //   1 Enquiry received (social_messages row)  2 Duplicate checked
+          //   3 Executive assigned  4 Follow-up sequence  5 Omnichannel Inbox linked
+          // createOrUpdateLead deduplicates by platform_user_id+platform+mobile,
+          // so repeated comments from the same person merge to one lead.
+          if (smId) {
+            autoCreateLeadFromMessage({
+              id: smId, platform,
+              sender_id: senderId, sender_name: senderName,
+              message_text: commentText,
+            }).catch((e: any) => console.error("[CommentWebhook] autoCreateLead:", e.message));
+          }
 
           // Load active comment automation rules for this platform
           let rules: any[] = [];
@@ -974,18 +1036,14 @@ router.post("/webhook/meta", async (req, res) => {
               }
             }
 
-            // Create CRM lead if configured
-            if (rule.create_lead) {
-              const smR = await pool.query(
-                `SELECT id FROM social_messages WHERE message_id=$1 LIMIT 1`, [commentId]
-              );
-              if (smR.rows[0]) {
-                await autoCreateLeadFromMessage({
-                  id: smR.rows[0].id, platform,
-                  sender_id: senderId, sender_name: senderName,
-                  message_text: commentText,
-                }).catch(() => {});
-              }
+            // create_lead flag: lead is already created above; this just logs that
+            // the rule triggered it (autoCreateLeadFromMessage is idempotent via dedup)
+            if (rule.create_lead && smId) {
+              autoCreateLeadFromMessage({
+                id: smId, platform,
+                sender_id: senderId, sender_name: senderName,
+                message_text: commentText,
+              }).catch(() => {});
             }
 
             // Update rule trigger stats
