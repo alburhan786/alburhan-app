@@ -22,11 +22,21 @@ export const META_PHONE_NUMBER_ID = "965912196611113"; // fallback default
 // Retry schedule: retry_count index → minutes to wait before next attempt
 const RETRY_SCHEDULE_MINUTES = [1, 5, 15, 30, 60, 1440]; // 1m,5m,15m,30m,1h,24h
 
+// ── Runtime token override ─────────────────────────────────────────────────────
+// esbuild replaces process.env.META_ACCESS_TOKEN with a compile-time constant ("").
+// autoSyncBotBeeMetaToken() calls setMetaRuntimeToken() to inject the live BotBee
+// WABA token at runtime, bypassing the esbuild define substitution entirely.
+let _runtimeMetaToken = "";
+export function setMetaRuntimeToken(token: string): void {
+  _runtimeMetaToken = token.trim();
+  console.log(`[MetaWAPI] Runtime token set (len=${_runtimeMetaToken.length}) — Meta Cloud API ${_runtimeMetaToken.length > 10 ? "ENABLED" : "DISABLED"}`);
+}
+
 // ── Credentials ───────────────────────────────────────────────────────────────
 
 function getMeta() {
   const cfg = getCachedConfig("meta_wapi");
-  const token          = (cfg?.apiKey                       || process.env.META_ACCESS_TOKEN          || "").trim();
+  const token          = (cfg?.apiKey || _runtimeMetaToken || process.env.META_ACCESS_TOKEN || "").trim();
   const phoneId        = (cfg?.extra?.phone_number_id       || process.env.META_PHONE_NUMBER_ID       || META_PHONE_NUMBER_ID).trim();
   const wabaId         = (cfg?.extra?.waba_id               || process.env.META_WABA_ID               || "").trim();
   const businessId     = (cfg?.extra?.business_account_id   || process.env.META_BUSINESS_ACCOUNT_ID   || "").trim();
@@ -202,7 +212,7 @@ export async function sendMetaTemplate(
     type: "template",
     template: {
       name: templateName,
-      language: { code: opts?.languageCode || "en" },
+      language: { code: opts?.languageCode || "en_US" },
       ...(variables.length > 0 ? {
         components: [{
           type: "body",
@@ -706,8 +716,8 @@ async function logMetaResult(opts: {
       `INSERT INTO notification_logs
        (id, event_type, channel, recipient, customer_id, booking_id, customer_name, booking_number,
         template, message, status, provider_name, api_endpoint, http_status,
-        request_payload, provider_response, error_code, wamid, created_at, updated_at)
-       VALUES ($1,$2,'whatsapp',$3,$4,$5,$6,$7,$8,$9,$10,'MetaCloudAPI',$11,$12,$13,$14,$15,$16,NOW(),NOW())`,
+        request_payload, provider_response, error_code, wamid, sent_at, created_at, updated_at)
+       VALUES ($1,$2,'whatsapp',$3,$4,$5,$6,$7,$8,$9,$10,'MetaCloudAPI',$11,$12,$13,$14,$15,$16,CASE WHEN $10='sent' THEN NOW() ELSE NULL END,NOW(),NOW())`,
       [
         id, opts.eventType, opts.recipient,
         opts.customerId || null, opts.bookingId || null,

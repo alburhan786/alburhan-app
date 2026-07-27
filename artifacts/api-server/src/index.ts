@@ -2481,6 +2481,15 @@ async function start() {
   const { initApiSettingsProvider } = await import("./lib/apiSettingsProvider.js");
   await initApiSettingsProvider();
 
+  // Auto-configure Meta Cloud API from BotBee's embedded WABA token.
+  // This enables proper {{1}},{{2}} variable substitution — BotBee's own template API never substitutes.
+  import("./lib/botbee.js").then(({ autoSyncBotBeeMetaToken }) => {
+    autoSyncBotBeeMetaToken().then(r => {
+      if (r.ok) console.log("[Startup] Meta Cloud API ✅:", r.message);
+      else console.warn("[Startup] Meta Cloud API not configured:", r.message);
+    }).catch(err => console.warn("[Startup] autoSyncBotBeeMetaToken failed (non-fatal):", err?.message));
+  }).catch(() => {});
+
   try {
     await db.update(usersTable)
       .set({ role: "admin" })

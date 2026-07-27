@@ -1,0 +1,125 @@
+STOP marking this task complete.
+
+The production system is still failing.
+
+Real production results:
+
+1. WhatsApp messages still contain raw placeholders:
+#!Name!#
+#!BookingID!#
+#!PackageContent!#
+#!Amount!#
+#!Agreement!#
+#!Download!#
+#!Paymenturllink!#
+
+2. Email notifications are not received.
+
+3. Push notifications are not received.
+
+4. Many SMS notifications are not received.
+
+The BotBee API request succeeding is NOT sufficient. I need proof that the customer receives the correct message.
+
+===================================================
+
+Perform a complete production audit.
+
+A. Capture the exact payload sent to BotBee.
+
+B. Capture BotBee's HTTP response.
+
+C. Capture the webhook delivery callback.
+
+D. Compare the delivered WhatsApp message with the payload.
+
+===================================================
+
+For every notification event:
+
+booking_submitted
+booking_approved
+payment_pending
+partial_payment
+payment_received
+invoice_ready
+agreement_ready
+agreement_signed
+visa_issued
+ticket_issued
+flight_ready
+hotel_assigned
+room_allocated
+departure_reminder
+return_flight
+orientation
+welcome
+
+Verify:
+
+• WhatsApp
+• SMS
+• Email
+• Push Notification
+• Customer Dashboard
+
+===================================================
+
+Variable Mapping
+
+Verify these values exist before sending:
+
+customer.full_name
+booking.booking_id
+package.package_name
+invoice.total_amount
+agreement.agreement_number
+agreement.download_url
+payment.payment_url
+
+If any value is null or undefined, stop sending and log the failure.
+
+===================================================
+
+Email
+
+Check:
+
+SMTP configuration
+Authentication
+Mail queue
+Retry queue
+DNS
+SPF
+DKIM
+DMARC
+Mail server logs
+
+Send a real email and verify it arrives.
+
+===================================================
+
+Push
+
+Check:
+
+Firebase credentials
+FCM server
+Device token
+Notification queue
+Customer device registration
+
+===================================================
+
+Do NOT report PASS based on API success.
+
+Only report PASS after:
+
+1. WhatsApp shows actual Booking ID, Package, Amount and Payment Link.
+2. SMS is received.
+3. Email is received.
+4. Push notification is received.
+5. Dashboard notification appears.
+6. PDFs (Invoice, Agreement, Voucher, Ticket) open correctly.
+
+Attach screenshots and logs for every successful notification.

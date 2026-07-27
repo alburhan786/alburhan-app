@@ -68,7 +68,7 @@ function getFast2SMSExtra() {
     // Hardcoded DLT defaults: otp_template_id=164844, notify_template_id=211277, sender=ALBURH
     // DB non-empty values override these via getCachedConfig() merge logic.
     otp_template_id:    ex.otp_template_id    || "164844",
-    notify_template_id: ex.notify_template_id  || "211277",
+    notify_template_id: ex.notify_template_id  || "",
   };
 }
 

@@ -476,10 +476,18 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
       const result = await sendEmail(ctx.customerEmail, subject, message.replace(/\n/g, "<br>"));
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      if (!ctx.customerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      let pushCustomerId = ctx.customerId;
+      if (!pushCustomerId && (ctx.bookingId || ctx.bookingNumber)) {
+        try {
+          const bid = ctx.bookingId || ctx.bookingNumber;
+          const r = await pool.query(`SELECT customer_id FROM bookings WHERE id=$1 OR booking_number=$1 LIMIT 1`, [bid]);
+          if (r.rows[0]?.customer_id) pushCustomerId = r.rows[0].customer_id;
+        } catch {}
+      }
+      if (!pushCustomerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
-        const pushResult = await sendPushToCustomer(ctx.customerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
+        const pushResult = await sendPushToCustomer(pushCustomerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
@@ -550,12 +558,9 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  // forceTemplateApi:true — bypasses the 24h session window check and goes directly to
-  // BotBee's /whatsapp/send/template endpoint. This guarantees delivery for all customers
-  // regardless of whether they have an active WhatsApp session with the business number.
-  // Variables MUST be a named object matching variable_map keys (not a flat array) so that
-  // BotBee substitutes #!VarName!# placeholders correctly in the delivered message.
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true, forceTemplateApi: true };
+  // forceTemplateApi removed — Meta Cloud API (line ~758) is tried FIRST in sendOnChannelWithType.
+  // BotBee template API (/whatsapp/send/template) is only reached as a last resort fallback.
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────
@@ -998,11 +1003,19 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
       const result = await sendEmail(ctx.customerEmail, buildEmailSubject(eventType, ctx), message.replace(/\n/g, "<br>"), undefined, attachments);
       return { status: result.ok ? "sent" : "failed", providerResponse: result };
     } else if (channel === "push") {
-      if (!ctx.customerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      let pushCustomerId2 = ctx.customerId || customerId;
+      if (!pushCustomerId2 && (bookingId || ctx.bookingNumber)) {
+        try {
+          const bid = bookingId || ctx.bookingNumber;
+          const r = await pool.query(`SELECT customer_id FROM bookings WHERE id=$1 OR booking_number=$1 LIMIT 1`, [bid]);
+          if (r.rows[0]?.customer_id) pushCustomerId2 = r.rows[0].customer_id;
+        } catch {}
+      }
+      if (!pushCustomerId2) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushTitle = buildEmailSubject(eventType, ctx) || "Al Burhan Tours & Travels";
-        const pushResult = await sendPushToCustomer(ctx.customerId, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
+        const pushResult = await sendPushToCustomer(pushCustomerId2, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };

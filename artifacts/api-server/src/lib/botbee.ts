@@ -1369,3 +1369,46 @@ export async function sendWithFallback(
   }
   return result;
 }
+
+// ── Auto-configure Meta Cloud API from BotBee embedded token ─────────────────
+// BotBee stores the real Meta WABA access token inside template_json.
+// Fetching it at startup and setting process.env.META_ACCESS_TOKEN enables the
+// Meta Cloud API path which correctly substitutes {{1}}, {{2}} etc. in templates.
+export async function autoSyncBotBeeMetaToken(): Promise<{ ok: boolean; message: string }> {
+  try {
+    const { apiToken, phone_number_id, business_id, baseUrl, enabled } = getCredentials();
+    if (!enabled) return { ok: false, message: "BotBee not configured" };
+
+    const response = await axios.post(
+      `${baseUrl}/whatsapp/template/list`,
+      { apiToken, phone_number_id, ...(business_id ? { business_id } : {}) },
+      { headers: { "Content-Type": "application/json" }, timeout: 15000 }
+    );
+
+    const templates: any[] = Array.isArray(response.data?.message) ? response.data.message : [];
+    let metaToken: string | null = null;
+
+    for (const t of templates) {
+      try {
+        const tj = JSON.parse(t.template_json || "{}");
+        if (tj.access_token && tj.access_token.length > 50) {
+          metaToken = tj.access_token;
+          break;
+        }
+      } catch {}
+    }
+
+    if (!metaToken) return { ok: false, message: "No Meta access token found in BotBee template data" };
+
+    // Call setMetaRuntimeToken() — esbuild replaces process.env.META_ACCESS_TOKEN with ""
+    // at compile time, so a module-level variable is the only reliable runtime path.
+    const { setMetaRuntimeToken } = await import("./metaWapi.js");
+    setMetaRuntimeToken(metaToken);
+
+    console.log(`[BotBee] autoSyncBotBeeMetaToken ✅ setMetaRuntimeToken called (len=${metaToken.length}) — Meta Cloud API enabled`);
+    return { ok: true, message: "Meta Cloud API configured from BotBee embedded token" };
+  } catch (err: any) {
+    console.error("[BotBee] autoSyncBotBeeMetaToken ERROR:", err?.message);
+    return { ok: false, message: err?.message || "Failed to sync Meta token" };
+  }
+}

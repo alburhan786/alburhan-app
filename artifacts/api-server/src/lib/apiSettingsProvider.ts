@@ -228,7 +228,7 @@ function buildEnvFallback(provider: ProviderName): ProviderConfig {
         extra: {
           sender_id: "ALBURH",
           otp_template_id: "164844",
-          notify_template_id: "211277",
+          notify_template_id: "",
         },
       };
     }
