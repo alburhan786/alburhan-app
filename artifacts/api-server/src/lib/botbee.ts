@@ -487,12 +487,31 @@ export async function sendTemplate(
     console.warn(`[BotBee] sendTemplate WARN: template ${templateId} sent with NO variables — all #!VarName!# placeholders will remain unsubstituted`);
   }
 
-  // ── Pre-render fallback message ──────────────────────────────────────────────
-  // BotBee's /whatsapp/send/template returns status:1 + wamid for ALL variable formats
-  // (named object, positional array, components) but delivers #!VarName!# unsubstituted.
-  // As a fallback, we pre-render the template body ourselves and include it as the
-  // `message` field. If BotBee's delivery engine honours the `message` field over the
-  // raw template body, the customer receives properly substituted text.
+  // ── Variable format conversion ────────────────────────────────────────────────
+  // BotBee's template substitution uses variable_map which maps position → CRM label.
+  // CRM labels are exactly: "#!Name!#", "#!BookingID!#", "#!PackageContent!#", etc.
+  //
+  // CONFIRMED from POST /api/v1/whatsapp/template/list audit (2026-07-27):
+  //   variable_map.body: {"1": "#!Name!#", "2": "#!BookingID!#", "3": "#!PackageContent!#", ...}
+  //   body_content: "...{{1}}\n...Booking ID: {{2}}\n..."
+  //
+  // BotBee matches variables by finding the CRM label in variable_map values and
+  // substituting the corresponding {{N}} in body_content. The API variables MUST
+  // use the full #!VarName!# format as keys (not the stripped "Name", "BookingID" form).
+  //
+  // Tested formats that return status:1+wamid but deliver UNSUBSTITUTED #!Name!#:
+  //   - named object    : {Name:"v", BookingID:"v"} — partial-matched, ignored
+  //   - positional array: ["v1","v2"] — ignored by BotBee CRM substitution
+  //   - index-keyed obj : {1:"v", 2:"v"} — ignored
+  //   - components      : [{type:"body",parameters:[...]}] — ignored
+  //   - message field   : {message:"pre-rendered text"} — ignored by BotBee delivery
+  //
+  // CORRECT format: {"#!Name!#": "Mohammed", "#!BookingID!#": "ABT123", ...}
+  const botbeeVars = namedVars
+    ? Object.fromEntries(Object.entries(namedVars).map(([k, v]) => [`#!${k}!#`, String(v ?? "-")]))
+    : undefined;
+
+  // Pre-render for logging/comparison only
   const templateBodyForFallback = isNumericId ? TEMPLATE_BODIES[templateId?.trim() ?? ""] : undefined;
   const preRenderedMsg = (templateBodyForFallback && namedVars)
     ? renderTemplateBody(templateBodyForFallback, namedVars)
@@ -511,16 +530,14 @@ export async function sendTemplate(
     apiToken, phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(namedVars ? { variables: namedVars } : {}),
-    ...(preRenderedMsg ? { message: preRenderedMsg } : {}),
+    ...(botbeeVars ? { variables: botbeeVars } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
     phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
-    ...(namedVars ? { variables: namedVars } : {}),
-    ...(preRenderedMsg ? { message: preRenderedMsg } : {}),
+    ...(botbeeVars ? { variables: botbeeVars } : {}),
   };
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));
