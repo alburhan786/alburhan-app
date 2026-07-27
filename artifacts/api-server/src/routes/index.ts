@@ -369,6 +369,8 @@ router.use("/enterprise", enterpriseRouter);
 router.use("/marketing", enterpriseRouter);
 import crmRouter from "./crm.js";
 router.use("/crm", crmRouter);
+import leadEngineRouter from "./lead-engine.js";
+router.use("/leads", leadEngineRouter);
 router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);

@@ -29,6 +29,7 @@ import GuidePanel from "@/pages/admin/GuidePanel";
 import TaskManager from "@/pages/admin/TaskManager";
 import MarketingCenter from "@/pages/admin/MarketingCenter";
 import LeadManager from "@/pages/admin/LeadManager";
+import AssignmentRules from "@/pages/admin/AssignmentRules";
 import SupplierManager from "@/pages/admin/SupplierManager";
 import GroupTracking from "@/pages/admin/GroupTracking";
 import KnowledgeCenter from "@/pages/public/KnowledgeCenter";
@@ -381,6 +382,7 @@ function Router() {
       <Route path="/admin/tasks" component={() => <AdminRoute component={TaskManager} />} />
       <Route path="/admin/marketing" component={() => <AdminRoute component={MarketingCenter} />} />
       <Route path="/admin/leads" component={() => <AdminRoute component={LeadManager} />} />
+      <Route path="/admin/assignment-rules" component={() => <AdminRoute component={AssignmentRules} />} />
       <Route path="/admin/suppliers" component={() => <AdminRoute component={SupplierManager} />} />
       <Route path="/admin/group-tracking" component={() => <AdminRoute component={GroupTracking} />} />
       <Route path="/admin/ai-ops" component={() => <AdminRoute component={AIOperationsCenter} />} />

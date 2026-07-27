@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,230 +7,252 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Phone, Mail, Search, RefreshCw, UserPlus, Edit2, Trash2,
-  MessageCircle, ChevronRight, X, Send, Calendar, TrendingUp,
-  BarChart3, Settings, CheckCircle, Clock, AlertTriangle, Instagram,
-  Facebook, MessageSquare, Globe, Zap, Users, Star, Save, Flame,
-  Thermometer, Snowflake, Target, Shield, ChevronDown, ChevronUp,
+  Plus, Phone, Mail, Search, RefreshCw, Edit2, Trash2,
+  MessageCircle, X, ChevronDown, ChevronUp, Target, Shield,
+  Flame, TrendingUp, BarChart3, Users, Star, Calendar, Clock,
+  CheckCircle, AlertTriangle, Zap, Send, Filter, Download,
+  UserCheck, ArrowUpDown, Eye, Activity, Tag, Globe,
 } from "lucide-react";
 
-const BASE_API = import.meta.env.VITE_API_URL || "";
+const API = import.meta.env.VITE_API_URL || "";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-// 22 spec-required sources first, then India-specific additions
+// ── Constants ──────────────────────────────────────────────────────────────────
 const SOURCES = [
-  // Digital channels
-  "whatsapp", "facebook", "instagram", "telegram", "sms", "email",
-  // Web sources
-  "website", "website_chat", "website_package", "website_contact", "google_forms",
-  // Paid acquisition
-  "google_business", "google_ads", "facebook_ads", "instagram_ads",
-  // Offline / personal
-  "phone", "missed_call", "walk-in", "referral", "travel_agent",
-  // Admin & utility
-  "manual_entry", "qr_code",
-  // India-specific
-  "messenger", "rcs", "google", "youtube", "twitter_x",
-  "justdial", "sulekha", "trade_fair", "naukri", "other",
+  "manual","whatsapp","facebook","facebook_lead_ad","instagram","instagram_lead_ad",
+  "facebook_messenger","instagram_dm","facebook_comment","instagram_comment",
+  "website","website_chat","google_business","email","sms","phone","referral",
+  "walk-in","travel_agent","google_ads","youtube","other",
 ];
 
-const STATUSES = [
-  "new", "contacted", "follow_up", "interested", "quotation_sent",
-  "negotiation", "documents_pending", "payment_pending",
-  "booked", "confirmed", "completed", "lost", "cancelled",
+const PACKAGES = ["Hajj 2025","Hajj 2026","Umrah Economy","Umrah Premium","Ramadan Umrah",
+  "Ziyarat Iraq","Baitul Muqaddas","Syria Jordan Tour","Air Ticket","Visa Assistance"];
+
+const PRIORITIES = ["low","normal","high","urgent"];
+const PIPELINE_STAGES = [
+  "new_lead","auto_response_sent","assigned","contact_attempted","contacted","interested",
+  "package_shared","quotation_sent","passport_awaited","documents_received",
+  "advance_payment_pending","advance_paid","agreement_pending","agreement_signed",
+  "visa_processing","ticket_pending","ticket_issued","hotel_confirmed",
+  "balance_payment_pending","full_payment_received","travel_ready","travel_completed",
+  "review_requested","future_remarketing","lost","spam",
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  new: "bg-sky-100 text-sky-700 border-sky-200",
-  contacted: "bg-blue-100 text-blue-700 border-blue-200",
-  follow_up: "bg-amber-100 text-amber-700 border-amber-200",
-  interested: "bg-violet-100 text-violet-700 border-violet-200",
-  quotation_sent: "bg-orange-100 text-orange-700 border-orange-200",
-  negotiation: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  documents_pending: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  payment_pending: "bg-pink-100 text-pink-700 border-pink-200",
-  booked: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  confirmed: "bg-green-100 text-green-700 border-green-200",
-  completed: "bg-teal-100 text-teal-700 border-teal-200",
-  lost: "bg-red-100 text-red-700 border-red-200",
-  cancelled: "bg-gray-100 text-gray-600 border-gray-200",
+const SOURCE_ICON: Record<string,string> = {
+  whatsapp:"💬", facebook:"👥", facebook_lead_ad:"📢", instagram:"📸",
+  instagram_lead_ad:"📸", facebook_messenger:"💬", instagram_dm:"📸",
+  website:"🌐", website_chat:"💭", google_business:"🏢", email:"✉️",
+  sms:"📱", phone:"📞", referral:"🤝", "walk-in":"🚶", travel_agent:"🧳",
+  google_ads:"🔍", youtube:"▶️", manual:"✏️", other:"📋",
 };
 
-const SOURCE_ICONS: Record<string, string> = {
-  // Spec-required 22
-  whatsapp: "💬", facebook: "👥", instagram: "📸", telegram: "✈️",
-  sms: "📱", email: "✉️", website: "🌐", google_business: "🏢",
-  google_ads: "🔍", referral: "🤝", "walk-in": "🚶", travel_agent: "🧳",
-  manual_entry: "✏️", qr_code: "📲", website_chat: "💭",
-  website_package: "📦", website_contact: "📋", missed_call: "📵",
-  phone: "📞", facebook_ads: "📢", instagram_ads: "📸", google_forms: "📝",
-  // India-specific additions
-  messenger: "💬", rcs: "📡", google: "🔍", youtube: "▶️",
-  twitter_x: "🐦", justdial: "📇", sulekha: "🟡", trade_fair: "🏪",
-  naukri: "💼", other: "📋",
+const SCORE_META: Record<string,{label:string;color:string;bg:string;icon:string}> = {
+  hot:  { label:"Hot",  color:"text-red-700",    bg:"bg-red-100",    icon:"🔥" },
+  warm: { label:"Warm", color:"text-orange-700", bg:"bg-orange-100", icon:"🌡️" },
+  cold: { label:"Cold", color:"text-sky-700",    bg:"bg-sky-100",    icon:"❄️" },
 };
 
-const SCORE_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  hot:  { label: "Hot",  color: "text-red-700",    bg: "bg-red-100",    border: "border-red-200",    icon: "🔥" },
-  warm: { label: "Warm", color: "text-orange-700",  bg: "bg-orange-100", border: "border-orange-200", icon: "🌡️" },
-  cold: { label: "Cold", color: "text-sky-700",     bg: "bg-sky-100",    border: "border-sky-200",    icon: "❄️" },
-  lost: { label: "Lost", color: "text-gray-500",    bg: "bg-gray-100",   border: "border-gray-200",   icon: "💀" },
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const fmt = (s:string) => s?.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()) || "";
+const fmtDate = (d:string) => {
+  if (!d) return "—";
+  try { return new Date(d).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}); } catch { return d; }
 };
-
-const PLATFORM_ICONS: Record<string, string> = {
-  telegram_bot: "✈️", telegram_channel: "✈️",
-  facebook_page: "👥", facebook_messenger: "💬", facebook_leads: "📢",
-  instagram: "📸", instagram_dm: "📸",
-  whatsapp_meta: "💬", whatsapp_botbee: "💬",
-  website_contact: "🌐", website_booking: "🌐", website_support: "🌐",
-  website_inquiry: "🌐", website_livechat: "🌐", website_ai_chat: "🤖",
-  fast2sms: "📱", smtp_email: "✉️",
+const fmtTime = (d:string) => {
+  if (!d) return "—";
+  try { return new Date(d).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}); } catch { return d; }
 };
-
-const PLATFORMS_FOR_RULES = [
-  { value: "telegram_bot", label: "Telegram Bot" },
-  { value: "facebook_page", label: "Facebook Page" },
-  { value: "facebook_messenger", label: "Facebook Messenger" },
-  { value: "facebook_leads", label: "Facebook Lead Ads" },
-  { value: "instagram", label: "Instagram Business" },
-  { value: "instagram_dm", label: "Instagram DMs" },
-  { value: "whatsapp_meta", label: "WhatsApp Cloud API" },
-  { value: "website_contact", label: "Website Contact Form" },
-  { value: "website_inquiry", label: "Website Inquiry" },
-  { value: "website_livechat", label: "Website Live Chat" },
-  { value: "fast2sms", label: "SMS (Fast2SMS)" },
-  { value: "smtp_email", label: "Email (SMTP)" },
-];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function fmtStatus(s: string) {
-  return s?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || s;
-}
-function fmtDate(d: string) {
+const timeAgo = (d:string) => {
   if (!d) return "";
-  try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); } catch { return d; }
-}
-function fmtTime(d: string) {
-  if (!d) return "";
-  try { return new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return d; }
-}
-function platformLabel(p: string) {
-  return p?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || "";
-}
-
-// ── Empty form ────────────────────────────────────────────────────────────────
-const EMPTY_FORM = {
-  name: "", mobile: "", email: "", source: "website", message: "",
-  packageInterest: "", assignedName: "", assignedBranch: "",
-  followUpDate: "", notes: "", budget: "", status: "new", priority: "normal",
-  instagramUsername: "", facebookName: "", telegramUsername: "",
-  passportNumber: "", aadhaarLast4: "", panNumber: "",
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// LEAD FORM
-// ═══════════════════════════════════════════════════════════════════
-function LeadForm({ initial, onSave, onCancel, saving }: { initial?: any; onSave: (d: any) => void; onCancel: () => void; saving: boolean }) {
-  const [form, setForm] = useState(initial || EMPTY_FORM);
-  const [showDedup, setShowDedup] = useState(false);
-  const set = (k: string, v: string) => setForm((f: any) => ({ ...f, [k]: v }));
+async function apiFetch(url:string, opts:RequestInit={}) {
+  const r = await fetch(`${API}${url}`, { credentials:"include", ...opts });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error||e.message||`HTTP ${r.status}`); }
+  return r.json();
+}
+
+// ── Score Badge ────────────────────────────────────────────────────────────────
+function ScoreBadge({ score }:{ score?:string }) {
+  const m = SCORE_META[score||"cold"] || SCORE_META.cold;
   return (
-    <div className="rounded-2xl border p-5 bg-background space-y-4">
+    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${m.bg} ${m.color}`}>
+      {m.icon} {m.label}
+    </span>
+  );
+}
+
+// ── Priority Badge ─────────────────────────────────────────────────────────────
+function PriorityBadge({ priority }:{ priority?:string }) {
+  const cls: Record<string,string> = {
+    urgent:"bg-red-100 text-red-700 border-red-200",
+    high:"bg-orange-100 text-orange-700 border-orange-200",
+    normal:"bg-blue-100 text-blue-700 border-blue-200",
+    low:"bg-gray-100 text-gray-600 border-gray-200",
+  };
+  return priority && priority !== "normal" ? (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border ${cls[priority]||cls.normal}`}>
+      {priority.toUpperCase()}
+    </span>
+  ) : null;
+}
+
+// ── Stats Cards ────────────────────────────────────────────────────────────────
+function StatsCards({ stats }:{ stats:any }) {
+  if (!stats) return null;
+  const t = stats.totals || {};
+  const cards = [
+    { label:"Total Leads", value:t.total||0, icon:<Users size={18}/>, color:"from-blue-500 to-blue-600" },
+    { label:"Active", value:t.active||0, icon:<Zap size={18}/>, color:"from-indigo-500 to-indigo-600" },
+    { label:"Today", value:stats.todayLeads||0, icon:<Calendar size={18}/>, color:"from-green-500 to-green-600" },
+    { label:"Converted", value:t.converted||0, icon:<CheckCircle size={18}/>, color:"from-emerald-500 to-emerald-600" },
+    { label:"Overdue Tasks", value:stats.overdueFollowups||0, icon:<AlertTriangle size={18}/>, color:"from-amber-500 to-amber-600" },
+    { label:"Lost", value:t.lost||0, icon:<X size={18}/>, color:"from-red-500 to-red-600" },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+      {cards.map(c => (
+        <div key={c.label} className={`rounded-2xl bg-gradient-to-br ${c.color} text-white p-4 flex items-center gap-3`}>
+          <div className="opacity-80">{c.icon}</div>
+          <div>
+            <div className="text-xl font-bold">{c.value.toLocaleString("en-IN")}</div>
+            <div className="text-[10px] opacity-80">{c.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Lead Form ──────────────────────────────────────────────────────────────────
+function LeadForm({ initial, onSave, onCancel, saving }:{
+  initial?:any; onSave:(d:any)=>void; onCancel:()=>void; saving:boolean;
+}) {
+  const [form, setForm] = useState({
+    name: initial?.name||"",
+    first_name: initial?.first_name||"",
+    last_name: initial?.last_name||"",
+    mobile: initial?.mobile||"",
+    whatsapp_number: initial?.whatsapp_number||"",
+    email: initial?.email||"",
+    city: initial?.city||"",
+    state: initial?.state||"",
+    country: initial?.country||"India",
+    source: initial?.source||"manual",
+    package_interest: initial?.package_interest||"",
+    budget: initial?.budget||"",
+    message: initial?.message||"",
+    travel_month: initial?.travel_month||"",
+    num_travellers: initial?.num_travellers||1,
+    priority: initial?.priority||"normal",
+    notes: initial?.notes||"",
+    consent_whatsapp: initial?.consent_whatsapp !== false,
+    consent_sms: initial?.consent_sms !== false,
+  });
+  const [showMore, setShowMore] = useState(false);
+  const set = (k:string, v:any) => setForm(f=>({...f,[k]:v}));
+
+  return (
+    <div className="rounded-2xl border bg-background p-5 space-y-4 max-h-[80vh] overflow-y-auto">
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5 col-span-2">
-          <Label className="text-xs">Full Name *</Label>
-          <Input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Customer name" className="h-9" />
+        <div className="col-span-2 space-y-1.5">
+          <Label className="text-xs font-semibold">Full Name *</Label>
+          <Input value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Customer full name" className="h-9" />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Mobile</Label>
-          <Input value={form.mobile} onChange={e => set("mobile", e.target.value)} placeholder="+91 9876543210" className="h-9" />
+          <Input value={form.mobile} onChange={e=>set("mobile",e.target.value)} placeholder="9876543210" className="h-9" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">WhatsApp (if different)</Label>
+          <Input value={form.whatsapp_number} onChange={e=>set("whatsapp_number",e.target.value)} placeholder="9876543210" className="h-9" />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Email</Label>
-          <Input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="email@example.com" className="h-9" />
+          <Input type="email" value={form.email} onChange={e=>set("email",e.target.value)} placeholder="customer@email.com" className="h-9" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Source</Label>
-          <select value={form.source} onChange={e => set("source", e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-            {SOURCES.map(s => <option key={s} value={s}>{SOURCE_ICONS[s]} {fmtStatus(s)}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Status</Label>
-          <select value={form.status} onChange={e => set("status", e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-            {STATUSES.map(s => <option key={s} value={s}>{fmtStatus(s)}</option>)}
+          <Label className="text-xs">Source *</Label>
+          <select value={form.source} onChange={e=>set("source",e.target.value)} className="w-full h-9 rounded-xl border bg-background px-3 text-sm">
+            {SOURCES.map(s=><option key={s} value={s}>{SOURCE_ICON[s]||"📋"} {fmt(s)}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Package Interest</Label>
-          <Input value={form.packageInterest} onChange={e => set("packageInterest", e.target.value)} placeholder="Hajj 2026, Umrah..." className="h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Budget (₹)</Label>
-          <Input value={form.budget} onChange={e => set("budget", e.target.value)} placeholder="250000" className="h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Assigned Staff</Label>
-          <Input value={form.assignedName} onChange={e => set("assignedName", e.target.value)} placeholder="Staff name" className="h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Follow-Up Date</Label>
-          <Input type="date" value={form.followUpDate} onChange={e => set("followUpDate", e.target.value)} className="h-9" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Priority</Label>
-          <select value={form.priority} onChange={e => set("priority", e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
+          <select value={form.package_interest} onChange={e=>set("package_interest",e.target.value)} className="w-full h-9 rounded-xl border bg-background px-3 text-sm">
+            <option value="">— Select Package —</option>
+            {PACKAGES.map(p=><option key={p} value={p}>{p}</option>)}
+            <option value="custom">Other / Custom</option>
           </select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Branch</Label>
-          <Input value={form.assignedBranch} onChange={e => set("assignedBranch", e.target.value)} placeholder="Branch name" className="h-9" />
+          <Label className="text-xs">Budget (₹)</Label>
+          <Input value={form.budget} onChange={e=>set("budget",e.target.value)} placeholder="e.g. 2,50,000" className="h-9" />
         </div>
-        <div className="space-y-1.5 col-span-2">
-          <Label className="text-xs">Message / Enquiry</Label>
-          <textarea value={form.message} onChange={e => set("message", e.target.value)} placeholder="What did the customer enquire about?"
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary" />
+        <div className="space-y-1.5">
+          <Label className="text-xs">Travel Month</Label>
+          <Input value={form.travel_month} onChange={e=>set("travel_month",e.target.value)} placeholder="March 2025, Ramadan..." className="h-9" />
         </div>
-        <div className="space-y-1.5 col-span-2">
-          <Label className="text-xs">Internal Notes</Label>
-          <textarea value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Internal notes (not visible to customer)"
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-none h-14 focus:outline-none focus:ring-2 focus:ring-primary" />
+        <div className="space-y-1.5">
+          <Label className="text-xs">No. of Travellers</Label>
+          <Input type="number" min={1} value={form.num_travellers} onChange={e=>set("num_travellers",parseInt(e.target.value)||1)} className="h-9" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs">Priority</Label>
+          <select value={form.priority} onChange={e=>set("priority",e.target.value)} className="w-full h-9 rounded-xl border bg-background px-3 text-sm">
+            {PRIORITIES.map(p=><option key={p} value={p}>{fmt(p)}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2 space-y-1.5">
+          <Label className="text-xs">Enquiry Message</Label>
+          <textarea value={form.message} onChange={e=>set("message",e.target.value)} placeholder="What did the customer enquire about?"
+            className="w-full rounded-xl border bg-background px-3 py-2 text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
       </div>
 
-      {/* Deduplication fields — collapsible */}
-      <div>
-        <button type="button" onClick={() => setShowDedup(v => !v)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-          <Shield size={12} /> Deduplication Fields (Passport / Aadhaar / PAN)
-          {showDedup ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
-        {showDedup && (
-          <div className="grid grid-cols-3 gap-3 mt-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Passport No.</Label>
-              <Input value={form.passportNumber} onChange={e => set("passportNumber", e.target.value)} placeholder="A1234567" className="h-9 uppercase" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Aadhaar Last 4</Label>
-              <Input value={form.aadhaarLast4} onChange={e => set("aadhaarLast4", e.target.value.slice(0,4))} placeholder="1234" maxLength={4} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">PAN Number</Label>
-              <Input value={form.panNumber} onChange={e => set("panNumber", e.target.value)} placeholder="ABCDE1234F" className="h-9 uppercase" />
-            </div>
+      <button type="button" onClick={()=>setShowMore(v=>!v)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <Shield size={12}/> Additional fields (city, consents, notes)
+        {showMore ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+      </button>
+      {showMore && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">City</Label>
+            <Input value={form.city} onChange={e=>set("city",e.target.value)} placeholder="Mumbai, Delhi..." className="h-9" />
           </div>
-        )}
-      </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">State</Label>
+            <Input value={form.state} onChange={e=>set("state",e.target.value)} placeholder="Maharashtra..." className="h-9" />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs">Internal Notes</Label>
+            <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Notes visible only to staff"
+              className="w-full rounded-xl border bg-background px-3 py-2 text-sm resize-none h-14 focus:outline-none focus:ring-2 focus:ring-primary" />
+          </div>
+          <div className="col-span-2 flex gap-4">
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={form.consent_whatsapp} onChange={e=>set("consent_whatsapp",e.target.checked)} className="rounded" />
+              WhatsApp consent
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={form.consent_sms} onChange={e=>set("consent_sms",e.target.checked)} className="rounded" />
+              SMS consent
+            </label>
+          </div>
+        </div>
+      )}
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end pt-2">
         <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button size="sm" onClick={() => onSave(form)} disabled={saving || !form.name.trim()} className="gap-1.5">
-          {saving && <RefreshCw size={13} className="animate-spin" />}
+        <Button size="sm" onClick={()=>onSave(form)} disabled={saving||!form.name.trim()} className="gap-1.5">
+          {saving && <RefreshCw size={13} className="animate-spin"/>}
           {initial ? "Update Lead" : "Add Lead"}
         </Button>
       </div>
@@ -238,863 +260,695 @@ function LeadForm({ initial, onSave, onCancel, saving }: { initial?: any; onSave
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// SCORE BADGE
-// ═══════════════════════════════════════════════════════════════════
-function ScoreBadge({ score }: { score?: string }) {
-  const s = score || "cold";
-  const m = SCORE_META[s] || SCORE_META.cold;
+// ── Activity Feed ──────────────────────────────────────────────────────────────
+function ActivityFeed({ leadId }:{ leadId:string }) {
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    apiFetch(`/api/crm/leads/${leadId}/activities`)
+      .then(d=>setActivities(d.activities||[]))
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  },[leadId]);
+
+  const iconFor = (type:string) => {
+    const m:Record<string,string> = {
+      lead_created:"✨",assignment:"👤",stage_change:"🔄",followup_created:"📅",
+      followup_completed:"✅",call:"📞",message:"💬",email:"✉️",whatsapp:"💬",
+      note:"📝",update:"✏️",conversion:"🎉",opt_out:"🚫",sla_alert:"⚠️",
+      sla_escalation:"🔴",auto_followup:"🤖",duplicate_enquiry:"🔁",
+    };
+    return m[type]||"📌";
+  };
+
+  if (loading) return <div className="text-xs text-muted-foreground py-4 text-center">Loading activity…</div>;
+  if (!activities.length) return (
+    <div className="text-xs text-muted-foreground py-4 text-center">No activity yet</div>
+  );
+
   return (
-    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold ${m.color} ${m.bg} ${m.border}`}>
-      {m.icon} {m.label}
-    </span>
+    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+      {activities.map((a:any)=>(
+        <div key={a.id} className="flex gap-2.5 text-xs">
+          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-sm">{iconFor(a.type)}</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-foreground/80 leading-tight">{a.content}</div>
+            <div className="text-muted-foreground mt-0.5">{timeAgo(a.created_at)} · {a.performed_by_name||"System"}</div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// CONVERSATION PANEL
-// ═══════════════════════════════════════════════════════════════════
-function ConversationPanel({ lead, onClose, onStatusChange }: { lead: any; onClose: () => void; onStatusChange: (id: string, status: string) => void }) {
+// ── Follow-up Tasks Panel ──────────────────────────────────────────────────────
+function FollowupPanel({ leadId }:{ leadId:string }) {
   const { toast } = useToast();
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [outgoing, setOutgoing] = useState<any[]>([]);
+  const [followups, setFollowups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(lead.status);
-  const [followUp, setFollowUp] = useState(lead.follow_up_date?.slice(0, 10) || "");
-  const [notes, setNotes] = useState(lead.notes || "");
-  const [saving, setSaving] = useState(false);
-  const [scoring, setScoring] = useState(false);
-  const [score, setScore] = useState<any>({ score: lead.score || "cold", factors: lead.score_factors || {} });
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title:"", due_at:"", type:"call", description:"" });
 
-  useEffect(() => {
-    setLoading(true);
-    fetch(`${BASE_API}/api/enterprise/leads/${lead.id}/conversations`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : { messages: [], outgoing: [] })
-      .then(d => { setConversations(d.messages || []); setOutgoing(d.outgoing || []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [lead.id]);
+  const load = useCallback(()=>{
+    apiFetch(`/api/crm/leads/${leadId}/followups`)
+      .then(d=>setFollowups(d.followups||[]))
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  },[leadId]);
 
-  const allMessages = [
-    ...conversations.map((m: any) => ({ ...m, direction: "incoming", ts: new Date(m.created_at).getTime() })),
-    ...outgoing.map((m: any) => ({ ...m, direction: "outgoing", ts: new Date(m.created_at).getTime() })),
-  ].sort((a, b) => a.ts - b.ts);
+  useEffect(()=>{ load(); },[load]);
 
-  const saveUpdate = async () => {
-    setSaving(true);
+  const addFollowup = async () => {
+    if (!form.title.trim()) return;
     try {
-      const r = await fetch(`${BASE_API}/api/enterprise/leads/${lead.id}`, {
-        method: "PATCH", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, followUpDate: followUp || null, notes }),
+      await apiFetch(`/api/crm/leads/${leadId}/followups`,{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(form),
       });
-      if (r.ok) { toast({ title: "Lead updated" }); onStatusChange(lead.id, status); }
-      else toast({ title: "Failed", variant: "destructive" });
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    setSaving(false);
+      setForm({ title:"", due_at:"", type:"call", description:"" });
+      setAdding(false);
+      toast({ title:"Follow-up scheduled" });
+      load();
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+  };
+
+  const completeFollowup = async (fid:string) => {
+    try {
+      await apiFetch(`/api/crm/leads/${leadId}/followups/${fid}`,{
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ status:"completed" }),
+      });
+      toast({ title:"Marked complete" });
+      load();
+    } catch {}
+  };
+
+  const visibleFollowups = followups.filter(f=>!f.title?.startsWith("LD-SEQ-"));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Follow-up Tasks ({visibleFollowups.length})</p>
+        <Button size="sm" variant="outline" className="h-6 text-xs px-2 gap-1" onClick={()=>setAdding(v=>!v)}>
+          <Plus size={11}/> Add Task
+        </Button>
+      </div>
+
+      {adding && (
+        <div className="rounded-xl border bg-muted/30 p-3 space-y-2">
+          <Input placeholder="Task title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} className="h-8 text-xs" />
+          <div className="grid grid-cols-2 gap-2">
+            <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} className="h-8 rounded-lg border bg-background px-2 text-xs">
+              <option value="call">📞 Call</option>
+              <option value="whatsapp">💬 WhatsApp</option>
+              <option value="email">✉️ Email</option>
+              <option value="meeting">🤝 Meeting</option>
+              <option value="other">📋 Other</option>
+            </select>
+            <Input type="datetime-local" value={form.due_at} onChange={e=>setForm(f=>({...f,due_at:e.target.value}))} className="h-8 text-xs" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs gap-1 flex-1" onClick={addFollowup}><CheckCircle size={11}/> Save</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={()=>setAdding(false)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div className="text-xs text-muted-foreground text-center py-3">Loading…</div> : (
+        <div className="space-y-2">
+          {visibleFollowups.length === 0 && <div className="text-xs text-muted-foreground text-center py-3">No tasks yet</div>}
+          {visibleFollowups.map((f:any)=>(
+            <div key={f.id} className={`flex gap-2.5 rounded-xl border px-3 py-2 text-xs ${f.status==="completed"?"opacity-50 bg-muted/30":f.due_at&&new Date(f.due_at)<new Date()?"bg-red-50 border-red-200":""}`}>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium">{f.title}</div>
+                {f.due_at && <div className="text-muted-foreground mt-0.5">{fmtTime(f.due_at)}</div>}
+              </div>
+              {f.status==="pending" && (
+                <button onClick={()=>completeFollowup(f.id)} className="text-green-600 hover:text-green-700 flex-shrink-0">
+                  <CheckCircle size={14}/>
+                </button>
+              )}
+              {f.status==="completed" && <CheckCircle size={14} className="text-green-500 flex-shrink-0"/>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Lead Detail Panel (slide-in) ───────────────────────────────────────────────
+function LeadDetailPanel({ lead, onClose, onUpdated }:{
+  lead:any; onClose:()=>void; onUpdated:(l:any)=>void;
+}) {
+  const { toast } = useToast();
+  const [detail, setDetail] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"overview"|"activity"|"tasks"|"edit">("overview");
+  const [stage, setStage] = useState(lead.pipeline_stage||"new_lead");
+  const [savingStage, setSavingStage] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [score, setScore] = useState({ score: lead.score||"cold" });
+  const [converting, setConverting] = useState(false);
+
+  useEffect(()=>{
+    setLoading(true);
+    apiFetch(`/api/leads/${lead.id}`)
+      .then(d=>{ setDetail(d); setScore({ score: d.lead?.score||"cold" }); setStage(d.lead?.pipeline_stage||"new_lead"); })
+      .catch(()=>{ setDetail({ lead }); })
+      .finally(()=>setLoading(false));
+  },[lead.id]);
+
+  const updateStage = async (newStage:string) => {
+    setSavingStage(true);
+    try {
+      await apiFetch(`/api/crm/leads/${lead.id}/stage`,{
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ stage: newStage }),
+      });
+      setStage(newStage);
+      toast({ title:"Stage updated" });
+      onUpdated({ ...lead, pipeline_stage: newStage });
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+    setSavingStage(false);
   };
 
   const recomputeScore = async () => {
     setScoring(true);
     try {
-      const r = await fetch(`${BASE_API}/api/enterprise/leads/${lead.id}/score`, { method: "POST", credentials: "include" });
-      if (r.ok) { const d = await r.json(); setScore(d); toast({ title: `Score: ${d.score}` }); }
-    } catch {}
+      const d = await apiFetch(`/api/leads/${lead.id}/score`,{ method:"POST" });
+      setScore(d);
+      toast({ title:`Lead score: ${d.score} (${d.score_points} pts)` });
+      onUpdated({ ...lead, score: d.score });
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
     setScoring(false);
   };
 
-  const msgTypeBadge = (type: string) => {
-    if (type === "photo") return "📷 Photo";
-    if (type === "voice") return "🎙️ Voice";
-    if (type === "document") return "📎 File";
-    if (type === "lead") return "📢 Lead Ad";
-    if (type === "attachment") return "📎 Attachment";
-    return null;
+  const convertToBooking = async () => {
+    setConverting(true);
+    try {
+      await apiFetch(`/api/leads/${lead.id}/convert`,{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ notes: "Converted from Lead Manager" }),
+      });
+      toast({ title:"Lead converted to booking" });
+      onUpdated({ ...lead, status:"converted" });
+      onClose();
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+    setConverting(false);
   };
 
+  const L = detail?.lead || lead;
   const scoreMeta = SCORE_META[score.score] || SCORE_META.cold;
-  const factors = score.factors || {};
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-2xl bg-background h-full flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-xl bg-background h-full flex flex-col shadow-2xl" onClick={e=>e.stopPropagation()}>
         {/* Header */}
-        <div className="px-5 py-4 border-b flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-lg flex-shrink-0">
-            {PLATFORM_ICONS[lead.platform] || SOURCE_ICONS[lead.source] || "📋"}
+        <div className="px-5 py-4 border-b flex items-center gap-3 bg-gradient-to-r from-primary/5 to-transparent">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-xl flex-shrink-0">
+            {SOURCE_ICON[L.source]||"📋"}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-base truncate">{lead.name}</h2>
-              <ScoreBadge score={score.score} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-bold text-base truncate">{L.name}</h2>
+              <ScoreBadge score={score.score}/>
+              <PriorityBadge priority={L.priority}/>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-              {lead.mobile && <span>📞 {lead.mobile}</span>}
-              {lead.email && <span>✉️ {lead.email}</span>}
-              {lead.platform && <span className="capitalize">{platformLabel(lead.platform)}</span>}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+              {L.lead_number && <span className="font-mono text-primary/70">{L.lead_number}</span>}
+              {L.mobile && <span>📞 {L.mobile}</span>}
+              {L.email && <span>✉️ {L.email}</span>}
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"><X size={16}/></button>
         </div>
 
-        {/* Quick Actions */}
-        <div className="px-5 py-3 border-b bg-muted/30 flex gap-2 flex-wrap">
-          {lead.mobile && (
-            <>
-              <a href={`tel:${lead.mobile}`} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors">
-                <Phone size={12} /> Call
-              </a>
-              <a href={`https://wa.me/${lead.mobile?.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 transition-colors">
-                💬 WhatsApp
-              </a>
-              <a href={`sms:${lead.mobile}`} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors">
-                📱 SMS
-              </a>
-            </>
-          )}
-          {lead.email && (
-            <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors">
-              <Mail size={12} /> Email
-            </a>
-          )}
-          {lead.telegram_username && (
-            <a href={`https://t.me/${lead.telegram_username?.replace("@","")}`} target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100 transition-colors">
-              ✈️ Telegram
-            </a>
-          )}
-          {lead.instagram_username && (
-            <a href={`https://instagram.com/${lead.instagram_username}`} target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100 transition-colors">
-              📸 Instagram
-            </a>
-          )}
+        {/* Quick actions */}
+        <div className="px-4 py-2.5 border-b bg-muted/20 flex gap-1.5 flex-wrap">
+          {L.mobile && <>
+            <a href={`tel:${L.mobile}`} className="text-xs px-2.5 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors flex items-center gap-1"><Phone size={11}/> Call</a>
+            <a href={`https://wa.me/${L.mobile?.replace(/\D/g,"")}`} target="_blank" rel="noreferrer"
+              className="text-xs px-2.5 py-1.5 rounded-lg border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 transition-colors">💬 WhatsApp</a>
+          </>}
+          {L.email && <a href={`mailto:${L.email}`} className="text-xs px-2.5 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors flex items-center gap-1"><Mail size={11}/> Email</a>}
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1 ml-auto" onClick={recomputeScore} disabled={scoring}>
+            {scoring?<RefreshCw size={11} className="animate-spin"/>:<Target size={11}/>} Score
+          </Button>
+          <Button size="sm" className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700" onClick={convertToBooking} disabled={converting||L.status==="converted"}>
+            {converting?<RefreshCw size={11} className="animate-spin"/>:<CheckCircle size={11}/>}
+            {L.status==="converted"?"Converted":"Convert"}
+          </Button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-          {/* AI Score Card */}
-          <div className={`rounded-2xl border p-4 space-y-2 ${scoreMeta.bg} ${scoreMeta.border}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{scoreMeta.icon}</span>
-                <div>
-                  <p className={`text-xs font-bold uppercase tracking-wider ${scoreMeta.color}`}>AI Lead Score</p>
-                  <p className={`text-lg font-bold ${scoreMeta.color}`}>{scoreMeta.label}</p>
-                </div>
-              </div>
-              <Button size="sm" variant="outline" onClick={recomputeScore} disabled={scoring} className="h-7 text-xs gap-1">
-                {scoring ? <RefreshCw size={11} className="animate-spin" /> : <Target size={11} />}
-                Recompute
-              </Button>
-            </div>
-            {Object.keys(factors).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {factors.prior_hajj_umrah && <span className="text-[10px] bg-white/60 rounded-md px-2 py-0.5 border">✅ Prior Hajj/Umrah +{factors.prior_hajj_umrah}</span>}
-                {factors.budget_set && <span className="text-[10px] bg-white/60 rounded-md px-2 py-0.5 border">💰 Budget Set +{factors.budget_set}</span>}
-                {factors.travel_month_near && <span className="text-[10px] bg-white/60 rounded-md px-2 py-0.5 border">📅 Travel Month +{factors.travel_month_near}</span>}
-                {factors.replies && <span className="text-[10px] bg-white/60 rounded-md px-2 py-0.5 border">💬 Replies +{factors.replies}</span>}
-                {factors.inactive_14d && <span className="text-[10px] bg-white/60 rounded-md px-2 py-0.5 border">⚠️ Inactive {factors.inactive_14d}</span>}
-              </div>
-            )}
-          </div>
-
-          {/* Conversation Thread */}
-          <div>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-              Conversation History ({allMessages.length} messages)
-            </p>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">Loading…</div>
-            ) : allMessages.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-6 text-center text-muted-foreground text-sm">
-                <MessageCircle size={28} className="mx-auto mb-2 opacity-30" />
-                No messages yet. Messages from social channels appear here automatically.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {allMessages.map((m: any, i: number) => (
-                  <div key={m.id || i} className={`flex ${m.direction === "outgoing" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                      m.direction === "outgoing"
-                        ? "bg-primary text-primary-foreground rounded-tr-sm"
-                        : "bg-muted rounded-tl-sm"
-                    }`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] opacity-70">{PLATFORM_ICONS[m.platform] || "💬"} {platformLabel(m.platform)}</span>
-                        {m.direction === "outgoing" && <span className="text-[10px] opacity-70">Outgoing</span>}
-                      </div>
-                      {msgTypeBadge(m.message_type) && (
-                        <span className="text-xs opacity-70">{msgTypeBadge(m.message_type)}</span>
-                      )}
-                      <p className="leading-snug">{m.message_text || m.message}</p>
-                      <p className="text-[10px] opacity-60 mt-1 text-right">{fmtTime(m.created_at)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Update Lead */}
-          <div className="rounded-2xl border p-4 space-y-3">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Update Lead</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Status</Label>
-                <select value={status} onChange={e => setStatus(e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                  {STATUSES.map(s => <option key={s} value={s}>{fmtStatus(s)}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Follow-Up Date</Label>
-                <Input type="date" value={followUp} onChange={e => setFollowUp(e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1 col-span-2">
-                <Label className="text-xs">Notes</Label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-none h-14 focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Add notes…" />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button size="sm" onClick={saveUpdate} disabled={saving} className="gap-1.5">
-                {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-                Save Update
-              </Button>
-            </div>
-          </div>
-
-          {/* Lead Info */}
-          <div className="rounded-2xl border p-4 space-y-2 text-sm">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Lead Info</p>
-            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-              {lead.source && <div><span className="text-muted-foreground text-xs">Source:</span> <span>{SOURCE_ICONS[lead.source]} {fmtStatus(lead.source)}</span></div>}
-              {lead.platform && <div><span className="text-muted-foreground text-xs">Platform:</span> <span>{platformLabel(lead.platform)}</span></div>}
-              {lead.package_interest && <div><span className="text-muted-foreground text-xs">Package:</span> <span>{lead.package_interest}</span></div>}
-              {lead.budget && <div><span className="text-muted-foreground text-xs">Budget:</span> <span>₹{Number(lead.budget).toLocaleString("en-IN")}</span></div>}
-              {lead.assigned_name && <div><span className="text-muted-foreground text-xs">Assigned:</span> <span>👤 {lead.assigned_name}</span></div>}
-              {lead.assigned_branch && <div><span className="text-muted-foreground text-xs">Branch:</span> <span>{lead.assigned_branch}</span></div>}
-              {lead.conversation_count > 0 && <div><span className="text-muted-foreground text-xs">Messages:</span> <span>💬 {lead.conversation_count}</span></div>}
-              <div><span className="text-muted-foreground text-xs">Added:</span> <span>{fmtDate(lead.created_at)}</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CRM DASHBOARD
-// ═══════════════════════════════════════════════════════════════════
-function CrmDashboard() {
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${BASE_API}/api/enterprise/lead-stats`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setStats(d); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className="py-16 text-center text-muted-foreground">Loading dashboard…</div>;
-  if (!stats) return <div className="py-8 text-center text-muted-foreground">Could not load stats.</div>;
-
-  const sourceColors: Record<string, string> = {
-    whatsapp: "bg-green-500", instagram: "bg-pink-500", facebook: "bg-blue-600",
-    messenger: "bg-blue-400", telegram: "bg-sky-500", website: "bg-indigo-500",
-    email: "bg-orange-500", phone: "bg-amber-500", google_ads: "bg-amber-400",
-    facebook_ads: "bg-blue-700", youtube: "bg-red-500", twitter_x: "bg-slate-700",
-    justdial: "bg-yellow-500", sulekha: "bg-yellow-400", trade_fair: "bg-emerald-500",
-    referral: "bg-teal-500", other: "bg-gray-400",
-  };
-
-  const scoreOrder = ["hot", "warm", "cold", "lost"];
-
-  return (
-    <div className="space-y-6">
-      {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Leads", value: stats.total, icon: <Users size={16} />, color: "text-foreground" },
-          { label: "Today's Leads", value: stats.today, icon: <Calendar size={16} />, color: "text-primary" },
-          { label: "Conversion Rate", value: `${stats.conversion_rate}%`, icon: <TrendingUp size={16} />, color: "text-emerald-700" },
-          { label: "Active (24h)", value: stats.active_today, icon: <Zap size={16} />, color: "text-amber-700" },
-        ].map(s => (
-          <div key={s.label} className="rounded-2xl border p-4 bg-background">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">{s.icon} <span className="text-xs">{s.label}</span></div>
-            <p className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Follow-ups row */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border p-4 bg-amber-50">
-          <div className="flex items-center gap-2 text-amber-700 mb-1"><Clock size={15} /> <span className="text-xs font-semibold">Follow-Up Today</span></div>
-          <p className="text-3xl font-bold font-mono text-amber-700">{stats.follow_ups?.today ?? 0}</p>
-        </div>
-        <div className="rounded-2xl border p-4 bg-red-50">
-          <div className="flex items-center gap-2 text-red-700 mb-1"><AlertTriangle size={15} /> <span className="text-xs font-semibold">Overdue</span></div>
-          <p className="text-3xl font-bold font-mono text-red-700">{stats.follow_ups?.overdue ?? 0}</p>
-        </div>
-      </div>
-
-      {/* AI Score Breakdown */}
-      {stats.by_score?.length > 0 && (
-        <div className="rounded-2xl border p-5">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">AI Lead Score Distribution</p>
-          <div className="grid grid-cols-4 gap-3">
-            {scoreOrder.map(sc => {
-              const row = stats.by_score?.find((r: any) => r.score === sc);
-              const count = row?.count || 0;
-              const m = SCORE_META[sc];
-              return (
-                <div key={sc} className={`rounded-xl border p-3 text-center ${m.bg} ${m.border}`}>
-                  <p className="text-2xl mb-0.5">{m.icon}</p>
-                  <p className={`text-xl font-bold font-mono ${m.color}`}>{count}</p>
-                  <p className={`text-[10px] font-semibold uppercase ${m.color}`}>{m.label}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Status breakdown */}
-      {stats.by_status?.length > 0 && (
-        <div className="rounded-2xl border p-5">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Leads by Status</p>
-          <div className="flex flex-wrap gap-2">
-            {stats.by_status.map((s: any) => (
-              <div key={s.status} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs ${STATUS_COLORS[s.status] || "bg-gray-100 text-gray-600"}`}>
-                {fmtStatus(s.status)} <span className="font-bold">{s.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Source breakdown */}
-      {stats.by_source?.length > 0 && (
-        <div className="rounded-2xl border p-5">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Leads by Source</p>
-          <div className="space-y-2">
-            {stats.by_source.map((s: any) => {
-              const max = Math.max(...stats.by_source.map((x: any) => x.count), 1);
-              const pct = Math.round((s.count / max) * 100);
-              return (
-                <div key={s.source} className="flex items-center gap-3">
-                  <span className="text-sm w-28 truncate flex-shrink-0">{SOURCE_ICONS[s.source] || "📋"} {fmtStatus(s.source)}</span>
-                  <div className="flex-1 bg-muted rounded-full h-2">
-                    <div className={`h-2 rounded-full ${sourceColors[s.source] || "bg-gray-400"}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs font-mono font-bold w-6 text-right">{s.count}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// LEAD ASSIGNMENT RULES (city/platform-based auto-assignment)
-// ═══════════════════════════════════════════════════════════════════
-const EMPTY_RULE = {
-  rule_name: "", branch_name: "", executive_name: "", executive_mobile: "",
-  platform: "", source: "", city_regex: "", priority: 0, is_active: true, auto_welcome_message: "",
-};
-
-function LeadAssignmentRules() {
-  const { toast } = useToast();
-  const [rules, setRules] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editRule, setEditRule] = useState<any>(null);
-  const [form, setForm] = useState<any>(EMPTY_RULE);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch(`${BASE_API}/api/enterprise/lead-assignment-rules`, { credentials: "include" });
-      if (r.ok) setRules(await r.json());
-    } catch {}
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const openNew = () => { setForm(EMPTY_RULE); setEditRule(null); setShowForm(true); };
-  const openEdit = (rule: any) => { setForm({ ...rule }); setEditRule(rule); setShowForm(true); };
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-
-  const saveRule = async () => {
-    if (!form.rule_name?.trim()) return;
-    setSaving(true);
-    try {
-      const url = editRule
-        ? `${BASE_API}/api/enterprise/lead-assignment-rules/${editRule.id}`
-        : `${BASE_API}/api/enterprise/lead-assignment-rules`;
-      const method = editRule ? "PATCH" : "POST";
-      const r = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      if (r.ok) { toast({ title: editRule ? "Rule updated" : "Rule created" }); setShowForm(false); load(); }
-      else toast({ title: "Failed", variant: "destructive" });
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    setSaving(false);
-  };
-
-  const deleteRule = async (id: string) => {
-    if (!confirm("Delete this rule?")) return;
-    await fetch(`${BASE_API}/api/enterprise/lead-assignment-rules/${id}`, { method: "DELETE", credentials: "include" });
-    setRules(rs => rs.filter(r => r.id !== id));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border bg-sky-50 p-4 text-sm text-sky-800">
-        <strong>Lead Auto-Assignment:</strong> Configure rules to automatically assign incoming leads to staff members based on platform, source, or city pattern. Rules are matched in priority order — higher priority wins.
-      </div>
-
-      <div className="flex justify-end">
-        <Button size="sm" onClick={openNew} className="gap-1.5">
-          <Plus size={13} /> Add Rule
-        </Button>
-      </div>
-
-      {showForm && (
-        <div className="rounded-2xl border p-5 bg-background space-y-4">
-          <p className="text-sm font-semibold">{editRule ? "Edit Rule" : "New Assignment Rule"}</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5 col-span-2">
-              <Label className="text-xs">Rule Name *</Label>
-              <Input value={form.rule_name} onChange={e => set("rule_name", e.target.value)} placeholder="e.g. WhatsApp → Bhopal Team" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Executive Name</Label>
-              <Input value={form.executive_name} onChange={e => set("executive_name", e.target.value)} placeholder="Sales executive name" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Executive Mobile</Label>
-              <Input value={form.executive_mobile} onChange={e => set("executive_mobile", e.target.value)} placeholder="+91 9876543210" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Branch Name</Label>
-              <Input value={form.branch_name} onChange={e => set("branch_name", e.target.value)} placeholder="e.g. Bhopal Branch" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Priority (higher wins)</Label>
-              <Input type="number" value={form.priority} onChange={e => set("priority", parseInt(e.target.value) || 0)} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Match Platform (optional)</Label>
-              <select value={form.platform || ""} onChange={e => set("platform", e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                <option value="">Any platform</option>
-                {PLATFORMS_FOR_RULES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Match Source (optional)</Label>
-              <select value={form.source || ""} onChange={e => set("source", e.target.value)} className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                <option value="">Any source</option>
-                {SOURCES.map(s => <option key={s} value={s}>{SOURCE_ICONS[s]} {fmtStatus(s)}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5 col-span-2">
-              <Label className="text-xs">City / Keyword Filter (regex, optional)</Label>
-              <Input value={form.city_regex} onChange={e => set("city_regex", e.target.value)} placeholder="bhopal|indore|ujjain" className="h-9" />
-            </div>
-            <div className="space-y-1.5 col-span-2">
-              <Label className="text-xs">Welcome Message (sent to lead on assignment)</Label>
-              <textarea value={form.auto_welcome_message} onChange={e => set("auto_welcome_message", e.target.value)}
-                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Assalamu Alaikum! Thank you for contacting Al Burhan Tours…" />
-            </div>
-            <div className="col-span-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.is_active !== false} onChange={e => set("is_active", e.target.checked)} className="rounded" />
-                Rule is active
-              </label>
-            </div>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button size="sm" onClick={saveRule} disabled={saving || !form.rule_name?.trim()} className="gap-1.5">
-              {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-              {editRule ? "Update" : "Create"} Rule
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="py-8 text-center text-muted-foreground text-sm">Loading rules…</div>
-      ) : rules.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
-          <Target size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="font-medium text-sm">No assignment rules yet.</p>
-          <p className="text-xs mt-1">Create rules to auto-assign incoming leads to your team.</p>
-        </div>
-      ) : (
-        <div className="divide-y rounded-2xl border overflow-hidden">
-          {rules.map(rule => (
-            <div key={rule.id} className={`px-4 py-3 ${!rule.is_active ? "opacity-50 bg-muted/30" : "bg-background"}`}>
-              <div className="flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-sm">{rule.rule_name}</p>
-                    {!rule.is_active && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-gray-100 text-gray-500">Inactive</Badge>}
-                    {rule.priority > 0 && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-blue-100 text-blue-700">P{rule.priority}</Badge>}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                    {rule.executive_name && <span>👤 {rule.executive_name}</span>}
-                    {rule.branch_name && <span>🏢 {rule.branch_name}</span>}
-                    {rule.platform && <span>📲 {platformLabel(rule.platform)}</span>}
-                    {rule.source && <span>🔗 {SOURCE_ICONS[rule.source]} {fmtStatus(rule.source)}</span>}
-                    {rule.city_regex && <span>📍 {rule.city_regex}</span>}
-                  </div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => openEdit(rule)} className="w-7 h-7 rounded-lg border hover:bg-muted flex items-center justify-center" title="Edit">
-                    <Edit2 size={12} />
-                  </button>
-                  <button onClick={() => deleteRule(rule.id)} className="w-7 h-7 rounded-lg border hover:bg-red-50 text-red-500 flex items-center justify-center" title="Delete">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Legacy platform-specific rules section */}
-      <div className="rounded-2xl border p-5 space-y-3">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Platform-Specific Defaults</p>
-        <p className="text-xs text-muted-foreground">Configure per-platform auto-replies and assignees via the Social Media settings in the Inbox.</p>
-        <a href="/admin/inbox" className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-background hover:bg-muted transition-colors">
-          <Settings size={12} /> Open Inbox Settings
-        </a>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// MAIN PAGE
-// ═══════════════════════════════════════════════════════════════════
-export default function LeadManager() {
-  const { toast } = useToast();
-  const [tab, setTab] = useState<"dashboard" | "leads" | "rules">("leads");
-  const [leads, setLeads] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editLead, setEditLead] = useState<any>(null);
-  const [viewLead, setViewLead] = useState<any>(null);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterSource, setFilterSource] = useState("all");
-  const [filterPlatform, setFilterPlatform] = useState("all");
-  const [filterScore, setFilterScore] = useState("all");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch(`${BASE_API}/api/enterprise/leads`, { credentials: "include" });
-      if (r.ok) setLeads(await r.json());
-    } catch {}
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleSave = async (form: any) => {
-    setSaving(true);
-    try {
-      const url = editLead ? `${BASE_API}/api/enterprise/leads/${editLead.id}` : `${BASE_API}/api/enterprise/leads`;
-      const method = editLead ? "PATCH" : "POST";
-      const r = await fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      if (r.ok) {
-        const data = await r.json();
-        if (data._merged) toast({ title: "Duplicate detected — existing lead updated" });
-        else toast({ title: editLead ? "Lead updated" : "Lead added" });
-        setShowForm(false); setEditLead(null); load();
-      } else toast({ title: "Failed", variant: "destructive" });
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    setSaving(false);
-  };
-
-  const quickStatus = async (id: string, status: string) => {
-    await fetch(`${BASE_API}/api/enterprise/leads/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
-    setLeads(ls => ls.map(l => l.id === id ? { ...l, status } : l));
-    if (viewLead?.id === id) setViewLead((v: any) => ({ ...v, status }));
-  };
-
-  const deleteLead = async (id: string) => {
-    if (!confirm("Delete this lead?")) return;
-    await fetch(`${BASE_API}/api/enterprise/leads/${id}`, { method: "DELETE", credentials: "include" });
-    setLeads(ls => ls.filter(l => l.id !== id));
-    if (viewLead?.id === id) setViewLead(null);
-  };
-
-  const today = new Date().toISOString().slice(0, 10);
-  const totalConverted = leads.filter(l => l.status === "converted" || l.status === "booked" || l.status === "confirmed" || l.status === "completed").length;
-  const convRate = leads.length > 0 ? Math.round((totalConverted / leads.length) * 100) : 0;
-  const followUpToday = leads.filter(l => l.follow_up_date?.slice(0, 10) === today && !["converted","lost","cancelled","completed"].includes(l.status)).length;
-  const hotLeads = leads.filter(l => l.score === "hot").length;
-
-  const filtered = leads.filter(l => {
-    if (filterStatus !== "all" && l.status !== filterStatus) return false;
-    if (filterSource !== "all" && l.source !== filterSource) return false;
-    if (filterPlatform !== "all" && l.platform !== filterPlatform) return false;
-    if (filterScore !== "all" && (l.score || "cold") !== filterScore) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const searchable = [l.name, l.mobile, l.email, l.telegram_username, l.instagram_username, l.facebook_name, l.package_interest].join(" ").toLowerCase();
-      if (!searchable.includes(q)) return false;
-    }
-    return true;
-  });
-
-  const uniquePlatforms = [...new Set(leads.map((l: any) => l.platform).filter(Boolean))];
-
-  const TABS = [
-    { key: "dashboard", label: "CRM Dashboard", icon: <BarChart3 size={14} /> },
-    { key: "leads", label: `All Leads (${leads.length})`, icon: <Users size={14} /> },
-    { key: "rules", label: "Assignment Rules", icon: <Target size={14} /> },
-  ] as const;
-
-  return (
-    <AdminLayout>
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Lead Management</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">CRM — AI scoring, deduplication & auto-assignment</p>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={load} className="gap-1.5">
-              <RefreshCw size={13} /> Refresh
-            </Button>
-            {tab === "leads" && (
-              <Button size="sm" onClick={() => { setShowForm(true); setEditLead(null); }} className="gap-1.5">
-                <Plus size={13} /> Add Lead
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Quick stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Total Leads", value: leads.length, color: "text-foreground" },
-            { label: "🔥 Hot Leads", value: hotLeads, color: "text-red-700" },
-            { label: "Converted / Booked", value: totalConverted, color: "text-emerald-700" },
-            { label: "Conv. Rate", value: `${convRate}%`, color: "text-primary" },
-          ].map(s => (
-            <div key={s.label} className="rounded-2xl border p-3 text-center bg-background">
-              <p className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-            </div>
-          ))}
+        {/* Stage selector */}
+        <div className="px-4 py-2.5 border-b flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Stage:</span>
+          <select value={stage} onChange={e=>updateStage(e.target.value)} disabled={savingStage}
+            className="flex-1 h-7 rounded-lg border bg-background px-2 text-xs">
+            {PIPELINE_STAGES.map(s=><option key={s} value={s}>{fmt(s)}</option>)}
+          </select>
+          {savingStage && <RefreshCw size={12} className="animate-spin text-primary"/>}
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 rounded-2xl border p-1 bg-muted/20 w-fit">
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm font-medium transition-all ${tab === t.key ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-              {t.icon} {t.label}
+        <div className="flex border-b">
+          {(["overview","activity","tasks","edit"] as const).map(t=>(
+            <button key={t} onClick={()=>setTab(t)}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${tab===t?"border-b-2 border-primary text-primary":"text-muted-foreground hover:text-foreground"}`}>
+              {t==="overview"?"Overview":t==="activity"?"Activity":t==="tasks"?"Tasks":"Edit"}
             </button>
           ))}
         </div>
 
-        {/* Tab: CRM Dashboard */}
-        {tab === "dashboard" && <CrmDashboard />}
-
-        {/* Tab: Assignment Rules */}
-        {tab === "rules" && <LeadAssignmentRules />}
-
-        {/* Tab: All Leads */}
-        {tab === "leads" && (
-          <>
-            {showForm && <LeadForm onSave={handleSave} onCancel={() => setShowForm(false)} saving={saving} />}
-            {editLead && (
-              <LeadForm
-                initial={{
-                  name: editLead.name, mobile: editLead.mobile||"", email: editLead.email||"",
-                  source: editLead.source, message: editLead.message||"",
-                  packageInterest: editLead.package_interest||"", assignedName: editLead.assigned_name||"",
-                  assignedBranch: editLead.assigned_branch||"", followUpDate: editLead.follow_up_date?.slice(0,10)||"",
-                  notes: editLead.notes||"", budget: editLead.budget||"", status: editLead.status,
-                  priority: editLead.priority||"normal",
-                  instagramUsername: editLead.instagram_username||"",
-                  facebookName: editLead.facebook_name||"",
-                  telegramUsername: editLead.telegram_username||"",
-                  passportNumber: editLead.passport_number||"",
-                  aadhaarLast4: editLead.aadhaar_last4||"",
-                  panNumber: editLead.pan_number||"",
-                }}
-                onSave={handleSave} onCancel={() => setEditLead(null)} saving={saving}
-              />
-            )}
-
-            {/* Filters */}
-            <div className="space-y-2">
-              <div className="flex gap-2 flex-wrap items-center">
-                <div className="relative flex-1 min-w-[180px]">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Name, mobile, email, username…" className="pl-8 h-9 text-sm" />
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm"><RefreshCw size={20} className="animate-spin mr-2"/>Loading…</div>
+          ) : tab==="overview" ? (
+            <div className="space-y-4">
+              {/* Score card */}
+              <div className={`rounded-xl border p-3 ${scoreMeta.bg}`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{scoreMeta.icon}</span>
+                  <div>
+                    <p className={`text-xs font-bold ${scoreMeta.color}`}>Lead Score</p>
+                    <p className={`text-base font-bold ${scoreMeta.color}`}>{scoreMeta.label}</p>
+                  </div>
                 </div>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                  <option value="all">All Status</option>
-                  {STATUSES.map(s => <option key={s} value={s}>{fmtStatus(s)}</option>)}
-                </select>
-                <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                  <option value="all">All Sources</option>
-                  {SOURCES.map(s => <option key={s} value={s}>{SOURCE_ICONS[s]} {fmtStatus(s)}</option>)}
-                </select>
-                {uniquePlatforms.length > 0 && (
-                  <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)} className="h-9 rounded-xl border border-input bg-background px-3 text-sm">
-                    <option value="all">All Platforms</option>
-                    {uniquePlatforms.map(p => <option key={p} value={p}>{PLATFORM_ICONS[p]} {platformLabel(p)}</option>)}
-                  </select>
-                )}
               </div>
 
-              {/* Score filter chips */}
-              <div className="flex gap-1.5 flex-wrap items-center">
-                <span className="text-xs text-muted-foreground">Score:</span>
-                {["all", "hot", "warm", "cold", "lost"].map(sc => {
-                  const m = sc === "all" ? null : SCORE_META[sc];
-                  const active = filterScore === sc;
-                  return (
-                    <button key={sc} onClick={() => setFilterScore(sc)}
-                      className={`h-7 px-2.5 rounded-lg border text-xs font-medium transition-all ${
-                        active
-                          ? sc === "all" ? "bg-foreground text-background border-foreground" : `${m?.bg} ${m?.color} ${m?.border}`
-                          : "bg-background text-muted-foreground hover:bg-muted"
-                      }`}>
-                      {m ? `${m.icon} ${m.label}` : "All Scores"}
-                    </button>
-                  );
-                })}
+              {/* Info grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                {[
+                  { label:"Package", value:L.package_interest },
+                  { label:"Budget", value:L.budget ? `₹${L.budget}` : null },
+                  { label:"Travellers", value:L.num_travellers },
+                  { label:"Travel Month", value:L.travel_month },
+                  { label:"Source", value:fmt(L.source) },
+                  { label:"City/State", value:[L.city,L.state].filter(Boolean).join(", ")||null },
+                  { label:"Assigned To", value:L.assigned_name||L.assigned_to },
+                  { label:"Branch", value:L.assigned_branch },
+                  { label:"Last Contact", value:fmtTime(L.last_communication_at) },
+                  { label:"Created", value:fmtDate(L.created_at) },
+                  { label:"Campaign", value:L.campaign_name },
+                ].filter(r=>r.value).map(r=>(
+                  <div key={r.label} className="rounded-lg bg-muted/40 px-3 py-2">
+                    <div className="text-muted-foreground text-[10px]">{r.label}</div>
+                    <div className="font-medium text-foreground truncate">{r.value}</div>
+                  </div>
+                ))}
               </div>
+
+              {/* Message */}
+              {L.message && (
+                <div className="rounded-xl border p-3 bg-blue-50/50">
+                  <p className="text-xs text-muted-foreground mb-1">Enquiry Message</p>
+                  <p className="text-sm">{L.message}</p>
+                </div>
+              )}
+
+              {/* Notes */}
+              {L.notes && (
+                <div className="rounded-xl border p-3 bg-amber-50/50">
+                  <p className="text-xs text-muted-foreground mb-1">Internal Notes</p>
+                  <p className="text-sm">{L.notes}</p>
+                </div>
+              )}
+
+              {/* Consents */}
+              {detail?.consents?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Communication Consents</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {detail.consents.map((c:any)=>(
+                      <span key={c.channel} className={`text-[10px] px-2 py-1 rounded-full border font-medium ${c.status==="opted_in"?"bg-green-50 text-green-700 border-green-200":"bg-red-50 text-red-700 border-red-200"}`}>
+                        {c.channel}: {c.status==="opted_in"?"✅ In":"❌ Out"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+          ) : tab==="activity" ? (
+            <ActivityFeed leadId={lead.id}/>
+          ) : tab==="tasks" ? (
+            <FollowupPanel leadId={lead.id}/>
+          ) : (
+            <EditLeadInline lead={L} onSaved={(updated)=>{ onUpdated(updated); setDetail(d=>({...d,lead:updated})); }} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-            {loading ? (
-              <div className="py-16 text-center text-muted-foreground">Loading leads…</div>
-            ) : filtered.length === 0 ? (
-              <div className="py-16 text-center text-muted-foreground">
-                <UserPlus size={36} className="mx-auto mb-2 opacity-30" />
-                <p className="font-medium">No leads found.</p>
-                <p className="text-sm mt-1">Leads are auto-created when messages arrive from any connected channel.</p>
-              </div>
-            ) : (
-              <div className="rounded-2xl border overflow-hidden">
-                <div className="px-4 py-2.5 bg-muted/30 border-b flex justify-between items-center">
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{filtered.length} Leads</p>
-                  <p className="text-xs text-muted-foreground">Sorted by latest activity</p>
-                </div>
-                <div className="divide-y">
-                  {filtered.map(l => {
-                    const isFollowUpToday = l.follow_up_date?.slice(0, 10) === today && !["converted","lost","cancelled","completed"].includes(l.status);
-                    const isOverdue = l.follow_up_date && l.follow_up_date.slice(0, 10) < today && !["converted","lost","cancelled","completed"].includes(l.status);
-                    const hasConvos = l.conversation_count > 0;
-                    const leadScore = l.score || "cold";
-                    return (
-                      <div key={l.id}
-                        className={`px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer ${isOverdue ? "bg-red-50/40" : isFollowUpToday ? "bg-amber-50/30" : leadScore === "hot" ? "bg-red-50/20" : ""}`}
-                        onClick={() => setViewLead(l)}>
-                        <div className="flex items-start gap-3">
-                          {/* Platform icon */}
-                          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-base flex-shrink-0">
-                            {PLATFORM_ICONS[l.platform] || SOURCE_ICONS[l.source] || "📋"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="font-semibold text-sm">{l.name}</p>
-                              <Badge variant="outline" className={`text-[10px] py-0 h-4 ${STATUS_COLORS[l.status] || "bg-gray-100 text-gray-600"}`}>
-                                {fmtStatus(l.status)}
-                              </Badge>
-                              {/* AI Score badge */}
-                              <ScoreBadge score={leadScore} />
-                              {l.priority === "urgent" && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-red-100 text-red-700 border-red-200">🚨 Urgent</Badge>}
-                              {l.priority === "high" && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-orange-100 text-orange-700 border-orange-200">⚡ High</Badge>}
-                              {isFollowUpToday && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-amber-100 text-amber-700 border-amber-200">Follow-up Today</Badge>}
-                              {isOverdue && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-red-100 text-red-700 border-red-200">Overdue</Badge>}
-                              {hasConvos && <Badge variant="outline" className="text-[10px] py-0 h-4 bg-sky-100 text-sky-700 border-sky-200">💬 {l.conversation_count}</Badge>}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                              {l.mobile && <span className="flex items-center gap-1"><Phone size={10} /> {l.mobile}</span>}
-                              {l.email && <span className="flex items-center gap-1"><Mail size={10} /> {l.email}</span>}
-                              {l.telegram_username && <span>✈️ {l.telegram_username}</span>}
-                              {l.instagram_username && <span>📸 {l.instagram_username}</span>}
-                              {l.package_interest && <span>📦 {l.package_interest}</span>}
-                              {l.assigned_name && <span>👤 {l.assigned_name}</span>}
-                              {l.follow_up_date && <span>📅 {fmtDate(l.follow_up_date)}</span>}
-                              {l.platform && <span className="text-[10px] bg-muted rounded-md px-1.5 py-0.5">{platformLabel(l.platform)}</span>}
-                              {l.source && l.source !== "website" && <span className="text-[10px] bg-muted rounded-md px-1.5 py-0.5">{SOURCE_ICONS[l.source]} {fmtStatus(l.source)}</span>}
-                            </div>
-                            {l.message && <p className="text-xs text-muted-foreground mt-0.5 italic truncate">"{l.message.slice(0, 80)}"</p>}
-                          </div>
+// ── Edit Lead Inline ───────────────────────────────────────────────────────────
+function EditLeadInline({ lead, onSaved }:{ lead:any; onSaved:(l:any)=>void }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    name: lead.name||"",
+    mobile: lead.mobile||"",
+    email: lead.email||"",
+    city: lead.city||"",
+    state: lead.state||"",
+    source: lead.source||"",
+    package_interest: lead.package_interest||"",
+    budget: lead.budget||"",
+    travel_month: lead.travel_month||"",
+    num_travellers: lead.num_travellers||1,
+    priority: lead.priority||"normal",
+    notes: lead.notes||"",
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k:string, v:any) => setForm(f=>({...f,[k]:v}));
 
-                          {/* Actions */}
-                          <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                            {l.mobile && (
-                              <a href={`https://wa.me/${l.mobile?.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"
-                                className="w-7 h-7 rounded-lg border border-green-200 hover:bg-green-50 text-green-700 flex items-center justify-center text-xs" title="WhatsApp">
-                                💬
-                              </a>
-                            )}
-                            {!["converted","lost","cancelled"].includes(l.status) && (
-                              <button onClick={() => quickStatus(l.id, "booked")}
-                                className="w-7 h-7 rounded-lg border border-emerald-200 hover:bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs" title="Mark Booked">
-                                <CheckCircle size={12} />
-                              </button>
-                            )}
-                            <button onClick={() => { setEditLead(l); setShowForm(false); }}
-                              className="w-7 h-7 rounded-lg border hover:bg-muted flex items-center justify-center" title="Edit">
-                              <Edit2 size={12} />
-                            </button>
-                            <button onClick={() => deleteLead(l.id)}
-                              className="w-7 h-7 rounded-lg border hover:bg-red-50 text-red-500 flex items-center justify-center" title="Delete">
-                              <Trash2 size={12} />
-                            </button>
-                            <button className="w-7 h-7 rounded-lg border hover:bg-muted flex items-center justify-center text-muted-foreground" title="View conversations">
-                              <ChevronRight size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+  const save = async () => {
+    setSaving(true);
+    try {
+      const d = await apiFetch(`/api/leads/${lead.id}`,{
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(form),
+      });
+      toast({ title:"Lead updated" });
+      onSaved(d.lead);
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Name</Label><Input value={form.name} onChange={e=>set("name",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">Mobile</Label><Input value={form.mobile} onChange={e=>set("mobile",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">Email</Label><Input type="email" value={form.email} onChange={e=>set("email",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">City</Label><Input value={form.city} onChange={e=>set("city",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">State</Label><Input value={form.state} onChange={e=>set("state",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">Package</Label>
+          <select value={form.package_interest} onChange={e=>set("package_interest",e.target.value)} className="w-full h-8 rounded-lg border bg-background px-2 text-xs">
+            <option value="">— Select —</option>
+            {PACKAGES.map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1"><Label className="text-xs">Budget</Label><Input value={form.budget} onChange={e=>set("budget",e.target.value)} className="h-8 text-sm"/></div>
+        <div className="space-y-1"><Label className="text-xs">Priority</Label>
+          <select value={form.priority} onChange={e=>set("priority",e.target.value)} className="w-full h-8 rounded-lg border bg-background px-2 text-xs">
+            {PRIORITIES.map(p=><option key={p} value={p}>{fmt(p)}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2 space-y-1"><Label className="text-xs">Notes</Label>
+          <textarea value={form.notes} onChange={e=>set("notes",e.target.value)} className="w-full rounded-xl border bg-background px-3 py-2 text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary"/>
+        </div>
+      </div>
+      <Button size="sm" className="w-full gap-1.5" onClick={save} disabled={saving}>
+        {saving?<RefreshCw size={12} className="animate-spin"/>:<CheckCircle size={12}/>} Save Changes
+      </Button>
+    </div>
+  );
+}
+
+// ── Lead Card ──────────────────────────────────────────────────────────────────
+function LeadCard({ lead, onSelect, onDelete }:{ lead:any; onSelect:(l:any)=>void; onDelete:(id:string)=>void }) {
+  const overdue = lead.followup_due_at && new Date(lead.followup_due_at) < new Date();
+  return (
+    <div className={`rounded-2xl border bg-background p-4 hover:shadow-md transition-all cursor-pointer group ${overdue?"border-red-200 bg-red-50/30":""}`}
+      onClick={()=>onSelect(lead)}>
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-base flex-shrink-0">
+          {SOURCE_ICON[lead.source]||"📋"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm truncate">{lead.name}</span>
+            <ScoreBadge score={lead.score}/>
+            <PriorityBadge priority={lead.priority}/>
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+            {lead.lead_number && <span className="font-mono text-primary/70">{lead.lead_number}</span>}
+            {lead.mobile && <span>📞 {lead.mobile}</span>}
+            <span className="capitalize">{fmt(lead.source)}</span>
+            {lead.pipeline_stage && lead.pipeline_stage !== "new_lead" && (
+              <span className="bg-muted px-1.5 py-0.5 rounded text-[9px]">{fmt(lead.pipeline_stage)}</span>
             )}
-          </>
+          </div>
+          {lead.package_interest && (
+            <div className="text-[11px] text-primary/80 mt-1 font-medium">📦 {lead.package_interest}</div>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className="text-[10px] text-muted-foreground">{timeAgo(lead.created_at)}</span>
+          {lead.assigned_name && (
+            <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full">👤 {lead.assigned_name}</span>
+          )}
+          {overdue && (
+            <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <AlertTriangle size={9}/> Overdue
+            </span>
+          )}
+        </div>
+      </div>
+      {lead.message && (
+        <div className="mt-2.5 text-[11px] text-muted-foreground line-clamp-2 bg-muted/30 rounded-lg px-2 py-1.5">
+          {lead.message}
+        </div>
+      )}
+      <div className="mt-2.5 flex items-center gap-3 text-[10px] text-muted-foreground">
+        {lead.activity_count > 0 && <span><Activity size={10} className="inline mr-1"/>{lead.activity_count} events</span>}
+        {lead.pending_tasks > 0 && <span><Calendar size={10} className="inline mr-1"/>{lead.pending_tasks} tasks</span>}
+        {lead.city && <span><Globe size={10} className="inline mr-1"/>{lead.city}</span>}
+        <button onClick={e=>{ e.stopPropagation(); onDelete(lead.id); }}
+          className="ml-auto opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-all p-1 rounded hover:bg-red-50">
+          <Trash2 size={12}/>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════
+export default function LeadManager() {
+  const { toast } = useToast();
+
+  // Data state
+  const [leads, setLeads] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+
+  // UI state
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [filterSource, setFilterSource] = useState("all");
+  const [filterScore, setFilterScore] = useState("all");
+  const [filterStage, setFilterStage] = useState("all");
+  const [filterPriority, setFilterPriority] = useState("all");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortDir, setSortDir] = useState("desc");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const searchTimeout = useRef<any>(null);
+
+  const loadLeads = useCallback(async (p=1) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(p), limit:"30",
+        sortBy, sortDir,
+        ...(search&&{search}),
+        ...(filterSource!=="all"&&{source:filterSource}),
+        ...(filterScore!=="all"&&{score:filterScore}),
+        ...(filterStage!=="all"&&{stage:filterStage}),
+        ...(filterPriority!=="all"&&{priority:filterPriority}),
+      });
+      const d = await apiFetch(`/api/leads?${params}`);
+      setLeads(d.leads||[]);
+      setTotal(d.total||0);
+      setPages(d.pages||1);
+      setPage(p);
+    } catch(e:any){ toast({ title:"Error loading leads", description:e.message, variant:"destructive" }); }
+    setLoading(false);
+  },[search,filterSource,filterScore,filterStage,filterPriority,sortBy,sortDir]);
+
+  const loadStats = useCallback(async () => {
+    apiFetch("/api/leads/stats").then(setStats).catch(()=>{});
+  },[]);
+
+  useEffect(()=>{ loadStats(); },[loadStats]);
+
+  useEffect(()=>{
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(()=>loadLeads(1), 400);
+    return ()=>clearTimeout(searchTimeout.current);
+  },[loadLeads]);
+
+  const createLead = async (form:any) => {
+    setSaving(true);
+    try {
+      const d = await apiFetch("/api/leads/create",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name: form.name, mobile: form.mobile, whatsapp_number: form.whatsapp_number,
+          email: form.email, city: form.city, state: form.state, country: form.country,
+          source: form.source, package_interest: form.package_interest,
+          budget: form.budget, message: form.message, travel_month: form.travel_month,
+          num_travellers: form.num_travellers, priority: form.priority, notes: form.notes,
+          consent_whatsapp: form.consent_whatsapp, consent_sms: form.consent_sms,
+        }),
+      });
+      toast({ title: d.isDuplicate ? "⚠️ Duplicate — existing lead updated" : "✅ Lead created",
+        description: d.isDuplicate ? "This contact already exists. New enquiry added to timeline." : `Lead #${d.lead?.lead_number}` });
+      setShowForm(false);
+      loadLeads(1);
+      loadStats();
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+    setSaving(false);
+  };
+
+  const deleteLead = async (id:string) => {
+    if (!confirm("Mark this lead as spam? This will hide it from the main view.")) return;
+    try {
+      await apiFetch(`/api/leads/${id}`,{ method:"DELETE" });
+      toast({ title:"Lead marked as spam" });
+      setLeads(ls=>ls.filter(l=>l.id!==id));
+      loadStats();
+    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
+  };
+
+  const onLeadUpdated = (updated:any) => {
+    setLeads(ls=>ls.map(l=>l.id===updated.id?{...l,...updated}:l));
+  };
+
+  const toggleSort = (field:string) => {
+    if (sortBy===field) setSortDir(d=>d==="asc"?"desc":"asc");
+    else { setSortBy(field); setSortDir("desc"); }
+  };
+
+  return (
+    <AdminLayout>
+      <div className="space-y-4 p-4 max-w-[1400px] mx-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-bold">Lead Manager</h1>
+            <p className="text-sm text-muted-foreground">{total.toLocaleString("en-IN")} leads · Smart assignment · Auto follow-up</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={()=>{ loadLeads(page); loadStats(); }}>
+              <RefreshCw size={13}/> Refresh
+            </Button>
+            <Button size="sm" className="gap-1.5 h-8" onClick={()=>setShowForm(v=>!v)}>
+              <Plus size={13}/> New Lead
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <StatsCards stats={stats}/>
+
+        {/* Create form */}
+        {showForm && (
+          <LeadForm onSave={createLead} onCancel={()=>setShowForm(false)} saving={saving}/>
+        )}
+
+        {/* Filters + Search */}
+        <div className="rounded-2xl border bg-background p-3 space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, mobile, email, lead#…"
+                className="pl-8 h-8 text-sm"/>
+            </div>
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={()=>setShowFilters(v=>!v)}>
+              <Filter size={13}/> Filters {showFilters?"▲":"▼"}
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <select value={filterSource} onChange={e=>setFilterSource(e.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs">
+                <option value="all">All Sources</option>
+                {SOURCES.map(s=><option key={s} value={s}>{SOURCE_ICON[s]||"📋"} {fmt(s)}</option>)}
+              </select>
+              <select value={filterScore} onChange={e=>setFilterScore(e.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs">
+                <option value="all">All Scores</option>
+                <option value="hot">🔥 Hot</option>
+                <option value="warm">🌡️ Warm</option>
+                <option value="cold">❄️ Cold</option>
+              </select>
+              <select value={filterStage} onChange={e=>setFilterStage(e.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs">
+                <option value="all">All Stages</option>
+                {PIPELINE_STAGES.map(s=><option key={s} value={s}>{fmt(s)}</option>)}
+              </select>
+              <select value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs">
+                <option value="all">All Priorities</option>
+                {PRIORITIES.map(p=><option key={p} value={p}>{fmt(p)}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Sort bar */}
+          <div className="flex gap-1 flex-wrap pt-1">
+            <span className="text-xs text-muted-foreground self-center mr-1">Sort:</span>
+            {[
+              { key:"created_at", label:"Date" },
+              { key:"score", label:"Score" },
+              { key:"name", label:"Name" },
+              { key:"last_communication_at", label:"Last Contact" },
+            ].map(s=>(
+              <button key={s.key} onClick={()=>toggleSort(s.key)}
+                className={`text-xs px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 ${sortBy===s.key?"bg-primary text-primary-foreground border-primary":"bg-background hover:bg-muted"}`}>
+                {s.label} {sortBy===s.key&&<ArrowUpDown size={10}/>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lead list */}
+        {loading ? (
+          <div className="flex items-center justify-center h-48 text-muted-foreground">
+            <RefreshCw size={24} className="animate-spin mr-3"/> Loading leads…
+          </div>
+        ) : leads.length === 0 ? (
+          <div className="rounded-2xl border border-dashed p-12 text-center">
+            <Users size={40} className="mx-auto mb-3 opacity-20"/>
+            <p className="font-semibold text-muted-foreground">No leads found</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Add your first lead or adjust filters</p>
+            <Button size="sm" className="mt-4 gap-1.5" onClick={()=>setShowForm(true)}><Plus size={13}/> Add Lead</Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {leads.map(lead=>(
+              <LeadCard key={lead.id} lead={lead} onSelect={setSelectedLead} onDelete={deleteLead}/>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pages > 1 && (
+          <div className="flex items-center justify-center gap-2">
+            <Button size="sm" variant="outline" onClick={()=>loadLeads(page-1)} disabled={page<=1||loading}>← Prev</Button>
+            <span className="text-sm text-muted-foreground">Page {page} of {pages} · {total.toLocaleString("en-IN")} leads</span>
+            <Button size="sm" variant="outline" onClick={()=>loadLeads(page+1)} disabled={page>=pages||loading}>Next →</Button>
+          </div>
         )}
       </div>
 
-      {/* Conversation Panel */}
-      {viewLead && (
-        <ConversationPanel
-          lead={viewLead}
-          onClose={() => setViewLead(null)}
-          onStatusChange={quickStatus}
+      {/* Lead detail slide-in */}
+      {selectedLead && (
+        <LeadDetailPanel
+          lead={selectedLead}
+          onClose={()=>setSelectedLead(null)}
+          onUpdated={(updated)=>{ onLeadUpdated(updated); setSelectedLead(l=>({...l,...updated})); }}
         />
       )}
     </AdminLayout>

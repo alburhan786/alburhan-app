@@ -94,6 +94,7 @@ import { startAgreementReminderCron } from "./jobs/agreementReminder.js";
 import { startTicketDepartureReminderCron } from "./jobs/ticketDepartureReminder.js";
 import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeedbackCron, startBalanceReminderCron, startDocumentReminderCron, startZiyaratReminderCron, startAgreementIntegrityCron, startVisaReminderCron, startDailyAdminReportCron } from "./lib/workflowEngine.js";
 import { DEFAULT_RULES } from "./routes/workflows.js";
+import { runFollowupCron } from "./lib/leadEngine.js";
 
 async function runMigrations() {
   // Session table — must exist BEFORE connect-pg-simple initializes
@@ -2600,6 +2601,11 @@ async function start() {
     startVisaReminderCron();
     startDailyAdminReportCron();
     startTicketDepartureReminderCron();
+    // Lead engine follow-up automation — runs every 5 minutes
+    setTimeout(() => {
+      runFollowupCron().catch(e => console.error("[LeadEngine] Initial cron error:", e));
+      setInterval(() => runFollowupCron().catch(e => console.error("[LeadEngine] Cron error:", e)), 5 * 60 * 1000);
+    }, 30 * 1000); // 30s startup delay
     const scheduleAuditRetention = () => {
       const now = new Date();
       const nextRun = new Date(now);
