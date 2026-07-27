@@ -164,6 +164,14 @@ router.delete("/unsubscribe", requireAuth as any, async (req, res) => {
 // ── Admin: FCM configuration status ──────────────────────────────────────────
 router.get("/fcm-status", requireAdmin as any, async (_req, res) => {
   try {
+    // Detect exactly which server-side keys are missing
+    const serverKeys = [
+      { key: "FIREBASE_PROJECT_ID",   value: process.env.FIREBASE_PROJECT_ID   || "" },
+      { key: "FIREBASE_CLIENT_EMAIL", value: process.env.FIREBASE_CLIENT_EMAIL || "" },
+      { key: "FIREBASE_PRIVATE_KEY",  value: process.env.FIREBASE_PRIVATE_KEY  || "" },
+    ];
+    const missingServerKeys = serverKeys.filter(k => !k.value).map(k => k.key);
+
     const [configured, subRes, byTypeRes] = await Promise.all([
       isFirebaseConfigured(),
       pool.query(`
@@ -182,6 +190,7 @@ router.get("/fcm-status", requireAdmin as any, async (_req, res) => {
     ]);
     res.json({
       configured,
+      missing_server_keys: missingServerKeys,
       unique_subscribers: subRes.rows[0]?.unique_subs || 0,
       total_tokens:       subRes.rows[0]?.total_tokens || 0,
       by_user_type:       byTypeRes.rows,

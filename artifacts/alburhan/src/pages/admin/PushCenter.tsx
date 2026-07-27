@@ -207,19 +207,33 @@ export default function PushCenter() {
 
                 {!status.configured && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
-                    <p className="font-semibold">Set these environment secrets to activate FCM:</p>
-                    <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
-                      <li>FIREBASE_PROJECT_ID</li>
-                      <li>FIREBASE_CLIENT_EMAIL</li>
-                      <li>FIREBASE_PRIVATE_KEY</li>
-                      <li>VITE_FIREBASE_API_KEY</li>
-                      <li>VITE_FIREBASE_AUTH_DOMAIN</li>
-                      <li>VITE_FIREBASE_PROJECT_ID</li>
-                      <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
-                      <li>VITE_FIREBASE_APP_ID</li>
-                      <li>VITE_FIREBASE_VAPID_KEY</li>
-                    </ul>
-                    <p className="mt-1.5 text-[11px]">Get these from Firebase Console → Project Settings → Service accounts + Web app config.</p>
+                    {status.missing_server_keys?.length > 0 ? (
+                      <>
+                        <p className="font-semibold">Missing server-side secrets ({status.missing_server_keys.length}):</p>
+                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
+                          {status.missing_server_keys.map((k: string) => (
+                            <li key={k} className="text-red-700 font-bold">{k}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-1 text-[11px]">Add these in Replit Secrets, then rebuild and redeploy to activate FCM.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-semibold">Set these environment secrets to activate FCM:</p>
+                        <ul className="list-disc pl-4 space-y-0.5 font-mono text-[11px]">
+                          <li>FIREBASE_PROJECT_ID</li>
+                          <li>FIREBASE_CLIENT_EMAIL</li>
+                          <li>FIREBASE_PRIVATE_KEY</li>
+                          <li>VITE_FIREBASE_API_KEY</li>
+                          <li>VITE_FIREBASE_AUTH_DOMAIN</li>
+                          <li>VITE_FIREBASE_PROJECT_ID</li>
+                          <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
+                          <li>VITE_FIREBASE_APP_ID</li>
+                          <li>VITE_FIREBASE_VAPID_KEY</li>
+                        </ul>
+                        <p className="mt-1.5 text-[11px]">Get these from Firebase Console → Project Settings → Service accounts + Web app config.</p>
+                      </>
+                    )}
                   </div>
                 )}
 

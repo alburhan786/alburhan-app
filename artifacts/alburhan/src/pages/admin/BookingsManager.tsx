@@ -2253,6 +2253,18 @@ export default function BookingsManager() {
     if (statusFilter === "trash") fetchTrash();
   }, [statusFilter]);
 
+  // Auto-open booking detail when navigated from notification drawer (?open=bookingId)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get("open");
+    if (!openId || !bookings.length) return;
+    const found = bookings.find((b: any) => b.id === openId);
+    if (found) {
+      setDetailBooking(found as Booking);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [bookings]);
+
   const handleApprove = async (id: string) => {
     try {
       await approveMutation.mutateAsync({ id });

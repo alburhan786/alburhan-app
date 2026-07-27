@@ -78,8 +78,43 @@ function typeColor(type: AdminNotifType): string {
 }
 
 function notifNavPath(n: AdminNotification): string | null {
-  if (n.bookingId) return `/admin/bookings/${n.bookingId}`;
-  if (n.type === "notification_failure") return "/admin/notification-logs";
+  const t = n.type;
+
+  // Booking-related: open the booking detail modal via query param
+  if (
+    n.bookingId &&
+    (t === "booking_new" || t === "booking_approved" ||
+     t === "booking_rejected" || t === "booking_cancelled" ||
+     t === "payment_received" || t.startsWith("booking") || t.startsWith("payment"))
+  ) {
+    return `/admin/bookings?open=${n.bookingId}`;
+  }
+
+  // Type-specific valid routes
+  if (t === "invoice_generated" || t === "invoice_overdue" || t.startsWith("invoice"))
+    return "/admin/invoices";
+  if (t === "agreement_signed" || t === "agreement_ready" || t.startsWith("agreement"))
+    return "/admin/agreements";
+  if (t === "visa_issued" || t === "visa_rejected" || t.startsWith("visa"))
+    return "/admin/visa";
+  if (t === "notification_failure" || t.startsWith("notification_fail"))
+    return "/admin/notification-logs";
+  if (t.startsWith("flight"))
+    return "/admin/flight-ops";
+  if (t.startsWith("hotel"))
+    return "/admin/hotel-ops";
+  if (t.startsWith("document"))
+    return "/admin/documents";
+  if (t.startsWith("customer"))
+    return "/admin/customers";
+  if (t.startsWith("passport") || t.startsWith("kyc"))
+    return "/admin/visa";
+  if (t.startsWith("reminder") || t.startsWith("alert"))
+    return "/admin/notification-logs";
+
+  // Fallback: if we have a bookingId at all, open the booking
+  if (n.bookingId) return `/admin/bookings?open=${n.bookingId}`;
+
   return null;
 }
 
