@@ -296,7 +296,10 @@ router.post("/verify-otp", async (req, res) => {
     return;
   }
 
-  const isNewUser = !user.name;
+  // Admin and super_admin users are never treated as "new users" regardless of
+  // whether their name field is set — they always go straight to the admin portal.
+  const isAdminRole = user.role === "admin" || user.role === "super_admin";
+  const isNewUser = !user.name && !isAdminRole;
   (req.session as any).userId = user.id;
 
   // Resolve entityId for portal roles (branch_manager / agent / staff)

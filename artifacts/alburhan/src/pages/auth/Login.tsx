@@ -244,8 +244,13 @@ export default function Login() {
     if (!name.trim()) return;
     setIsUpdating(true);
     try {
-      await updateProfile({ name: name.trim(), email: email.trim() || undefined });
-      setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
+      const updated = await updateProfile({ name: name.trim(), email: email.trim() || undefined });
+      // Admin/super_admin users who somehow reach step 3 go to admin portal, not customer dashboard
+      if (updated?.role === "admin" || updated?.role === "super_admin") {
+        adminRedirect(updated.role);
+      } else {
+        setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
+      }
     } catch {
       setLocation(returnUrl || DEFAULT_CUSTOMER_REDIRECT);
     } finally {

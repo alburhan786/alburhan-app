@@ -35,7 +35,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       mobile: u.mobile,
       role: u.role,
       // Default admin/super_admin users to 'admin' role when admin_role is not set in DB
-      adminRole: (u.admin_role || (u.role === "admin" ? "admin" : "read_only")) as AdminRole,
+      adminRole: (u.admin_role || (u.role === "super_admin" ? "super_admin" : u.role === "admin" ? "admin" : "read_only")) as AdminRole,
       name: u.name,
       email: u.email,
       assignedGroupIds: Array.isArray(u.assigned_group_ids) ? u.assigned_group_ids : [],
@@ -71,10 +71,15 @@ export async function requirePortalUser(req: AuthenticatedRequest, res: Response
   });
 }
 
+/** Central helper: true for any user that has admin-portal access */
+function isAdminOrSuperAdmin(req: AuthenticatedRequest): boolean {
+  return ADMIN_ROLES.has(req.user?.role ?? "");
+}
+
 export function requirePermission(module: Module, action: Action) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     await requireAuth(req, res, async () => {
-      if (req.user?.role !== "admin") {
+      if (!isAdminOrSuperAdmin(req)) {
         res.status(403).json({ message: "Admin access required." });
         return;
       }
@@ -97,7 +102,7 @@ export function requireModuleAccess(module: Module) {
   };
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     await requireAuth(req, res, async () => {
-      if (req.user?.role !== "admin") {
+      if (!isAdminOrSuperAdmin(req)) {
         res.status(403).json({ message: "Admin access required." });
         return;
       }

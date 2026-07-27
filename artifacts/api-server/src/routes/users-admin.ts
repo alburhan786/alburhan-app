@@ -22,7 +22,9 @@ async function hashPassword(password: string): Promise<string> {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function isSuperAdmin(req: AuthenticatedRequest) {
-  return req.user?.role === "admin" && req.user?.adminRole === "super_admin";
+  // Supports both role="admin"+adminRole="super_admin" (current) and
+  // role="super_admin" (future-proof) patterns.
+  return (req.user?.role === "admin" || req.user?.role === "super_admin") && req.user?.adminRole === "super_admin";
 }
 
 async function sendCredentials(

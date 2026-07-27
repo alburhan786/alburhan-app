@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useGetMe, useSendOtp, useVerifyOtp, useLogout, User } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { PORTAL_REDIRECT, DEFAULT_CUSTOMER_REDIRECT } from "@/config/roleRedirects";
+import { PORTAL_REDIRECT, DEFAULT_CUSTOMER_REDIRECT, DEFAULT_ADMIN_REDIRECT } from "@/config/roleRedirects";
 
 const BASE_URL = import.meta.env.BASE_URL ?? "/";
 
