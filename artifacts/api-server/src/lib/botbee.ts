@@ -283,7 +283,7 @@ export function applyTemplateOverrides(overrides: Record<string, { id: string; b
  * For {{N}} templates, variables are substituted positionally: {{1}} → vars[0], {{2}} → vars[1], etc.
  * (Object.values preserves insertion order, so sender functions must pass vars in template order.)
  */
-function renderTemplateBody(body: string, vars: Record<string, string>): string {
+export function renderTemplateBody(body: string, vars: Record<string, string>): string {
   let result = body;
 
   // 1. Replace #!VarName!# (named CRM variable format)
@@ -447,15 +447,30 @@ export async function sendTemplate(
   }
 
   // ── Variable validation ───────────────────────────────────────────────────────
-  // Block the send if any variable value still contains an unresolved placeholder
-  // (#!VarName!# or {{N}}). Log a warning if any value is empty / defaulted to "-".
+  // HARD BLOCK (1): any value that is undefined/null/"undefined"/"null" — the template
+  //   would deliver a literal "undefined" or null to the customer. Fail immediately.
+  // HARD BLOCK (2): any value still containing #!VarName!# or {{N}} placeholders.
+  // WARN: empty string or "-" default values (allowed — some optional fields).
   if (namedVars && Object.keys(namedVars).length > 0) {
+    const nullUndefinedKeys = Object.entries(namedVars)
+      .filter(([, v]) => v === undefined || v === null || String(v) === "undefined" || String(v) === "null")
+      .map(([k]) => k);
+    if (nullUndefinedKeys.length > 0) {
+      const detail = nullUndefinedKeys.map(k => `${k}=undefined`).join(", ");
+      const errMsg = `Template ${templateId} BLOCKED: undefined/null variable values — ${detail}. Resolve all fields before sending.`;
+      console.error(`[BotBee] sendTemplate BLOCKED (undefined vars): ${errMsg}`);
+      const blocked: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: errMsg };
+      if (opts?.eventType && !opts?.noInternalLog) {
+        await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: errMsg, status: "failed", result: blocked });
+      }
+      return blocked;
+    }
     const unresolvedEntries = Object.entries(namedVars)
       .filter(([, v]) => /#![^!]+!#|\{\{\d+\}\}/.test(String(v ?? "")));
     if (unresolvedEntries.length > 0) {
       const detail = unresolvedEntries.map(([k, v]) => `${k}="${v}"`).join(", ");
-      const errMsg = `Template ${templateId} blocked: variable values contain unresolved placeholders — ${detail}`;
-      console.error(`[BotBee] sendTemplate BLOCKED: ${errMsg}`);
+      const errMsg = `Template ${templateId} BLOCKED: variable values contain unresolved placeholders — ${detail}`;
+      console.error(`[BotBee] sendTemplate BLOCKED (placeholder vars): ${errMsg}`);
       const blocked: BotBeeResult = { ok: false, provider: "BotBee", endpoint, errorMessage: errMsg };
       if (opts?.eventType && !opts?.noInternalLog) {
         await logToDb({ eventType: opts.eventType, channel: "whatsapp", recipient: to, bookingId: opts.bookingId, customerId: opts.customerId, customerName: opts.customerName, templateId, message: errMsg, status: "failed", result: blocked });
@@ -463,7 +478,7 @@ export async function sendTemplate(
       return blocked;
     }
     const emptyKeys = Object.entries(namedVars)
-      .filter(([, v]) => v === undefined || v === null || String(v).trim() === "" || String(v) === "-")
+      .filter(([, v]) => String(v).trim() === "" || String(v) === "-")
       .map(([k]) => k);
     if (emptyKeys.length > 0) {
       console.warn(`[BotBee] sendTemplate WARN: template ${templateId} has empty/defaulted variables: [${emptyKeys.join(", ")}] — message will show "-" for those slots`);
@@ -472,17 +487,32 @@ export async function sendTemplate(
     console.warn(`[BotBee] sendTemplate WARN: template ${templateId} sent with NO variables — all #!VarName!# placeholders will remain unsubstituted`);
   }
 
-  // CRITICAL — named variables ONLY, no components array.
-  // BotBee substitutes #!VarName!# in mixed_body_text when variables is a NAMED OBJECT
-  // matching the template's variable_map keys exactly.
-  // Sending components alongside variables causes BotBee to prefer the Meta components
-  // routing path which does NOT apply #!Name!# substitution in OBA delivery —
-  // the recipient then sees the raw "#!Name!#" placeholder text.
+  // ── Pre-render fallback message ──────────────────────────────────────────────
+  // BotBee's /whatsapp/send/template returns status:1 + wamid for ALL variable formats
+  // (named object, positional array, components) but delivers #!VarName!# unsubstituted.
+  // As a fallback, we pre-render the template body ourselves and include it as the
+  // `message` field. If BotBee's delivery engine honours the `message` field over the
+  // raw template body, the customer receives properly substituted text.
+  const templateBodyForFallback = isNumericId ? TEMPLATE_BODIES[templateId?.trim() ?? ""] : undefined;
+  const preRenderedMsg = (templateBodyForFallback && namedVars)
+    ? renderTemplateBody(templateBodyForFallback, namedVars)
+    : undefined;
+
+  if (preRenderedMsg) {
+    const remaining = [...preRenderedMsg.matchAll(/#![^!]+!#|\{\{\d+\}\}/g)].map(m => m[0]);
+    if (remaining.length) {
+      console.warn(`[BotBee] sendTemplate FALLBACK pre-render WARN: unsubstituted after render:`, remaining, "vars:", Object.keys(namedVars ?? {}));
+    } else {
+      console.log(`[BotBee] sendTemplate FALLBACK pre-render ✅ preview="${preRenderedMsg.substring(0, 100).replace(/\n/g, "↵")}"`);
+    }
+  }
+
   const payload: Record<string, unknown> = {
     apiToken, phone_number_id, phone_number: phone,
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(namedVars ? { variables: namedVars } : {}),
+    ...(preRenderedMsg ? { message: preRenderedMsg } : {}),
   };
 
   const reqPayload: Record<string, unknown> = {
@@ -490,6 +520,7 @@ export async function sendTemplate(
     ...(business_id ? { business_id } : {}),
     ...(isNumericId ? { template_id: Number(templateId) } : { template_name: templateId }),
     ...(namedVars ? { variables: namedVars } : {}),
+    ...(preRenderedMsg ? { message: preRenderedMsg } : {}),
   };
 
   console.log("[BotBee] sendTemplate REQUEST →", JSON.stringify(reqPayload));

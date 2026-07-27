@@ -1,0 +1,249 @@
+STOP marking the project as COMPLETE.
+
+The production system is NOT working correctly.
+
+Real customer testing shows production failures.
+
+DO NOT rely on internal PASS reports.
+
+==================================================
+CURRENT PRODUCTION FAILURES
+==================================================
+
+1. WhatsApp messages still contain raw placeholders:
+
+#!Name!#
+#!BookingID!#
+#!PackageContent!#
+#!Amount!#
+#!Agreement!#
+#!Download!#
+#!Paymenturllink!#
+
+These MUST be replaced with actual values BEFORE sending.
+
+==================================================
+
+2. Many SMS events are never received.
+
+Verify EVERY SMS event:
+
+booking_submitted
+
+booking_approved
+
+payment_pending
+
+partial_payment
+
+payment_received
+
+invoice_ready
+
+agreement_ready
+
+agreement_signed
+
+visa_issued
+
+ticket_ready
+
+hotel_assignment
+
+room_allocation
+
+departure_reminder
+
+return_flight
+
+orientation
+
+welcome
+
+==================================================
+
+3. EMAIL
+
+Production email is NOT arriving.
+
+Audit:
+
+SMTP
+
+Mail Queue
+
+Worker
+
+Retry Queue
+
+Transport
+
+Authentication
+
+DNS
+
+SPF
+
+DKIM
+
+DMARC
+
+Mail logs
+
+Send a REAL email.
+
+==================================================
+
+4. PUSH
+
+Production push notifications are not received.
+
+Verify:
+
+Firebase
+
+Device Token
+
+FCM
+
+Notification Queue
+
+Customer Device
+
+==================================================
+
+5. VARIABLE RESOLUTION
+
+Before BotBee API call log:
+
+Booking ID
+
+Customer Name
+
+Package
+
+Amount
+
+Invoice Number
+
+Agreement Number
+
+Download URL
+
+Payment URL
+
+If ANY variable is undefined
+
+FAIL THE MESSAGE.
+
+Never send placeholders.
+
+==================================================
+
+6. TEMPLATE MAPPING
+
+Audit every template.
+
+Each placeholder must map to a real database field.
+
+For example
+
+#!Name!# -> customer.full_name
+
+#!BookingID!# -> booking.booking_id
+
+#!PackageContent!# -> package.package_name
+
+#!Amount!# -> invoice.total_amount
+
+#!Agreement!# -> agreement.agreement_number
+
+#!Download!# -> agreement.download_url
+
+#!Paymenturllink!# -> payment.payment_url
+
+Print a mapping table.
+
+==================================================
+
+7. BOTBEE
+
+Capture the EXACT outbound payload.
+
+Capture the EXACT BotBee response.
+
+Capture the EXACT delivered message.
+
+Compare all three.
+
+==================================================
+
+8. PRODUCTION TEST
+
+Create one REAL booking.
+
+Run complete journey.
+
+Booking
+
+↓
+
+Approval
+
+↓
+
+Invoice
+
+↓
+
+Payment
+
+↓
+
+Agreement
+
+↓
+
+Signature
+
+↓
+
+Visa
+
+↓
+
+Ticket
+
+↓
+
+Hotel
+
+↓
+
+Room
+
+↓
+
+Departure
+
+↓
+
+Return
+
+Verify every notification on:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+Dashboard
+
+==================================================
+
+Do NOT report PASS until a real customer receives every notification with correctly substituted variables.
+
+Provide screenshots and logs proving each notification contains actual values instead of placeholders.

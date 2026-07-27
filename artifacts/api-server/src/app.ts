@@ -4609,6 +4609,203 @@ app.get("/api/test-email", async (req: any, res: any) => {
   }
 });
 
+// ── Notification debug endpoint ────────────────────────────────────────────────
+// GET /api/debug/notifications/:bookingId
+// Returns: DB values, resolved variables, exact JSON to BotBee, BotBee response, preview.
+// Protected by ?key= query param (same as migration key).
+app.get("/api/debug/notifications/:bookingId", async (req: any, res: any) => {
+  const { bookingId } = req.params;
+  const key = String(req.query.key || "");
+  const send = req.query.send === "1"; // ?send=1 to actually trigger a live send
+  const EXPECTED_KEY = process.env.MIGRATION_KEY || "alburhan-migrate-2026";
+  if (key !== EXPECTED_KEY) {
+    return res.status(401).json({ ok: false, error: "Invalid or missing ?key= parameter" });
+  }
+
+  try {
+    const p = sharedPool;
+
+    // ── 1. Fetch booking + related data ──────────────────────────────────────
+    const bkRes = await p.query(
+      `SELECT b.id, b.booking_number, b.status, b.customer_id,
+              b.customer_name, b.customer_mobile, b.customer_email,
+              b.package_name, b.total_amount, b.paid_amount, b.invoice_number,
+              i.id AS invoice_id, i.invoice_number AS inv_number,
+              i.total AS inv_total, i.paid AS inv_paid, i.balance AS inv_balance,
+              i.invoice_status,
+              a.id AS agreement_id, a.agreement_number, a.status AS agreement_status
+       FROM bookings b
+       LEFT JOIN invoices i ON i.booking_id = b.id
+       LEFT JOIN agreements a ON a.booking_id = b.id
+       WHERE b.booking_number = $1 OR b.id::text = $1
+       ORDER BY i.created_at DESC, a.created_at DESC
+       LIMIT 1`,
+      [bookingId]
+    );
+
+    if (bkRes.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: `Booking not found: ${bookingId}` });
+    }
+    const bk = bkRes.rows[0];
+    const SITE = process.env.SITE_URL || "https://alburhantravels.online";
+
+    // ── 2. Build variable map for each template ───────────────────────────────
+    const fmtAmt = (v: any) => {
+      const n = Number(v);
+      return (isNaN(n) || n === 0) ? "-" : n.toLocaleString("en-IN");
+    };
+
+    const customerName  = bk.customer_name   ?? undefined;
+    const bookingRef    = bk.booking_number  ?? undefined;
+    const packageName   = bk.package_name   ?? undefined;
+    const totalAmount   = bk.inv_total ?? bk.total_amount ?? undefined;
+    const paidAmount    = bk.inv_paid  ?? bk.paid_amount  ?? undefined;
+    const invoiceNumber = bk.inv_number ?? bk.invoice_number ?? undefined;
+    const agreementNum  = bk.agreement_number ?? undefined;
+    const paymentUrl    = bk.invoice_id ? `${SITE}/invoice/${bk.booking_number}` : undefined;
+    const downloadUrl   = agreementNum ? `${SITE}/agreement/${agreementNum}` : undefined;
+
+    // Variable mapping table
+    const variableMapping = {
+      "#!Name!#":          { resolvedTo: customerName,       dbField: "bookings.customer_name",         dbValue: bk.customer_name },
+      "#!BookingID!#":     { resolvedTo: bookingRef,         dbField: "bookings.booking_number",        dbValue: bk.booking_number },
+      "#!PackageContent!#":{ resolvedTo: packageName,        dbField: "bookings.package_name",          dbValue: bk.package_name },
+      "#!Amount!#":        { resolvedTo: fmtAmt(totalAmount),dbField: "invoices.total_amount",          dbValue: totalAmount },
+      "#!Invoice!#":       { resolvedTo: invoiceNumber,      dbField: "invoices.invoice_number",        dbValue: invoiceNumber },
+      "#!Agreement!#":     { resolvedTo: agreementNum,       dbField: "agreements.agreement_number",    dbValue: bk.agreement_number },
+      "#!Download!#":      { resolvedTo: downloadUrl,        dbField: "derived: SITE/agreement/agreement_number", dbValue: agreementNum ?? null },
+      "#!Paymenturllink!#":{ resolvedTo: paymentUrl,         dbField: "derived: SITE/invoice/booking_number", dbValue: "computed" },
+    };
+
+    // Undefined check
+    const undefinedVars = Object.entries(variableMapping)
+      .filter(([, v]) => v.resolvedTo === undefined || v.resolvedTo === null)
+      .map(([k, v]) => ({ placeholder: k, dbField: v.dbField, dbValue: v.dbValue }));
+
+    // Per-template variable objects
+    const templates: Record<string, any> = {
+      booking_submitted: {
+        templateId: "409897",
+        variables: { Name: customerName, BookingID: bookingRef, PackageContent: packageName, Amount: fmtAmt(totalAmount), Paymenturllink: paymentUrl },
+      },
+      booking_approved: {
+        templateId: "409950",
+        variables: { Name: customerName, BookingID: bookingRef, PackageContent: packageName, Amount: fmtAmt(totalAmount), Paymenturllink: paymentUrl },
+      },
+      payment_received: {
+        templateId: "409953",
+        variables: { Name: customerName, BookingID: bookingRef, Invoice: invoiceNumber, Amount: fmtAmt(paidAmount) },
+      },
+      agreement_ready: {
+        templateId: "409958",
+        variables: { Name: customerName, BookingID: bookingRef, Agreement: agreementNum, Download: downloadUrl },
+      },
+      agreement_signed: {
+        templateId: "409965",
+        variables: { Name: customerName, Agreement: agreementNum },
+      },
+    };
+
+    // Identify undefined vars in each template
+    for (const [tplKey, tpl] of Object.entries(templates)) {
+      const undef = Object.entries(tpl.variables)
+        .filter(([, v]) => v === undefined || v === null || String(v) === "undefined")
+        .map(([k]) => k);
+      (tpl as any).undefinedVars = undef;
+      (tpl as any).wouldBeBlocked = undef.length > 0;
+    }
+
+    // ── 3. Exact JSON as would be sent to BotBee ─────────────────────────────
+    const { getCredentials, TEMPLATE_BODIES, renderTemplateBody } = await import("./lib/botbee.js") as any;
+    const creds = getCredentials();
+    const botbeePayloads: Record<string, any> = {};
+    for (const [tplKey, tpl] of Object.entries(templates)) {
+      const namedVars = (tpl as any).variables;
+      const tplId = (tpl as any).templateId;
+      const tplBody = TEMPLATE_BODIES?.[tplId];
+      const preRendered = (tplBody && namedVars) ? renderTemplateBody(tplBody, namedVars) : null;
+      botbeePayloads[tplKey] = {
+        endpoint: `https://app.botbee.io/api/v1/whatsapp/send/template`,
+        body: {
+          apiToken: "[REDACTED]",
+          phone_number_id: creds.phone_number_id,
+          phone_number: `91${bk.customer_mobile?.replace(/\D/g, "").slice(-10)}`,
+          business_id: creds.business_id,
+          template_id: Number(tplId),
+          variables: namedVars,
+          ...(preRendered ? { message: preRendered } : {}),
+        },
+        preRenderedMessage: preRendered,
+        templateBodyFound: !!tplBody,
+        wouldBeBlocked: (tpl as any).wouldBeBlocked,
+        undefinedVars: (tpl as any).undefinedVars,
+      };
+    }
+
+    // ── 4. Recent notification_logs for this booking ──────────────────────────
+    const logsRes = await p.query(
+      `SELECT channel, event_type, status, sent_at,
+              request_payload, provider_response
+       FROM notification_logs
+       WHERE booking_id = $1
+       ORDER BY sent_at DESC
+       LIMIT 20`,
+      [bk.id]
+    );
+
+    // ── 5. Live test send (optional: ?send=1) ─────────────────────────────────
+    let liveTestResult: any = null;
+    if (send) {
+      const { sendApprovalTemplate } = await import("./lib/botbee.js") as any;
+      const mobile = bk.customer_mobile?.replace(/\D/g, "").slice(-10);
+      if (mobile && customerName && bookingRef) {
+        liveTestResult = await sendApprovalTemplate(
+          mobile,
+          { customerName, packageName: packageName || "Test Package", bookingId: bookingRef, amount: totalAmount, invoiceUrl: paymentUrl },
+          { eventType: "booking_approved", bookingId: bk.id, noInternalLog: true }
+        );
+      } else {
+        liveTestResult = { ok: false, error: "Missing mobile/customerName/bookingRef for live send" };
+      }
+    }
+
+    return res.json({
+      ok: true,
+      booking: {
+        id: bk.id,
+        booking_number: bk.booking_number,
+        status: bk.status,
+        customer_name: bk.customer_name,
+        customer_mobile: bk.customer_mobile,
+        customer_email: bk.customer_email,
+        package_name: bk.package_name,
+        invoice_number: invoiceNumber,
+        total_amount: totalAmount,
+        paid_amount: paidAmount,
+        agreement_number: bk.agreement_number,
+        agreement_download_url: downloadUrl,
+      },
+      variable_mapping: variableMapping,
+      undefined_variables: undefinedVars,
+      templates_resolved: templates,
+      botbee_payloads: botbeePayloads,
+      recent_notifications: logsRes.rows.map((r: any) => ({
+        channel: r.channel,
+        event_type: r.event_type,
+        status: r.status,
+        sent_at: r.sent_at,
+        request_payload: r.request_payload,
+        provider_response: r.provider_response,
+      })),
+      ...(send ? { live_test_result: liveTestResult } : {}),
+      tip: "Add ?send=1 to trigger a live booking_approved send to the customer's number",
+    });
+  } catch (err: any) {
+    console.error("[debug/notifications] Error:", err?.message, err?.stack?.slice(0, 500));
+    return res.status(500).json({ ok: false, error: err?.message, stack: err?.stack?.slice(0, 500) });
+  }
+});
+
 // ── Main API router ───────────────────────────────────────────────────────────
 // Error log middleware (must be before router so it captures 4xx/5xx)
 ensureErrorLogTable().catch(() => {});

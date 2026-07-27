@@ -80,3 +80,15 @@ Without it: customers outside the 24h window fall through to template API with w
 
 Must be `965912196611113` (15 digits). Hardcoded as `CORRECT_PHONE_NUMBER_ID` in botbee.ts.
 Any 14-digit version blocks all template delivery.
+
+## 2026-07-27 Update — Pre-render fallback
+
+ALL BotBee variable formats return status:1 + wamid but deliver #!Name!# unsubstituted:
+- Named object: {Name:"v1", BookingID:"v2"} → NOT substituted
+- Positional array: ["v1","v2"] → NOT substituted
+- Index-keyed: {"1":"v1","2":"v2"} → NOT substituted
+- Components [{type:"text",text:"v1"}] → NOT substituted
+- Pre-render + message field: {template_id:N, message:"rendered text", variables:{...}} → STATUS UNKNOWN (pending phone check)
+
+CURRENT FIX: FALLBACK PATH now sends `message` field with pre-rendered body text alongside `variables`.
+Debug endpoint: GET /api/debug/notifications/:bookingId?key=alburhan-migrate-2026
