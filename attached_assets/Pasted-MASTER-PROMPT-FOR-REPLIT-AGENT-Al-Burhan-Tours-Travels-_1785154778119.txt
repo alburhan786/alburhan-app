@@ -1,0 +1,744 @@
+MASTER PROMPT FOR REPLIT AGENT
+
+Al Burhan Tours & Travels ERP – Enterprise Automation Phase
+
+Project: Al Burhan Tours & Travels ERP
+Production URL: https://alburhantravels.com
+
+This is an enterprise-grade ERP for Hajj, Umrah, and Ziyarat operations. The objective is to eliminate manual work and build a fully automated workflow from customer registration to journey completion.
+
+Do not create demo functionality. Build production-ready features only.
+
+⸻
+
+PRIMARY GOAL
+
+Build a complete workflow engine where every event automatically updates:
+
+* Customer Dashboard
+* Admin Dashboard
+* Branch Dashboard
+* Agent Dashboard
+* Finance Dashboard
+* Operations Dashboard
+* CRM
+* Notification Center
+
+Every event must automatically trigger:
+
+* WhatsApp
+* SMS
+* Email
+* Firebase Push Notification
+* In-App Dashboard Notification
+
+No manual sending should be required after setup.
+
+⸻
+
+PHASE 1 – CUSTOMER JOURNEY AUTOMATION
+
+Create a complete booking workflow.
+
+Customer Registration
+
+Customer visits website.
+
+Customer signs up.
+
+Verification using:
+
+* Mobile OTP
+* Email OTP
+
+Automatically:
+
+* Create Customer ID
+* Create Customer Dashboard
+* Generate Customer Profile
+* Welcome Notification
+
+Send automatically:
+
+* WhatsApp
+* SMS
+* Email
+* Push Notification
+
+⸻
+
+Customer Dashboard
+
+Dashboard must automatically display:
+
+* Profile
+* My Packages
+* Booking Status
+* Payment Status
+* Agreements
+* Invoices
+* Payment Receipts
+* Uploaded Documents
+* Visa
+* Air Ticket
+* Hotel Voucher
+* Room Allocation
+* Pilgrim ID Card
+* Notifications
+* Travel Timeline
+* Downloads
+
+All data updates automatically.
+
+⸻
+
+Package Booking
+
+Customer selects package.
+
+Clicks Book Now.
+
+Automatically generate:
+
+* Booking ID
+* Agreement ID
+* Invoice Number
+
+Status:
+
+Booking Received
+
+Immediately notify:
+
+Customer
+
+Admin
+
+Branch
+
+Operations
+
+Finance
+
+Agent
+
+Through:
+
+* WhatsApp
+* SMS
+* Email
+* Push
+* Dashboard
+
+⸻
+
+Booking Approval
+
+When Admin approves booking:
+
+Automatically
+
+Booking Status
+
+↓
+
+Approved
+
+Customer receives:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push Notification
+
+Dashboard Notification
+
+⸻
+
+Payment Workflow
+
+Customer pays online.
+
+Automatically:
+
+Verify payment
+
+Generate Payment Receipt
+
+Generate GST Invoice
+
+Update Finance
+
+Update Ledger
+
+Update Dashboard
+
+Payment Status
+
+↓
+
+Paid
+
+Automatically notify customer.
+
+⸻
+
+PHASE 2 – AGREEMENT AUTOMATION
+
+Generate Agreement automatically.
+
+Compulsory before signing:
+
+Passport Photo
+
+Customer Photo
+
+Passport Copy
+
+Emergency Contact
+
+Medical Information
+
+Blood Group
+
+Nominee
+
+Terms Acceptance
+
+OTP Verification
+
+Digital Signature
+
+Timestamp
+
+Device
+
+IP Address
+
+QR Code
+
+Agreement ID
+
+Booking ID
+
+After signature:
+
+Lock Agreement
+
+Generate Secure PDF
+
+Store permanently
+
+Update Dashboard
+
+Automatically send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+⸻
+
+PHASE 3 – DOCUMENT MANAGEMENT
+
+Customer uploads:
+
+Passport
+
+Photo
+
+PAN
+
+Aadhaar
+
+Medical Certificate
+
+Vaccination
+
+Automatically:
+
+Validate
+
+Store
+
+Verify
+
+Update Dashboard
+
+Notify Admin
+
+Notify Customer
+
+⸻
+
+PHASE 4 – VISA AUTOMATION
+
+When Visa uploaded:
+
+Automatically
+
+Generate Visa PDF
+
+Update Dashboard
+
+Send
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+Status
+
+↓
+
+Visa Ready
+
+⸻
+
+PHASE 5 – AIR TICKET AUTOMATION
+
+When Ticket uploaded:
+
+Automatically
+
+Generate Ticket PDF
+
+Store
+
+Update Dashboard
+
+Send
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+Status
+
+↓
+
+Ticket Issued
+
+⸻
+
+PHASE 6 – HOTEL AUTOMATION
+
+When hotel assigned:
+
+Automatically generate:
+
+Hotel Voucher
+
+Room Allocation
+
+Google Maps Link
+
+Hotel Details
+
+QR Code
+
+Store
+
+Update Dashboard
+
+Send:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+⸻
+
+PHASE 7 – DEPARTURE AUTOMATION
+
+Automatically send:
+
+Departure Reminder
+
+Flight Timing
+
+Airport
+
+Terminal
+
+Reporting Time
+
+Luggage Rules
+
+Ihram Reminder
+
+Travel Checklist
+
+Passport Reminder
+
+Vaccination Reminder
+
+All through:
+
+WhatsApp
+
+SMS
+
+Email
+
+Push
+
+⸻
+
+PHASE 8 – RETURN AUTOMATION
+
+Automatically notify:
+
+Return Flight
+
+Arrival
+
+Feedback Form
+
+Review Request
+
+Certificate
+
+Journey Completed
+
+⸻
+
+PHASE 9 – AUTOMATIC COMMUNICATION ENGINE
+
+Every workflow event automatically triggers:
+
+Booking Received
+
+Booking Approved
+
+Booking Rejected
+
+Payment Received
+
+Payment Failed
+
+Balance Pending
+
+Agreement Ready
+
+Agreement Signed
+
+Document Uploaded
+
+Document Rejected
+
+Visa Ready
+
+Visa Rejected
+
+Ticket Issued
+
+Hotel Assigned
+
+Room Allocated
+
+Departure Reminder
+
+Journey Started
+
+Journey Completed
+
+Feedback Request
+
+Communication Channels:
+
+WhatsApp Business API
+
+BotBee
+
+SMS
+
+Email
+
+Firebase Push
+
+Dashboard Notification
+
+Notification Center
+
+No manual sending.
+
+⸻
+
+PHASE 10 – AUTOMATIC PDF ENGINE
+
+Automatically generate:
+
+Invoice
+
+Receipt
+
+Agreement
+
+Visa
+
+Air Ticket
+
+Hotel Voucher
+
+Room Allocation
+
+Pilgrim ID Card
+
+Booking Confirmation
+
+Travel Itinerary
+
+QR Verification Sheet
+
+Store every PDF permanently.
+
+Customer Dashboard always shows latest version.
+
+⸻
+
+PHASE 11 – BACKGROUND WORKFLOW ENGINE
+
+Every admin action automatically triggers background jobs.
+
+Example:
+
+Admin uploads Visa
+
+↓
+
+Generate PDF
+
+↓
+
+Save to Customer
+
+↓
+
+Send WhatsApp
+
+↓
+
+Send Email
+
+↓
+
+Send SMS
+
+↓
+
+Push Notification
+
+↓
+
+Dashboard Notification
+
+↓
+
+Log Delivery
+
+↓
+
+Retry Failed Delivery
+
+No manual action.
+
+⸻
+
+PHASE 12 – DELIVERY TRACKING
+
+Track:
+
+WhatsApp
+
+Delivered
+
+Read
+
+Failed
+
+SMS
+
+Delivered
+
+Failed
+
+Email
+
+Sent
+
+Opened
+
+Failed
+
+Push
+
+Delivered
+
+Clicked
+
+Dashboard
+
+Read
+
+Unread
+
+Retry failures automatically.
+
+⸻
+
+PHASE 13 – ADMIN ERP AUTOMATION
+
+Automatically update:
+
+Operations Dashboard
+
+Finance Dashboard
+
+CRM Dashboard
+
+Manager Dashboard
+
+Executive Dashboard
+
+Super Admin Dashboard
+
+Branch Dashboard
+
+Agent Dashboard
+
+Real-time statistics.
+
+⸻
+
+PHASE 14 – CUSTOMER TIMELINE
+
+Display:
+
+Signup
+
+↓
+
+Booking Received
+
+↓
+
+Booking Approved
+
+↓
+
+Payment Received
+
+↓
+
+Agreement Signed
+
+↓
+
+Documents Verified
+
+↓
+
+Visa Approved
+
+↓
+
+Ticket Issued
+
+↓
+
+Hotel Assigned
+
+↓
+
+Room Allocated
+
+↓
+
+Departure Ready
+
+↓
+
+Journey Started
+
+↓
+
+Journey Completed
+
+Live updates.
+
+⸻
+
+PHASE 15 – SECURITY
+
+OTP Verification
+
+JWT Authentication
+
+Role Based Access
+
+Encrypted Documents
+
+Audit Logs
+
+Activity History
+
+IP Tracking
+
+Session History
+
+QR Verification
+
+Digital Signature Validation
+
+⸻
+
+PHASE 16 – ENTERPRISE REQUIREMENTS
+
+The ERP must be event-driven.
+
+Every action should automatically:
+
+* Update the database
+* Update dashboards
+* Generate PDFs
+* Send notifications through all configured channels
+* Record audit logs
+* Track delivery status
+* Retry failures automatically
+* Keep customer and admin portals synchronized in real time
+
+No manual intervention should be required after the initial configuration.
+
+⸻
+
+FINAL ACCEPTANCE CRITERIA
+
+The ERP will be considered complete only when:
+
+* Customer registration to journey completion is fully automated.
+* Every business event automatically updates all relevant dashboards.
+* All PDFs are generated automatically and available in the customer dashboard.
+* WhatsApp, SMS, Email, Push, and Dashboard notifications are sent automatically.
+* Finance, Operations, CRM, Admin, Branch, and Agent modules stay synchronized.
+* All workflows are logged, auditable, secure, fault-tolerant, and production-ready.
+* The solution is fully tested on the live production environment at https://alburhantravels.com with no placeholder code or manual steps remaining.
