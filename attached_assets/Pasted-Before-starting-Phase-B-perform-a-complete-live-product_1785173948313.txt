@@ -1,0 +1,108 @@
+Before starting Phase B, perform a complete live production acceptance test for Phase A and the Super Admin portal.
+
+Do not make unrelated changes.
+
+PART 1 — SUPER ADMIN LOGIN
+
+1. Open the real production website in a fresh private/incognito session.
+2. Request OTP for the actual Super Admin account.
+3. Confirm the OTP API returns:
+   - isNewUser: false
+   - role: super_admin
+4. Complete OTP login.
+5. Confirm redirect goes exactly to:
+   /admin/super
+6. Confirm it does not redirect to:
+   - customer profile setup
+   - /dashboard
+   - /undefined
+   - customer portal
+7. Confirm the Super Admin dashboard and sidebar load.
+8. Refresh directly on /admin/super.
+9. Confirm no 401, 403, 404, 500, blank screen, or redirect loop.
+10. Log out and confirm /admin/super becomes inaccessible.
+
+PART 2 — PHASE A LEAD ENGINE
+
+Create one safe production test lead clearly marked:
+
+TEST — PHASE A ACCEPTANCE
+
+Verify the complete flow:
+
+1. Create the test lead.
+2. Confirm a unique lead ID is generated.
+3. Confirm the lead appears in:
+   - Lead Pipeline Kanban
+   - Lead List
+4. Confirm the lead is automatically assigned according to the active assignment rule.
+5. Confirm the assignment appears in the activity timeline.
+6. Confirm a follow-up task is created.
+7. Confirm the next follow-up date and time are correct.
+8. Confirm duplicate processing does not create duplicate tasks.
+9. Move the lead to another pipeline stage.
+10. Confirm the stage change is recorded in the activity log.
+11. Reassign the lead manually.
+12. Confirm the reassignment history is preserved.
+13. Mark a follow-up complete.
+14. Confirm the next configured follow-up is scheduled correctly.
+15. Pause automation for the lead.
+16. Confirm no new automatic follow-up is created while paused.
+17. Resume automation and confirm it continues correctly.
+18. Mark the lead as converted or test-completed.
+19. Confirm conversion stops sales follow-up automation.
+20. Delete or archive the test data safely after testing.
+
+PART 3 — SECURITY AND ROLE TESTING
+
+Confirm:
+
+- Super Admin can access all lead functions.
+- Normal Admin has only authorized access.
+- Sales Executive sees only assigned leads where required.
+- Customer cannot access CRM APIs.
+- Unauthenticated API requests return 401.
+- Unauthorized role requests return 403.
+- Backend authorization is enforced, not only frontend hiding.
+
+PART 4 — REGRESSION TESTING
+
+Confirm that these existing features still work:
+
+- Customer login
+- Admin login
+- Branch login
+- Agent login
+- Finance login
+- Bookings
+- Payments
+- WhatsApp through Meta Cloud API
+- Notification logging
+- SMS
+- Email
+- Push notifications
+- Agreements and invoices
+
+PART 5 — FINAL REPORT
+
+Provide:
+
+1. Production URL tested
+2. Super Admin login result
+3. Final redirect URL
+4. Test lead ID
+5. Assignment rule used
+6. Assigned user
+7. Follow-up task created
+8. Pipeline stage test result
+9. Duplicate prevention result
+10. Pause/resume automation result
+11. Role and permission test result
+12. Regression test result
+13. Browser and server errors
+14. Test data cleanup result
+15. Exact checkpoint or commit reference
+
+Do not mark Phase A accepted based only on bundle matching or successful compilation.
+
+Phase A is accepted only after the real production lead flow and Super Admin login are tested end to end.

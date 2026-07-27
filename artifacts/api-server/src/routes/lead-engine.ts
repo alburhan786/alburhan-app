@@ -521,4 +521,6 @@ router.delete("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Named export bypasses esbuild CJS default-export interop issue
+export { router as leadEngineRouter };
 export default router;
