@@ -8,7 +8,9 @@ export type AdminNotifType =
   | "booking_approved"
   | "booking_rejected"
   | "booking_cancelled"
-  | "payment_received";
+  | "payment_received"
+  | "notification_failure"
+  | string;
 
 export interface AdminNotifBody {
   bookingId?: string;

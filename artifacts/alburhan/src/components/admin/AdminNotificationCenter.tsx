@@ -20,6 +20,7 @@ function typeColor(type: AdminNotifType) {
     case "booking_rejected": return "bg-red-100 text-red-700";
     case "booking_cancelled": return "bg-orange-100 text-orange-700";
     case "payment_received": return "bg-purple-100 text-purple-700";
+    case "notification_failure": return "bg-amber-100 text-amber-700";
     default: return "bg-gray-100 text-gray-700";
   }
 }
@@ -31,8 +32,15 @@ function typeLabel(type: AdminNotifType) {
     case "booking_rejected": return "Rejected";
     case "booking_cancelled": return "Cancelled";
     case "payment_received": return "Payment";
-    default: return "Info";
+    case "notification_failure": return "Alert";
+    default: return type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   }
+}
+
+function notifNavPath(n: AdminNotification): string | null {
+  if (n.bookingId) return `/admin/bookings/${n.bookingId}`;
+  if (n.type === "notification_failure") return "/admin/notification-logs";
+  return null;
 }
 
 function timeAgo(iso: string) {
@@ -118,54 +126,61 @@ export function AdminNotificationCenter({ notifications, unreadCount, onMarkRead
                 No notifications yet
               </div>
             ) : (
-              shown.map((n) => (
-                <div
-                  key={n.id}
-                  className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-blue-50/40" : ""}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${typeColor(n.type)}`}>
-                          {typeLabel(n.type)}
-                        </span>
-                        {!n.isRead && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+              shown.map((n) => {
+                const navPath = notifNavPath(n);
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => {
+                      if (!n.isRead) onMarkRead(n.id);
+                      if (navPath) { setOpen(false); navigate(navPath); }
+                    }}
+                    className={`px-4 py-3 border-b border-gray-50 transition-colors ${navPath ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50"} ${!n.isRead ? "bg-blue-50/40" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${typeColor(n.type)}`}>
+                            {typeLabel(n.type)}
+                          </span>
+                          {!n.isRead && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                          )}
+                        </div>
+                        <p className="text-xs font-medium text-gray-900 truncate">{n.title}</p>
+                        {n.body.packageName && (
+                          <p className="text-[11px] text-gray-500 truncate">{n.body.packageName}</p>
                         )}
+                        {n.body.amount && (
+                          <p className="text-[11px] text-gray-500">₹{n.body.amount}</p>
+                        )}
+                        {n.body.finalAmount && !n.body.amount && (
+                          <p className="text-[11px] text-gray-500">₹{Number(n.body.finalAmount).toLocaleString("en-IN")}</p>
+                        )}
+                        <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(n.createdAt)}</p>
                       </div>
-                      <p className="text-xs font-medium text-gray-900 truncate">{n.title}</p>
-                      {n.body.packageName && (
-                        <p className="text-[11px] text-gray-500 truncate">{n.body.packageName}</p>
-                      )}
-                      {n.body.amount && (
-                        <p className="text-[11px] text-gray-500">₹{n.body.amount}</p>
-                      )}
-                      {n.body.finalAmount && !n.body.amount && (
-                        <p className="text-[11px] text-gray-500">₹{Number(n.body.finalAmount).toLocaleString("en-IN")}</p>
-                      )}
-                      <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(n.createdAt)}</p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {!n.isRead && (
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {!n.isRead && (
+                          <button
+                            onClick={() => onMarkRead(n.id)}
+                            className="p-1 text-blue-400 hover:text-blue-600 rounded"
+                            title="Mark read"
+                          >
+                            <Check size={13} />
+                          </button>
+                        )}
                         <button
-                          onClick={() => onMarkRead(n.id)}
-                          className="p-1 text-blue-400 hover:text-blue-600 rounded"
-                          title="Mark read"
+                          onClick={() => onDelete(n.id)}
+                          className="p-1 text-gray-300 hover:text-red-500 rounded"
+                          title="Delete"
                         >
-                          <Check size={13} />
+                          <Trash2 size={13} />
                         </button>
-                      )}
-                      <button
-                        onClick={() => onDelete(n.id)}
-                        className="p-1 text-gray-300 hover:text-red-500 rounded"
-                        title="Delete"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
