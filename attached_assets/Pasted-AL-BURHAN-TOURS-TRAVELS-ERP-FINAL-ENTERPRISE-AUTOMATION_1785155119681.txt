@@ -1,0 +1,287 @@
+AL BURHAN TOURS & TRAVELS ERP – FINAL ENTERPRISE AUTOMATION (100% COMPLETION)
+
+Production Website: https://alburhantravels.com
+
+This ERP must become a fully automated enterprise Hajj & Umrah management platform. Eliminate manual work wherever possible. Every business event should trigger the correct workflow, document generation, notifications, dashboard updates, and audit logs automatically.
+
+Priority 1 – Complete End-to-End Customer Journey
+
+Implement a complete workflow:
+
+1. Customer Signup
+2. Mobile & Email OTP Verification
+3. Customer Dashboard Creation
+4. Package Selection
+5. Booking Submission
+6. Booking Approval / Rejection
+7. Invoice Generation
+8. Online Payment
+9. Payment Verification
+10. Agreement Generation
+11. Mandatory Customer Photo + Passport Photo before signing
+12. OTP-based Digital Agreement Signature
+13. Document Upload & Verification
+14. Visa Processing
+15. Air Ticket Upload
+16. Hotel Assignment
+17. Hotel Voucher Generation
+18. Room Allocation
+19. Pilgrim ID Card Generation
+20. Departure Management
+21. Return Journey
+22. Feedback & Journey Completion
+
+No manual communication should be required after setup.
+
+⸻
+
+Priority 2 – Universal Event Engine
+
+Every business event must automatically trigger:
+
+* Dashboard Notification
+* Push Notification (Firebase)
+* WhatsApp (BotBee / Meta)
+* SMS
+* Email
+* Audit Log
+* Delivery Status Tracking
+
+Support at least:
+
+* Signup
+* OTP Verified
+* Booking Received
+* Booking Approved
+* Booking Rejected
+* Payment Received
+* Payment Failed
+* Balance Due Reminder
+* Agreement Ready
+* Agreement Signed
+* Document Uploaded
+* Document Approved
+* Document Rejected
+* Visa Ready
+* Visa Rejected
+* Ticket Issued
+* Hotel Assigned
+* Room Assigned
+* Departure Reminder
+* Journey Started
+* Journey Completed
+* Feedback Request
+
+⸻
+
+Priority 3 – Automatic Document Engine
+
+Automatically generate and store:
+
+* Booking Confirmation
+* Invoice
+* GST Invoice
+* Payment Receipt
+* Agreement PDF
+* Visa Copy
+* Air Ticket
+* Hotel Voucher
+* Room Allocation Letter
+* Pilgrim ID Card
+* Travel Itinerary
+* QR Verification Sheet
+
+Each PDF should:
+
+* Have QR verification
+* Booking ID
+* Agreement ID (where applicable)
+* Customer Photo
+* Company Logo
+* Company Stamp Area
+* Digital Signature Support
+* Version Number
+* Timestamp
+
+Save each document to the customer dashboard automatically.
+
+⸻
+
+Priority 4 – Background Workflow Engine
+
+Whenever an admin updates a booking:
+
+Automatically:
+
+1. Detect workflow event
+2. Generate required documents
+3. Save documents to customer account
+4. Send notifications through all configured channels
+5. Log delivery status
+6. Retry failed deliveries automatically with exponential backoff
+7. Update dashboards in real time
+
+No manual sending.
+
+⸻
+
+Priority 5 – Delivery Tracking
+
+Track:
+
+WhatsApp
+
+* Sent
+* Delivered
+* Read
+* Failed
+
+SMS
+
+* Sent
+* Delivered
+* Failed
+
+Email
+
+* Sent
+* Delivered
+* Opened
+* Link Clicked
+* Failed
+
+Push
+
+* Sent
+* Delivered
+* Clicked
+* Failed
+
+Dashboard
+
+* Read
+* Unread
+
+Retry failed deliveries automatically.
+
+⸻
+
+Priority 6 – Finance Automation
+
+Automatically maintain:
+
+* Customer Ledger
+* Outstanding Balance
+* Advance Payment
+* Installment Schedule
+* Refund Records
+* GST Reports
+* Daily Cashbook
+* Payment History
+* Finance Dashboard
+
+⸻
+
+Priority 7 – Operations Automation
+
+Automatically manage:
+
+* Room Allocation
+* Flight Assignment
+* Hotel Assignment
+* Visa Status
+* Pilgrim Groups
+* Family Groups
+* Bus Allocation
+* Maktab
+* Mina Camp
+* Guides
+* Manifest
+* Checklists
+
+⸻
+
+Priority 8 – Customer Dashboard
+
+Customer should always see:
+
+* Booking Status
+* Payment Status
+* Agreement
+* Invoice
+* Receipts
+* Uploaded Documents
+* Visa
+* Ticket
+* Hotel Voucher
+* Room Allocation
+* Pilgrim ID Card
+* Notifications
+* Travel Timeline
+* Downloads
+
+No page refresh required after updates.
+
+⸻
+
+Priority 9 – Admin Dashboards
+
+Automatically synchronize:
+
+* Super Admin
+* Executive
+* Operations
+* Finance
+* CRM
+* Branch
+* Agent
+* Staff
+
+All statistics update automatically.
+
+⸻
+
+Priority 10 – Security
+
+Implement:
+
+* OTP Authentication
+* JWT
+* Role Permissions
+* Audit Logs
+* Device Tracking
+* Session Tracking
+* IP Logging
+* Digital Signature Validation
+* QR Verification
+* Document Version History
+
+⸻
+
+Priority 11 – Production Quality
+
+Before marking complete:
+
+* Test every workflow on the production environment.
+* Verify every notification channel.
+* Verify every PDF generation.
+* Verify customer dashboard updates.
+* Verify admin dashboard updates.
+* Verify retry logic for failed notifications.
+* Remove placeholder code, mock data, and unused routes.
+* Ensure no manual steps remain for normal booking operations.
+
+⸻
+
+Final Acceptance Criteria
+
+The ERP is complete only when:
+
+* The entire customer journey from signup to return is automated.
+* All required PDFs are generated automatically and stored in the customer dashboard.
+* WhatsApp, SMS, Email, Push Notifications, and Dashboard Notifications are sent automatically for every relevant event.
+* Delivery status is tracked with automatic retry for failures.
+* Finance, Operations, CRM, Branch, Agent, Staff, and Customer dashboards remain synchronized.
+* The system is production-ready, secure, fully tested, and requires no manual document sending for standard workflows.
+
+This prompt aligns with the remaining gaps shown in your screenshots (auto-retry, hotel voucher automation, delivery tracking) while also driving the ERP toward the

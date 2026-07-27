@@ -4,6 +4,9 @@ import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "..
 import { randomUUID } from "crypto";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { generateHotelVoucherPdf } from "../lib/hotelVoucherPdf.js";
+import { uploadToGCS } from "../lib/gcsUpload.js";
+import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -173,17 +176,118 @@ router.post("/:hotelId/rooms/:roomId/assign", requireAdmin as any, async (req, r
       [id, req.params.hotelId, req.params.roomId, pilgrimId]
     );
     res.json({ message: "Assigned" });
-    Promise.all([
-      pool.query(`SELECT id, full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [pilgrimId]),
-      pool.query(`SELECT h.name as hotel_name, r.room_number FROM hotels h JOIN hotel_rooms r ON r.id=$1 AND r.hotel_id=$2`, [req.params.roomId, req.params.hotelId]),
-    ]).then(([pRes, hRes]) => {
-      if (!pRes.rows[0]) return;
-      const p = pRes.rows[0];
-      const hotelName = hRes.rows[0]?.hotel_name;
-      const roomNumber = hRes.rows[0]?.room_number;
-      fireNotificationEvent("room_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, hotelName, roomNumber }).catch(() => {});
-      triggerWorkflow("hotel_assigned", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, hotelName, roomNumber }).catch(() => {});
-    }).catch(() => {});
+
+    // ── Background: notifications + auto-generate hotel voucher PDF ───────────
+    setImmediate(async () => {
+      try {
+        const [pRes, hRes, rRes] = await Promise.all([
+          pool.query(
+            `SELECT p.id, p.full_name, p.mobile_india, p.booking_id, p.group_id,
+                    b.booking_number, b.customer_id, b.package_name,
+                    u.email AS customer_email, u.mobile AS customer_mobile_user,
+                    hg.group_name, hg.maktab_number
+             FROM pilgrims p
+             LEFT JOIN bookings b ON b.id = p.booking_id
+             LEFT JOIN users u ON u.id = b.customer_id
+             LEFT JOIN hajj_groups hg ON hg.id = p.group_id
+             WHERE p.id = $1`,
+            [pilgrimId]
+          ),
+          pool.query(
+            `SELECT h.name, h.city, h.address, h.stars, h.contact_phone,
+                    h.check_in_date, h.check_out_date
+             FROM hotels h WHERE h.id = $1`,
+            [req.params.hotelId]
+          ),
+          pool.query(
+            `SELECT r.room_number, r.floor, r.capacity, r.bed_type
+             FROM hotel_rooms r WHERE r.id = $1`,
+            [req.params.roomId]
+          ),
+        ]);
+
+        const p = pRes.rows[0];
+        const h = hRes.rows[0];
+        const r = rRes.rows[0];
+        if (!p || !h || !r) return;
+
+        const hotelName   = h.name;
+        const roomNumber  = r.room_number;
+        const bookingId   = p.booking_id;
+        const bookingNum  = p.booking_number || bookingId?.slice(-8).toUpperCase() || "—";
+        const customerId  = p.customer_id;
+        const mobile      = p.mobile_india || p.customer_mobile_user || "";
+        const email       = p.customer_email || "";
+
+        // ── Notifications ──────────────────────────────────────────────────
+        fireNotificationEvent("room_assigned", {
+          customerName: p.full_name, customerMobile: mobile, hotelName, roomNumber,
+          customerId, bookingId,
+        }).catch(() => {});
+        triggerWorkflow("hotel_assigned", {
+          customerName: p.full_name, customerMobile: mobile, pilgramName: p.full_name,
+          bookingId, bookingNumber: bookingNum, hotelName, roomNumber, customerId,
+          packageName: p.package_name,
+        }).catch(() => {});
+
+        // ── Generate Hotel Voucher PDF ─────────────────────────────────────
+        const voucherId = randomUUID();
+        try {
+          const pdfBuf = await generateHotelVoucherPdf({
+            pilgrimName:   p.full_name,
+            bookingNumber: bookingNum,
+            bookingId:     bookingId || voucherId,
+            customerId,
+            hotelName:     h.name,
+            hotelCity:     h.city,
+            hotelAddress:  h.address,
+            hotelStars:    h.stars,
+            hotelPhone:    h.contact_phone,
+            roomNumber:    r.room_number,
+            floorNumber:   r.floor,
+            bedType:       r.bed_type,
+            roomCapacity:  r.capacity,
+            checkInDate:   h.check_in_date,
+            checkOutDate:  h.check_out_date,
+            groupName:     p.group_name,
+            maktabNumber:  p.maktab_number,
+            voucherId,
+            issuedAt:      new Date(),
+          });
+
+          const fileName = `Hotel-Voucher-${bookingNum}-${p.full_name.replace(/\s+/g, "-")}.pdf`;
+          const fileUrl  = await uploadToGCS(pdfBuf, fileName, "application/pdf", "hotel_vouchers");
+          const docId    = randomUUID();
+
+          await pool.query(
+            `INSERT INTO documents
+               (id, booking_id, customer_id, document_type, file_name, original_filename,
+                file_key, file_url, file_size, mime_type, uploaded_by,
+                is_visible_to_customer, notification_sent, created_at)
+             VALUES ($1,$2,$3,'hotel_voucher',$4,$4,$5,$5,$6,'application/pdf','admin',true,false,NOW())
+             ON CONFLICT DO NOTHING`,
+            [docId, bookingId, customerId, fileName, fileUrl, pdfBuf.length]
+          );
+          console.log(`[Hotels] ✅ Hotel voucher PDF generated — ${fileName} (${pdfBuf.length} bytes)`);
+
+          // ── Deliver to customer ──────────────────────────────────────────
+          if (mobile) {
+            await sendDocumentToCustomer({
+              docId, bookingId: bookingId || "", bookingNumber: bookingNum,
+              customerId, customerName: p.full_name, customerMobile: mobile,
+              customerEmail: email || undefined,
+              documentType: "hotel_voucher", fileName, fileUrl,
+              mimeType: "application/pdf",
+              packageName: p.package_name,
+            });
+          }
+        } catch (pdfErr: any) {
+          console.error("[Hotels] ❌ Hotel voucher PDF failed:", pdfErr?.message);
+        }
+      } catch (bgErr: any) {
+        console.error("[Hotels] Background task error:", bgErr?.message);
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
