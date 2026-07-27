@@ -1,0 +1,194 @@
+FINAL PRODUCTION CERTIFICATION – AL BURHAN TOURS & TRAVELS ERP
+
+Do not add demo features or placeholders. Treat this as a production release.
+
+1. End-to-End Customer Journey Test
+
+Verify the complete workflow:
+
+* Customer Signup
+* Mobile OTP
+* Email OTP
+* Customer Dashboard
+* Package Selection
+* Booking Submission
+* Admin Approval
+* Invoice Generation
+* Payment
+* Receipt Generation
+* Agreement Generation
+* Customer Photo (mandatory)
+* Passport Photo (mandatory)
+* OTP Digital Signature
+* Document Upload
+* Document Verification
+* Visa Approval
+* Air Ticket
+* Hotel Assignment
+* Hotel Voucher
+* Room Allocation
+* Pilgrim ID Card
+* Departure
+* Return
+* Journey Completion
+
+No manual step should be required.
+
+⸻
+
+2. Automatic Communications
+
+For every event automatically send:
+
+* Dashboard Notification
+* Push Notification (Firebase)
+* WhatsApp (BotBee/Meta)
+* SMS
+* Email
+
+Events include:
+
+* Signup
+* OTP Verified
+* Booking Received
+* Booking Approved
+* Booking Rejected
+* Invoice Ready
+* Payment Received
+* Balance Reminder
+* Agreement Ready
+* Agreement Signed
+* Documents Uploaded
+* Documents Approved
+* Visa Ready
+* Ticket Ready
+* Hotel Assigned
+* Room Allocated
+* Departure Reminder
+* Return Reminder
+* Journey Completed
+
+⸻
+
+3. Automatic PDF Engine
+
+Generate automatically:
+
+* Booking Confirmation
+* Invoice
+* GST Invoice
+* Payment Receipt
+* Agreement
+* Visa Copy
+* Air Ticket
+* Hotel Voucher
+* Room Allocation Letter
+* Travel Itinerary
+* Pilgrim ID Card
+* QR Verification Sheet
+
+Store every PDF automatically in the customer dashboard.
+
+Automatically send through:
+
+* WhatsApp
+* SMS (where appropriate)
+* Email
+* Dashboard
+* Push Notification
+
+⸻
+
+4. Delivery Tracking
+
+Track delivery status for:
+
+WhatsApp
+
+* Queued
+* Sent
+* Delivered
+* Read
+* Failed
+
+SMS
+
+* Sent
+* Delivered
+* Failed
+
+Email
+
+* Sent
+* Delivered
+* Opened
+* Link Clicked
+* Failed
+
+Push
+
+* Sent
+* Delivered
+* Clicked
+* Failed
+
+Retry failed deliveries automatically.
+
+⸻
+
+5. Admin Automation
+
+When an admin changes a booking status:
+
+Automatically:
+
+* Generate required PDFs
+* Save them
+* Notify customer
+* Update dashboard
+* Update audit logs
+* Retry failed notifications
+* Sync all dashboards
+
+No manual sending.
+
+⸻
+
+6. Final Production Validation
+
+Run a complete production test and confirm:
+
+* No 404 pages
+* No broken links
+* No missing routes
+* No placeholder data
+* No console errors
+* No failed API calls
+* All dashboards synchronized
+* Firebase Push working
+* WhatsApp working
+* SMS working
+* Email working
+* PDF generation working
+* Hotel voucher working
+* Travel itinerary working
+* QR verification working
+
+⸻
+
+7. Production Completion Report
+
+Only mark the project complete after providing a report with:
+
+* Total ERP completion percentage
+* Features completed
+* Remaining issues (if any)
+* Test results
+* Production health status
+* APIs status
+* Background worker status
+* Notification status
+* Security status
+* Deployment status
+
+Do not mark complete until every production workflow has been tested successfully.

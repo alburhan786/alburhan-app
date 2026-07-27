@@ -4,6 +4,8 @@ import { db, bookingsTable, pilgrimsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendCustomerDocumentUploadNotification } from "../lib/notifications.js";
+import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendDocumentToCustomer, TRAVEL_DOC_TYPES } from "../lib/documentDelivery.js";
 import { sendTicketEmail, sendVisaEmail } from "../services/emailService.js";
 import multer from "multer";
@@ -264,11 +266,49 @@ router.patch("/:id/viewed", requireAuth as any, async (req: AuthenticatedRequest
 router.patch("/:id/visibility", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   if (req.user?.role !== "admin") { res.status(403).json({ message: "Admin only" }); return; }
   const { visible } = req.body;
+  const isVisible = visible !== false;
   await pool.query(
     `UPDATE documents SET is_visible_to_customer = $1 WHERE id = $2`,
-    [visible !== false, req.params.id]
+    [isVisible, req.params.id]
   );
   res.json({ ok: true });
+
+  // ── When making document visible → notify customer that docs are approved ──
+  if (isVisible) {
+    setImmediate(async () => {
+      try {
+        const { rows } = await pool.query(
+          `SELECT d.document_type, d.file_name,
+                  b.id AS booking_id, b.booking_number, b.customer_id,
+                  b.customer_name, b.customer_mobile, b.customer_email, b.package_name
+           FROM documents d
+           JOIN bookings b ON b.id = d.booking_id
+           WHERE d.id = $1`,
+          [req.params.id]
+        );
+        const doc = rows[0];
+        if (!doc || !doc.customer_mobile) return;
+        fireNotificationEvent("documents_approved" as any, {
+          customerName:   doc.customer_name,
+          customerMobile: doc.customer_mobile,
+          customerEmail:  doc.customer_email,
+          customerId:     doc.customer_id,
+          bookingId:      doc.booking_id,
+          bookingNumber:  doc.booking_number,
+          packageName:    doc.package_name,
+          documentType:   doc.document_type,
+        }).catch(() => {});
+        triggerWorkflow("document_reminder" as any, {
+          customerName:   doc.customer_name,
+          customerMobile: doc.customer_mobile,
+          bookingId:      doc.booking_id,
+          bookingNumber:  doc.booking_number,
+          customerId:     doc.customer_id,
+          packageName:    doc.package_name,
+        }).catch(() => {});
+      } catch {}
+    });
+  }
 });
 
 // ── Serve local fallback files (disk storage) ─────────────────────────────────

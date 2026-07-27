@@ -538,6 +538,53 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   auditLog({ req, action: "created", entityTable: "bookings", entityId: booking.id, newValue: { bookingNumber: booking.bookingNumber, customerName: booking.customerName, status: booking.status } }).catch(() => {});
 
   res.status(201).json(formatBooking(booking));
+
+  // ── Background: auto-generate Booking Confirmation PDF ───────────────────
+  setImmediate(async () => {
+    try {
+      const { generateBookingConfirmationPdf } = await import("../lib/bookingConfirmationPdf.js");
+      const { uploadToGCS } = await import("../lib/gcsUpload.js");
+      const { sendDocumentToCustomer } = await import("../lib/documentDelivery.js");
+      const { randomUUID } = await import("crypto");
+      const confBuf = await generateBookingConfirmationPdf({
+        bookingId:     booking.id,
+        bookingNumber: booking.bookingNumber,
+        customerName:  booking.customerName,
+        customerMobile: booking.customerMobile || undefined,
+        customerEmail:  booking.customerEmail  || undefined,
+        packageName:   booking.packageName     || pkg?.name || undefined,
+        totalAmount:   booking.finalAmount     || undefined,
+        status:        "pending",
+        submittedAt:   new Date(),
+        dashboardUrl:  `${process.env.SITE_URL || "https://alburhantravels.online"}/customer/dashboard`,
+      });
+      const confName = `Booking-Confirmation-${booking.bookingNumber}.pdf`;
+      const confUrl  = await uploadToGCS(confBuf, confName, "application/pdf", "booking_confirmations");
+      const confDocId = randomUUID();
+      const { pool: dbPool } = await import("@workspace/db");
+      await dbPool.query(
+        `INSERT INTO documents
+           (id, booking_id, customer_id, document_type, file_name, original_filename,
+            file_key, file_url, file_size, mime_type, uploaded_by,
+            is_visible_to_customer, notification_sent, created_at)
+         VALUES ($1,$2,$3,'model_contract',$4,$4,$5,$5,$6,'application/pdf','admin',true,false,NOW())
+         ON CONFLICT DO NOTHING`,
+        [confDocId, booking.id, booking.customerId, confName, confUrl, confBuf.length]
+      );
+      console.log(`[Bookings] ✅ Booking confirmation PDF generated — ${confName}`);
+      if (booking.customerMobile) {
+        await sendDocumentToCustomer({
+          docId: confDocId, bookingId: booking.id, bookingNumber: booking.bookingNumber,
+          customerId: booking.customerId || "", customerName: booking.customerName,
+          customerMobile: booking.customerMobile, customerEmail: booking.customerEmail || undefined,
+          documentType: "model_contract", fileName: confName, fileUrl: confUrl,
+          mimeType: "application/pdf", packageName: booking.packageName || pkg?.name || undefined,
+        });
+      }
+    } catch (err: any) {
+      console.error("[Bookings] ⚠️ Booking confirmation PDF failed:", err?.message);
+    }
+  });
 });
 
 router.get("/:id", requireAuth as any, async (req: AuthenticatedRequest, res) => {

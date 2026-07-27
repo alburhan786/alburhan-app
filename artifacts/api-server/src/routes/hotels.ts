@@ -5,10 +5,61 @@ import { randomUUID } from "crypto";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateHotelVoucherPdf } from "../lib/hotelVoucherPdf.js";
+import { generateRoomAllocationPdf } from "../lib/roomAllocationPdf.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
 
 const router = Router();
+
+// ── PUBLIC: QR verification (no auth required — must be before requireModuleAccess) ──
+router.get("/verify-assignment/:docId", async (req, res) => {
+  try {
+    // Join via documents → bookings only; parse pilgrim name from filename
+    const { rows } = await pool.query(
+      `SELECT d.id, d.file_url, d.file_name, d.created_at, d.document_type,
+              b.booking_number, b.customer_name,
+              b.package_name, b.id AS booking_id
+       FROM documents d
+       LEFT JOIN bookings b ON b.id = d.booking_id
+       WHERE d.id = $1
+         AND d.document_type IN ('hotel_voucher','room_allotment')
+         AND d.is_revoked = FALSE
+       LIMIT 1`,
+      [req.params.docId]
+    );
+    const row = rows[0];
+    if (!row) return void res.status(404).json({ error: "Assignment not found" });
+
+    // Try to extract extra details from the stored filename
+    // e.g. "Hotel-Voucher-AB1234-JOHN-DOE.pdf" or "Room-Allocation-AB1234-JOHN-DOE.pdf"
+    const nameParts = (row.file_name || "").replace(/\.pdf$/i, "").split("-");
+    const pilgrimName = nameParts.length >= 4
+      ? nameParts.slice(3).join(" ").replace(/-/g, " ")
+      : row.customer_name || "—";
+
+    return res.json({
+      pilgrimName,
+      bookingNumber: row.booking_number || "—",
+      hotelName:     null,
+      hotelCity:     null,
+      hotelAddress:  null,
+      roomNumber:    null,
+      floorNumber:   null,
+      bedType:       null,
+      checkInDate:   null,
+      checkOutDate:  null,
+      groupName:     null,
+      maktabNumber:  null,
+      issuedAt:      row.created_at || null,
+      documentType:  row.document_type,
+      fileUrl:       row.file_url || null,
+      verified:      true,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.use(requireModuleAccess("groups") as any);
 
 const CITIES = ["Makkah", "Madinah", "Aziziah", "Mina", "Arafat", "Other"];
@@ -283,6 +334,52 @@ router.post("/:hotelId/rooms/:roomId/assign", requireAdmin as any, async (req, r
           }
         } catch (pdfErr: any) {
           console.error("[Hotels] ❌ Hotel voucher PDF failed:", pdfErr?.message);
+        }
+
+        // ── Generate Room Allocation Letter PDF ────────────────────────────
+        try {
+          const allocBuf = await generateRoomAllocationPdf({
+            pilgrimName:   p.full_name,
+            bookingNumber: bookingNum,
+            bookingId:     bookingId || randomUUID(),
+            customerId,
+            hotelName:     h.name,
+            hotelCity:     h.city,
+            hotelAddress:  h.address,
+            roomNumber:    r.room_number,
+            floorNumber:   r.floor,
+            bedType:       r.bed_type,
+            roomCapacity:  r.capacity,
+            checkInDate:   h.check_in_date,
+            checkOutDate:  h.check_out_date,
+            groupName:     p.group_name,
+            maktabNumber:  p.maktab_number,
+            issuedAt:      new Date(),
+          });
+          const allocName = `Room-Allocation-${bookingNum}-${p.full_name.replace(/\s+/g, "-")}.pdf`;
+          const allocUrl  = await uploadToGCS(allocBuf, allocName, "application/pdf", "room_allocations");
+          const allocDocId = randomUUID();
+          await pool.query(
+            `INSERT INTO documents
+               (id, booking_id, customer_id, document_type, file_name, original_filename,
+                file_key, file_url, file_size, mime_type, uploaded_by,
+                is_visible_to_customer, notification_sent, created_at)
+             VALUES ($1,$2,$3,'room_allotment',$4,$4,$5,$5,$6,'application/pdf','admin',true,false,NOW())
+             ON CONFLICT DO NOTHING`,
+            [allocDocId, bookingId, customerId, allocName, allocUrl, allocBuf.length]
+          );
+          console.log(`[Hotels] ✅ Room allocation letter generated — ${allocName}`);
+          if (mobile) {
+            await sendDocumentToCustomer({
+              docId: allocDocId, bookingId: bookingId || "", bookingNumber: bookingNum,
+              customerId, customerName: p.full_name, customerMobile: mobile,
+              customerEmail: email || undefined,
+              documentType: "room_allotment", fileName: allocName, fileUrl: allocUrl,
+              mimeType: "application/pdf", packageName: p.package_name,
+            });
+          }
+        } catch (allocErr: any) {
+          console.error("[Hotels] ❌ Room allocation letter failed:", allocErr?.message);
         }
       } catch (bgErr: any) {
         console.error("[Hotels] Background task error:", bgErr?.message);

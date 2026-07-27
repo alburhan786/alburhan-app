@@ -157,6 +157,7 @@ import AutoNotificationSettings from "@/pages/admin/AutoNotificationSettings";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
+import VerifyHotelAssignment from "@/pages/public/VerifyHotelAssignment";
 import VerifyFamily from "@/pages/public/VerifyFamily";
 import ScanPilgrim from "@/pages/public/ScanPilgrim";
 import AgreementCenter from "@/pages/admin/AgreementCenter";
@@ -279,6 +280,7 @@ function Router() {
       <Route path="/feedback" component={FeedbackPage} />
       <Route path="/verify-staff" component={StaffVerify} />
       <Route path="/verify/family/:groupId/:familyId" component={VerifyFamily} />
+      <Route path="/verify/hotel/:id" component={VerifyHotelAssignment} />
       <Route path="/verify/:id" component={VerifyPilgrim} />
       <Route path="/scan/:barcodeId" component={ScanPilgrim} />
       <Route path="/attendance-scan/:groupId/:eventId" component={AttendanceScanPublic} />
