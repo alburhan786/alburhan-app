@@ -35,6 +35,9 @@ import GroupTracking from "@/pages/admin/GroupTracking";
 import KnowledgeCenter from "@/pages/public/KnowledgeCenter";
 import AIOperationsCenter from "@/pages/admin/AIOperationsCenter";
 import ExecutiveDashboard from "@/pages/admin/ExecutiveDashboard";
+import BookingFunnel from "@/pages/admin/BookingFunnel";
+import RevenueAnalytics from "@/pages/admin/RevenueAnalytics";
+import AiForecast from "@/pages/admin/AiForecast";
 import DocumentExpiryCenter from "@/pages/admin/DocumentExpiryCenter";
 import GlobalSearch from "@/pages/admin/GlobalSearch";
 import NotificationHealth from "@/pages/admin/NotificationHealth";
@@ -390,6 +393,9 @@ function Router() {
       <Route path="/admin/group-tracking" component={() => <AdminRoute component={GroupTracking} />} />
       <Route path="/admin/ai-ops" component={() => <AdminRoute component={AIOperationsCenter} />} />
       <Route path="/admin/executive" component={() => <AdminRoute component={ExecutiveDashboard} />} />
+      <Route path="/admin/funnel" component={() => <AdminRoute component={BookingFunnel} />} />
+      <Route path="/admin/revenue" component={() => <AdminRoute component={RevenueAnalytics} />} />
+      <Route path="/admin/forecast" component={() => <AdminRoute component={AiForecast} />} />
       <Route path="/admin/document-expiry" component={() => <AdminRoute component={DocumentExpiryCenter} />} />
       <Route path="/admin/search" component={() => <AdminRoute component={GlobalSearch} />} />
       <Route path="/admin/notification-health" component={() => <AdminRoute component={NotificationHealth} />} />

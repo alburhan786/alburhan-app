@@ -9,7 +9,8 @@ import {
   Search, RefreshCw, X, Send, Phone, Mail, MessageCircle, Users,
   ChevronDown, Filter, Check, AlertTriangle, Clock, Star, Archive,
   MoreVertical, StickyNote, UserPlus, Calendar, Zap, Tag, Edit2,
-  ArrowLeft, Info, CheckCheck, Bell, Sparkles,
+  ArrowLeft, Info, CheckCheck, Bell, Sparkles, Paperclip, Mic, MicOff,
+  FileText, Image as ImageIcon, StopCircle,
 } from "lucide-react";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
@@ -121,16 +122,96 @@ function MsgBubble({ msg }: { msg: any }) {
           <div className="flex items-center gap-1.5 mb-1 text-yellow-700 text-[10px] font-semibold">
             <StickyNote size={10} /> Internal Note — {msg.sender_name || msg.replied_by}
           </div>
-          <p className="text-yellow-900">{msg.message_text}</p>
+          <p className="text-yellow-900 whitespace-pre-wrap">{msg.message_text}</p>
           <p className="text-[10px] text-yellow-600 mt-1">{fmtFull(msg.created_at)}</p>
         </div>
       </div>
     );
   }
 
+  /** Render the message body based on media type */
+  const renderBody = () => {
+    const type = msg.message_type;
+    const mediaUrl = msg.media_url;
+    const text = msg.message_text || msg.message || "";
+
+    if (type === "image" || type === "photo") {
+      return (
+        <div className="space-y-1.5">
+          {mediaUrl ? (
+            <a href={`https://cdn.botbee.io/${mediaUrl}`} target="_blank" rel="noreferrer"
+              className="block rounded-xl overflow-hidden border border-white/20 max-w-[220px]">
+              <img
+                src={`https://cdn.botbee.io/${mediaUrl}`}
+                alt={text || "Image"}
+                className="w-full max-h-48 object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </a>
+          ) : (
+            <div className="flex items-center gap-1.5 opacity-70"><ImageIcon size={14} /> Photo</div>
+          )}
+          {text && text !== "Photo" && <p className="text-sm leading-relaxed break-words">{text}</p>}
+        </div>
+      );
+    }
+
+    if (type === "audio" || type === "voice") {
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs opacity-80 font-medium">
+            <Mic size={12} /> {type === "voice" ? "Voice Note" : "Audio"}
+          </div>
+          {mediaUrl ? (
+            <audio controls className="w-full max-w-[220px] h-9 rounded-lg" preload="none">
+              <source src={`https://cdn.botbee.io/${mediaUrl}`} type="audio/ogg" />
+              <source src={`https://cdn.botbee.io/${mediaUrl}`} type="audio/mpeg" />
+              Your browser does not support audio.
+            </audio>
+          ) : (
+            <p className="text-sm opacity-70">🎙️ Voice Note</p>
+          )}
+        </div>
+      );
+    }
+
+    if (type === "document" || type === "video") {
+      const icon = type === "video" ? "🎥" : "📎";
+      return (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <FileText size={14} className="opacity-70 flex-shrink-0" />
+            {mediaUrl ? (
+              <a href={`https://cdn.botbee.io/${mediaUrl}`} target="_blank" rel="noreferrer"
+                className="text-sm underline underline-offset-2 break-all hover:opacity-80">
+                {text || `${icon} Download`}
+              </a>
+            ) : (
+              <span className="text-sm opacity-70">{icon} {text || "File"}</span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (type === "location") {
+      return <p className="text-sm opacity-70">📍 {text || "Location shared"}</p>;
+    }
+
+    if (type === "sticker") {
+      return <p className="text-2xl">{text || "🖼️"}</p>;
+    }
+
+    // Default: plain text
+    return <p className="leading-relaxed break-words whitespace-pre-wrap">{text}</p>;
+  };
+
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"} mb-1`}>
-      <div className={`max-w-[78%] ${isOut ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm" : "bg-muted rounded-2xl rounded-tl-sm"} px-4 py-2.5 text-sm shadow-sm`}>
+      <div className={`max-w-[78%] ${isOut
+        ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm"
+        : "bg-muted rounded-2xl rounded-tl-sm"
+      } px-4 py-2.5 text-sm shadow-sm`}>
         {!isOut && (
           <div className="flex items-center gap-1.5 mb-1 text-[10px] opacity-70">
             <span>{pm.icon}</span> <span>{pm.label}</span>
@@ -142,14 +223,11 @@ function MsgBubble({ msg }: { msg: any }) {
             {pm.icon} {msg.replied_by || "Admin"} via {pm.label}
           </div>
         )}
-        {msg.message_type === "photo" && <p className="text-xs opacity-70 mb-1">📷 Photo</p>}
-        {msg.message_type === "voice" && <p className="text-xs opacity-70 mb-1">🎙️ Voice Note</p>}
-        {msg.message_type === "document" && <p className="text-xs opacity-70 mb-1">📎 Document</p>}
-        {msg.message_type === "location" && <p className="text-xs opacity-70 mb-1">📍 Location</p>}
-        <p className="leading-relaxed break-words">{msg.message_text || msg.message}</p>
+        {renderBody()}
         <div className="flex items-center justify-end gap-1 mt-1">
           <p className="text-[10px] opacity-60">{fmtFull(msg.created_at)}</p>
           {isOut && msg.status === "sent" && <CheckCheck size={10} className="opacity-60" />}
+          {isOut && msg.status === "read" && <CheckCheck size={10} className="text-blue-300" />}
         </div>
       </div>
     </div>
@@ -496,6 +574,17 @@ export default function OmnichannelInbox() {
   const [noteMode, setNoteMode] = useState(false);
   const [showRightBar, setShowRightBar] = useState(true);
 
+  // State: file attachment
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State: voice recorder
+  const [recording, setRecording] = useState(false);
+  const [recDuration, setRecDuration] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const replyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -528,6 +617,138 @@ export default function OmnichannelInbox() {
   }, []);
 
   useEffect(() => { loadConversations(); loadStats(); }, [loadConversations, loadStats]);
+
+  // ── SSE: Real-time inbox updates ─────────────────────────────────
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      try {
+        es = new EventSource(`${BASE_API}/api/inbox/stream`, { withCredentials: true });
+        es.addEventListener("connected", () => console.log("[Inbox SSE] connected"));
+        es.addEventListener("new_message", (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data);
+            // Refresh conversation list and messages if the active conv matches
+            loadConversations();
+            setActiveConv((cur: any) => {
+              if (cur && (cur.id === data.lead_id || cur.mobile === data.mobile)) {
+                // Reload messages for this conversation
+                fetch(`${BASE_API}/api/inbox/conversations/${cur.id}/messages`, { credentials: "include" })
+                  .then(r => r.json()).then(d => setMessages(d.messages || [])).catch(() => {});
+              }
+              return cur;
+            });
+          } catch {}
+        });
+        es.onerror = () => {
+          es?.close();
+          // Reconnect after 10 seconds
+          reconnectTimer = setTimeout(connect, 10000);
+        };
+      } catch {}
+    };
+
+    connect();
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── File attachment handler ──────────────────────────────────────
+  const handleFileAttach = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConv) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum size is 20 MB", variant: "destructive" });
+      return;
+    }
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("caption", replyText.trim() || "");
+      const r = await fetch(`${BASE_API}/api/inbox/conversations/${activeConv.id}/media`, {
+        method: "POST", credentials: "include", body: form,
+      });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        toast({ title: "File sent ✓" });
+        setReplyText("");
+        // Reload messages
+        const mr = await fetch(`${BASE_API}/api/inbox/conversations/${activeConv.id}/messages`, { credentials: "include" });
+        if (mr.ok) { const md = await mr.json(); setMessages(md.messages || []); }
+      } else {
+        toast({ title: "Send failed", description: d.error || "Unknown error", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setUploadingFile(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [activeConv, replyText, toast]);
+
+  // ── Voice recorder handlers ──────────────────────────────────────
+  const startRecording = useCallback(async () => {
+    if (!activeConv) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")
+          ? "audio/ogg;codecs=opus"
+          : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recChunksRef.current = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) recChunksRef.current.push(e.data); };
+      recorder.start(100);
+      recorderRef.current = recorder;
+      setRecording(true);
+      setRecDuration(0);
+      recTimerRef.current = setInterval(() => setRecDuration(d => d + 1), 1000);
+    } catch {
+      toast({ title: "Microphone access denied", variant: "destructive" });
+    }
+  }, [activeConv, toast]);
+
+  const stopRecording = useCallback(async () => {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
+    setRecording(false);
+
+    await new Promise<void>(resolve => {
+      recorder.onstop = () => resolve();
+      recorder.stop();
+      recorder.stream.getTracks().forEach(t => t.stop());
+    });
+
+    const blob = new Blob(recChunksRef.current, { type: recorder.mimeType });
+    if (blob.size < 1000) { toast({ title: "Recording too short", variant: "destructive" }); return; }
+
+    const ext = recorder.mimeType.includes("ogg") ? "ogg" : "webm";
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append("audio", blob, `voice_${Date.now()}.${ext}`);
+      const r = await fetch(`${BASE_API}/api/inbox/conversations/${activeConv.id}/voice`, {
+        method: "POST", credentials: "include", body: form,
+      });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        toast({ title: "Voice note sent ✓" });
+        const mr = await fetch(`${BASE_API}/api/inbox/conversations/${activeConv.id}/messages`, { credentials: "include" });
+        if (mr.ok) { const md = await mr.json(); setMessages(md.messages || []); }
+      } else {
+        toast({ title: "Send failed", description: d.error, variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setUploadingFile(false);
+  }, [activeConv, toast]);
 
   // ── Open conversation ───────────────────────────────────────────
   const openConversation = async (conv: any) => {
@@ -833,10 +1054,56 @@ export default function OmnichannelInbox() {
                   className={`w-full px-4 py-3 text-sm resize-none focus:outline-none bg-transparent ${noteMode ? "placeholder:text-yellow-600" : ""}`}
                   rows={3}
                 />
-                <div className="flex items-center justify-between px-3 py-2 border-t">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <span className="text-xs">{replyText.length} chars</span>
+                <div className="flex items-center justify-between px-3 py-2 border-t gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">{replyText.length} chars</span>
+
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt"
+                      className="hidden"
+                      onChange={handleFileAttach}
+                    />
+
+                    {/* File attachment button — only for WhatsApp in reply mode */}
+                    {!noteMode && replyChannel === "whatsapp" && (
+                      <button
+                        title="Attach file (image, PDF, doc)"
+                        disabled={uploadingFile}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-40 transition-colors"
+                      >
+                        {uploadingFile
+                          ? <RefreshCw size={13} className="animate-spin" />
+                          : <Paperclip size={13} />}
+                      </button>
+                    )}
+
+                    {/* Voice recorder button — only for WhatsApp in reply mode */}
+                    {!noteMode && replyChannel === "whatsapp" && (
+                      <button
+                        title={recording ? `Stop recording (${recDuration}s)` : "Record voice note"}
+                        disabled={uploadingFile}
+                        onClick={recording ? stopRecording : startRecording}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 ${
+                          recording
+                            ? "bg-red-100 text-red-600 hover:bg-red-200 animate-pulse"
+                            : "hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {recording ? <StopCircle size={13} /> : <Mic size={13} />}
+                      </button>
+                    )}
+
+                    {recording && (
+                      <span className="text-xs text-red-600 font-medium tabular-nums">
+                        🔴 {recDuration}s
+                      </span>
+                    )}
                   </div>
+
                   <Button size="sm" onClick={sendReply} disabled={sendingReply || !replyText.trim()} className="gap-1.5 h-7 text-xs">
                     {sendingReply ? <RefreshCw size={12} className="animate-spin" /> : <Send size={12} />}
                     {noteMode ? "Add Note" : "Send"}

@@ -10,6 +10,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { addTimeline } from "../lib/workflowEngine.js";
+import { broadcastToInbox } from "./inbox.js";
 
 const router = Router();
 
@@ -287,6 +288,15 @@ router.post("/botbee", async (req, res) => {
         JSON.stringify({ kind, raw: body, at: timestamp }),
       ]
     ).catch(() => {});
+
+    // Broadcast to SSE inbox clients (real-time update for admin Omnichannel Inbox)
+    broadcastToInbox("new_message", {
+      lead_id: null, // will be resolved by inbox when it reloads
+      mobile: mobile10,
+      platform: "whatsapp",
+      preview: text.slice(0, 80),
+      at: Date.now(),
+    });
 
     // Add to customer timeline
     if (customerId) {

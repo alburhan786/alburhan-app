@@ -1,9 +1,32 @@
 // @ts-nocheck
 import { Router } from "express";
+import multer from "multer";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 import axios from "axios";
+
+// ── Multer: memory storage for inbox media uploads ────────────────────────────
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max
+  fileFilter: (_req, file, cb) => {
+    const allowed = /^(image|audio|video|application\/pdf|application\/msword|application\/vnd\.|text\/)/.test(file.mimetype);
+    cb(null, allowed || file.mimetype.startsWith("image") || file.mimetype.startsWith("audio"));
+  },
+});
+
+// ── SSE: Real-time inbox broadcast ───────────────────────────────────────────
+const sseClients = new Set<any>();
+
+/** Broadcast an event to all connected admin inbox tabs */
+export function broadcastToInbox(event: string, data: Record<string, unknown>) {
+  if (sseClients.size === 0) return;
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) {
+    try { res.write(msg); } catch { sseClients.delete(res); }
+  }
+}
 
 const router = Router();
 
@@ -484,6 +507,180 @@ router.get("/leads", requireAdmin as any, async (req, res) => {
 
     const countRes = await pool.query(`SELECT COUNT(*)::int as total FROM leads l WHERE ${where}`, params.slice(0, -2));
     res.json({ leads: rows, total: countRes.rows[0]?.total || 0, page, limit });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ── GET /api/inbox/stream ─────────────────────────────────────────────────────
+/**
+ * Server-Sent Events endpoint for real-time inbox updates.
+ * Keeps the HTTP connection alive and emits events whenever a new inbound
+ * message is broadcast via broadcastToInbox().
+ */
+router.get("/stream", requireAdmin as any, (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no", // disable nginx buffering
+  });
+  res.write("event: connected\ndata: {}\n\n");
+  sseClients.add(res);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(": ping\n\n"); } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+});
+
+// ── POST /api/inbox/conversations/:id/media ───────────────────────────────────
+/**
+ * Upload and send a file attachment (image / document / video) via WhatsApp.
+ * Accepts multipart/form-data with field `file` and optional `caption` text.
+ * Uses BotBee uploadMedia → sendFile pipeline.
+ */
+router.post(
+  "/conversations/:id/media",
+  requireAdmin as any,
+  upload.single("file"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) return void res.status(400).json({ error: "No file uploaded" });
+      const { caption = "" } = req.body;
+
+      const leadR = await pool.query(`SELECT * FROM leads WHERE id = $1`, [req.params.id]);
+      const lead = leadR.rows[0];
+      if (!lead) return void res.status(404).json({ error: "Lead not found" });
+      if (!lead.mobile) return void res.status(400).json({ error: "Lead has no mobile number" });
+
+      // Determine WhatsApp message type from MIME
+      const mime = req.file.mimetype;
+      let msgType = "document";
+      if (mime.startsWith("image/")) msgType = "image";
+      else if (mime.startsWith("audio/")) msgType = "audio";
+      else if (mime.startsWith("video/")) msgType = "video";
+
+      // Upload buffer to BotBee media store to get a media_id
+      const { uploadMedia, sendFile } = await import("../lib/botbee.js") as any;
+      const up = await uploadMedia(req.file.buffer, mime, req.file.originalname);
+      if (!up.mediaId) {
+        return void res.status(500).json({ error: "Media upload failed", detail: up.errorMessage });
+      }
+
+      // Send the media via WhatsApp
+      const sendResult = await sendFile(lead.mobile, up.mediaId, caption || req.file.originalname);
+      const adminName = (req as any).user?.name || "Admin";
+
+      // Persist in conversation thread
+      await pool.query(`
+        INSERT INTO social_messages
+          (platform, message_text, message_type, media_url, lead_text_id, direction, replied_by, sender_name, status)
+        VALUES ('whatsapp', $1, $2, $3, $4, 'outgoing', $5, $5, 'sent')
+      `, [caption || req.file.originalname, msgType, up.mediaId, req.params.id, adminName]);
+
+      await pool.query(`UPDATE leads SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+
+      res.json({ ok: sendResult.ok, mediaId: up.mediaId, type: msgType,
+        error: sendResult.ok ? undefined : sendResult.errorMessage });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  }
+);
+
+// ── POST /api/inbox/conversations/:id/voice ───────────────────────────────────
+/**
+ * Upload a browser-recorded audio blob and send as a WhatsApp voice note.
+ * Accepts multipart/form-data with field `audio` (ogg/webm/mp4 audio).
+ */
+router.post(
+  "/conversations/:id/voice",
+  requireAdmin as any,
+  upload.single("audio"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) return void res.status(400).json({ error: "No audio uploaded" });
+
+      const leadR = await pool.query(`SELECT * FROM leads WHERE id = $1`, [req.params.id]);
+      const lead = leadR.rows[0];
+      if (!lead) return void res.status(404).json({ error: "Lead not found" });
+      if (!lead.mobile) return void res.status(400).json({ error: "Lead has no mobile number" });
+
+      const mime = req.file.mimetype || "audio/ogg";
+      const filename = req.file.originalname || `voice_${Date.now()}.ogg`;
+
+      const { uploadMedia, sendFile } = await import("../lib/botbee.js") as any;
+      const up = await uploadMedia(req.file.buffer, mime, filename);
+      if (!up.mediaId) {
+        return void res.status(500).json({ error: "Voice upload failed", detail: up.errorMessage });
+      }
+
+      const sendResult = await sendFile(lead.mobile, up.mediaId, "");
+      const adminName = (req as any).user?.name || "Admin";
+
+      await pool.query(`
+        INSERT INTO social_messages
+          (platform, message_text, message_type, media_url, lead_text_id, direction, replied_by, sender_name, status)
+        VALUES ('whatsapp', '🎙️ Voice Note', 'audio', $1, $2, 'outgoing', $3, $3, 'sent')
+      `, [up.mediaId, req.params.id, adminName]);
+
+      await pool.query(`UPDATE leads SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+      res.json({ ok: sendResult.ok, mediaId: up.mediaId });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  }
+);
+
+// ── GET /api/inbox/conversations/:id/customer360 ─────────────────────────────
+/**
+ * Returns a quick Customer 360 snapshot for the conversation panel:
+ * booking status, last payment, pilgrim count, open tickets, recent activity.
+ */
+router.get("/conversations/:id/customer360", requireAdmin as any, async (req, res) => {
+  try {
+    const leadR = await pool.query(`SELECT * FROM leads WHERE id = $1`, [req.params.id]);
+    const lead = leadR.rows[0];
+    if (!lead) return void res.status(404).json({ error: "Lead not found" });
+
+    const mobile = lead.mobile;
+    const email  = lead.email;
+
+    // Find linked user/booking (match by mobile or email)
+    let booking: any = null;
+    let user: any    = null;
+    if (mobile || email) {
+      const conds = [];
+      const params: any[] = [];
+      if (mobile) { params.push(mobile.replace(/\D/g, "").slice(-10)); conds.push(`REGEXP_REPLACE(mobile,'\\D','','g') LIKE $${params.length}`); }
+      if (email)  { params.push(email.toLowerCase()); conds.push(`LOWER(email) = $${params.length}`); }
+      const uRes = await pool.query(
+        `SELECT id, name, email, mobile, created_at FROM users WHERE ${conds.join(" OR ")} LIMIT 1`, params
+      );
+      user = uRes.rows[0] || null;
+      if (user) {
+        const bRes = await pool.query(`
+          SELECT b.id, b.booking_number, b.status, b.final_amount, b.paid_amount,
+                 b.created_at, p.name as package_name
+          FROM bookings b LEFT JOIN packages p ON p.id = b.package_id
+          WHERE b.customer_id = $1
+          ORDER BY b.created_at DESC LIMIT 1
+        `, [user.id]);
+        booking = bRes.rows[0] || null;
+      }
+    }
+
+    // Open support tickets
+    const ticketR = await pool.query(
+      `SELECT COUNT(*)::int as count FROM support_tickets WHERE customer_id = $1 AND status != 'closed'`,
+      [user?.id || "none"]
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+
+    res.json({
+      lead,
+      user,
+      booking,
+      openTickets: ticketR.rows[0]?.count || 0,
+    });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

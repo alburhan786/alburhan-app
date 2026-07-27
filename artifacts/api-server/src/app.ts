@@ -15,6 +15,7 @@ import { ensureErrorLogTable, errorLogMiddleware } from "./routes/error-logs.js"
 import { leadEngineRouter } from "./routes/lead-engine.js";
 import inboxRouter from "./routes/inbox.js";
 import customer360Router from "./routes/customer360.js";
+import analyticsRouter from "./routes/analytics.js";
 // Lazy pool from @workspace/db — pool creation is deferred until first use (after dotenv)
 import { pool as sharedPool } from "@workspace/db";
 const __filename = fileURLToPath(import.meta.url);
@@ -4816,6 +4817,7 @@ app.use("/api/leads", leadEngineRouter as any);
 app.use("/api/inbox", inboxRouter as any);
 app.use("/api/customer360", customer360Router as any);
 app.use("/api/customers", customer360Router as any);
+app.use("/api/analytics", analyticsRouter as any);
 
 // ── Main API router ───────────────────────────────────────────────────────────
 // Error log middleware (must be before router so it captures 4xx/5xx)
