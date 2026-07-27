@@ -777,6 +777,248 @@ router.get("/:id/audit-log", requireAdmin, async (req: AuthenticatedRequest, res
   }
 });
 
+// ── Full Automation: Lead → Booking ──────────────────────────────────────────
+import {
+  autoConvertLeadToBooking,
+  getPaymentSchedule,
+  getOverdueInstallments,
+} from "../lib/leadConversion.js";
+
+// GET /:id/convert-preview  — prefill data for the convert modal
+router.get("/:id/convert-preview", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT l.*, u.name as assigned_to_name
+         FROM leads l
+         LEFT JOIN users u ON u.id = l.assigned_to
+        WHERE l.id = $1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Lead not found" });
+    const l = rows[0];
+    const numTravellers = parseInt(l.num_travellers) || 1;
+    res.json({
+      leadId:              l.id,
+      leadNumber:          l.lead_number,
+      name:                l.name,
+      mobile:              l.mobile,
+      email:               l.email,
+      packageId:           l.package_interest_id || null,
+      packageName:         l.package_interest   || "",
+      suggestedAmount:     Number(l.budget) || 0,
+      numTravellers,
+      roomType:            l.room_preference || "quad",
+      departureDate:       l.preferred_departure_date || "",
+      source:              l.source,
+      status:              l.status,
+      pipelineStage:       l.pipeline_stage,
+      alreadyConverted:    l.status === "converted",
+      convertedBookingId:  l.converted_booking_id || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /:id/auto-convert  — full one-click automation pipeline
+router.post("/:id/auto-convert", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await autoConvertLeadToBooking(
+      req.params.id,
+      req.user?.id?.toString() || "",
+      req.body
+    );
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /payment-schedules/:bookingId  — fetch payment schedule for a booking
+router.get("/payment-schedules/:bookingId", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const schedule = await getPaymentSchedule(req.params.bookingId);
+    res.json(schedule);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /overdue-installments  — all overdue payment schedule items
+router.get("/overdue-installments", requireAdmin, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const rows = await getOverdueInstallments();
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Executive CRM Summary ────────────────────────────────────────────────────
+router.get("/executive-summary", requireAdmin, async (_req: AuthenticatedRequest, res) => {
+  try {
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [
+      pipelineStats, monthActivity, sourceROI,
+      agentPerf, funnelStats, overdueSchedules,
+    ] = await Promise.all([
+      // Pipeline snapshot
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                                           AS total_active,
+          COUNT(*) FILTER (WHERE pipeline_stage = 'new_lead')::int               AS new_leads,
+          COUNT(*) FILTER (WHERE pipeline_stage IN ('contacted','follow_up'))::int AS contacted,
+          COUNT(*) FILTER (WHERE pipeline_stage IN ('qualified','interested'))::int AS qualified,
+          COUNT(*) FILTER (WHERE pipeline_stage IN ('proposal','negotiation'))::int AS proposal,
+          COUNT(*) FILTER (WHERE pipeline_stage = 'won')::int                    AS won,
+          COUNT(*) FILTER (WHERE status = 'lost')::int                           AS lost,
+          COUNT(*) FILTER (WHERE status = 'converted')::int                      AS converted_all_time
+        FROM leads
+        WHERE status NOT IN ('spam','cancelled')
+      `),
+      // This-month activity
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                                         AS new_this_month,
+          COUNT(*) FILTER (WHERE status = 'converted')::int                    AS converted_this_month,
+          COUNT(*) FILTER (WHERE follow_up_date::date = $1 AND status NOT IN ('converted','lost'))::int
+                                                                               AS follow_up_today,
+          COALESCE(AVG(ai_score) FILTER (WHERE ai_score IS NOT NULL), 0)::int AS avg_ai_score
+        FROM leads
+        WHERE created_at >= $2
+      `, [today, monthStart]),
+      // Source ROI (top 8)
+      pool.query(`
+        SELECT
+          COALESCE(source,'direct') AS source,
+          COUNT(*)::int             AS total,
+          COUNT(*) FILTER (WHERE status = 'converted')::int AS converted,
+          COALESCE(SUM(budget) FILTER (WHERE status = 'converted'), 0)::float AS revenue_est,
+          ROUND(
+            COUNT(*) FILTER (WHERE status = 'converted')::numeric /
+            NULLIF(COUNT(*), 0) * 100, 1
+          )::float                  AS conv_rate
+        FROM leads
+        WHERE status NOT IN ('spam','cancelled')
+        GROUP BY 1
+        ORDER BY converted DESC, total DESC
+        LIMIT 8
+      `),
+      // Agent performance (top 8 this month)
+      pool.query(`
+        SELECT
+          u.name                              AS agent_name,
+          COUNT(l.id)::int                    AS assigned,
+          COUNT(l.id) FILTER (WHERE l.status='converted')::int AS converted,
+          COALESCE(AVG(l.ai_score) FILTER (WHERE l.ai_score IS NOT NULL), 0)::int AS avg_score,
+          ROUND(
+            COUNT(l.id) FILTER (WHERE l.status='converted')::numeric /
+            NULLIF(COUNT(l.id), 0) * 100, 1
+          )::float                            AS conv_rate
+        FROM leads l
+        JOIN users u ON u.id = l.assigned_to
+        WHERE l.created_at >= $1
+          AND l.status NOT IN ('spam','cancelled')
+        GROUP BY u.name
+        ORDER BY converted DESC, assigned DESC
+        LIMIT 8
+      `, [monthStart]),
+      // Funnel drop-off
+      pool.query(`
+        SELECT pipeline_stage, COUNT(*)::int AS cnt
+        FROM leads
+        WHERE status NOT IN ('spam','cancelled')
+        GROUP BY pipeline_stage
+        ORDER BY cnt DESC
+      `),
+      // Overdue payment schedules
+      pool.query(`
+        SELECT COUNT(*)::int AS cnt,
+               COALESCE(SUM(amount),0)::float AS total_overdue
+        FROM payment_schedules
+        WHERE status = 'pending' AND due_date < CURRENT_DATE
+      `).catch(() => ({ rows: [{ cnt: 0, total_overdue: 0 }] })),
+    ]);
+
+    const pipeline  = pipelineStats.rows[0]  || {};
+    const monthly   = monthActivity.rows[0]  || {};
+    const overdue   = overdueSchedules.rows[0] || {};
+    const totalLeadsMonth = monthly.new_this_month || 0;
+    const convMonth       = monthly.converted_this_month || 0;
+    const crmConvRate     = totalLeadsMonth > 0
+      ? Math.round((convMonth / totalLeadsMonth) * 100) : 0;
+
+    res.json({
+      pipeline:       { ...pipeline, crmConvRate, avgAiScore: monthly.avg_ai_score },
+      monthly:        { ...monthly, crmConvRate },
+      sourceROI:      sourceROI.rows,
+      agentPerf:      agentPerf.rows,
+      funnel:         funnelStats.rows,
+      overdueInstallments: { count: overdue.cnt, amount: overdue.total_overdue },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /daily-report/send  — WhatsApp + email daily summary to management
+router.post("/daily-report/send", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { sendWhatsApp, sendDLTSMS } = await import("../lib/notifications.js");
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [leads, bookings, payments] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int as total, COUNT(*) FILTER(WHERE DATE(created_at)=$1)::int as today_new, COUNT(*) FILTER(WHERE status='converted' AND DATE(updated_at)=$1)::int as today_converted FROM leads WHERE status NOT IN('spam','cancelled')`, [today]),
+      pool.query(`SELECT COUNT(*)::int as total, COUNT(*) FILTER(WHERE DATE(created_at)=$1)::int as today_new FROM bookings WHERE deleted_at IS NULL`, [today]),
+      pool.query(`SELECT COALESCE(SUM(amount) FILTER(WHERE DATE(created_at)=$1),0)::float as today, COALESCE(SUM(amount) FILTER(WHERE created_at >= $2),0)::float as month FROM payment_transactions`, [today, monthStart]),
+    ]);
+
+    const l = leads.rows[0] || {};
+    const b = bookings.rows[0] || {};
+    const p = payments.rows[0] || {};
+    const fmt = (n: number) => `₹${(n || 0).toLocaleString("en-IN")}`;
+    const dateStr = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+    const msg = `🕌 *Al Burhan Daily CRM Report — ${dateStr}*
+
+📊 *Leads*
+• New Today: ${l.today_new}
+• Converted Today: ${l.today_converted}
+• Total Active: ${l.total}
+
+📋 *Bookings*
+• New Today: ${b.today_new}
+• Total: ${b.total}
+
+💰 *Revenue*
+• Today's Collection: ${fmt(p.today)}
+• Month Total: ${fmt(p.month)}
+
+_Auto-generated by Al Burhan ERP_`;
+
+    const targets: string[] = req.body?.mobiles || [];
+    const results: any[] = [];
+
+    for (const mobile of targets) {
+      try {
+        await sendWhatsApp(mobile, msg);
+        results.push({ mobile, ok: true, channel: "whatsapp" });
+      } catch (e: any) {
+        results.push({ mobile, ok: false, error: e.message });
+      }
+    }
+
+    res.json({ ok: true, results, report: { leads: l, bookings: b, payments: p } });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Named export bypasses esbuild CJS default-export interop issue
 export { router as leadEngineRouter };
 export default router;

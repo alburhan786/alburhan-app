@@ -487,4 +487,80 @@ router.get("/leads", requireAdmin as any, async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ── POST /api/inbox/conversations/:id/ai-suggest ─────────────────────────────
+// Returns 3 AI-generated reply suggestions for a conversation
+router.post("/conversations/:id/ai-suggest", requireAdmin as any, async (req, res) => {
+  try {
+    const leadRes = await pool.query(`SELECT * FROM leads WHERE id = $1`, [req.params.id]);
+    if (!leadRes.rows[0]) return res.status(404).json({ error: "Conversation not found" });
+    const l = leadRes.rows[0];
+
+    const msgs = await pool.query(`
+      SELECT message_text, direction, created_at
+        FROM social_messages
+       WHERE lead_text_id = $1
+       ORDER BY created_at DESC LIMIT 10
+    `, [req.params.id]);
+
+    const history = msgs.rows
+      .reverse()
+      .map((m: any) =>
+        `${m.direction === "outgoing" ? "Agent" : "Customer"}: ${m.message_text || "(media)"}`)
+      .join("\n");
+
+    const apiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+    const baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+
+    if (!apiKey || !baseURL) {
+      // Fallback: context-aware templates
+      const name = l.name || "valued customer";
+      return res.json({ suggestions: [
+        `Assalamu Alaikum ${name}, JazakAllah khair for your interest! We have excellent ${l.package_interest || "Hajj/Umrah"} packages available. How many travellers will be joining?`,
+        `Thank you for reaching out, ${name}! Our team would love to help you plan your spiritual journey. Could you please share your preferred travel dates and budget?`,
+        `Dear ${name}, we're delighted to assist with your ${l.package_interest || "Hajj/Umrah"} booking. Please allow us 24 hours to prepare a personalised package quote for you.`,
+      ], source: "template" });
+    }
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey, baseURL });
+
+    const prompt = `You are a professional sales agent for Al Burhan Tours & Travels, a trusted Hajj and Umrah travel company in India.
+
+Customer profile:
+- Name: ${l.name || "Unknown"}
+- Mobile: ${l.mobile || "N/A"}
+- Source: ${l.source || "Unknown"}
+- Package interest: ${l.package_interest || "General Hajj/Umrah"}
+- Budget: ${l.budget ? "₹" + Number(l.budget).toLocaleString("en-IN") : "Not specified"}
+- Stage: ${l.pipeline_stage || "new_lead"}
+- Priority: ${l.priority || "normal"}
+
+${history ? `Recent conversation:\n${history}` : "(No prior messages — this will be the first contact)"}
+
+Generate exactly 3 short, professional reply suggestions in the tone of a helpful Islamic travel consultant. Each reply should be natural, warm, and move the conversation forward toward booking. 
+Return ONLY a valid JSON array of 3 strings, nothing else.
+Example format: ["Reply 1 text", "Reply 2 text", "Reply 3 text"]`;
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 800,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = response.content[0]?.text || "[]";
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    let suggestions: string[] = [];
+    try {
+      suggestions = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      if (!Array.isArray(suggestions)) suggestions = [text];
+    } catch {
+      suggestions = [text];
+    }
+
+    res.json({ suggestions: suggestions.slice(0, 3), source: "ai" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, suggestions: [] });
+  }
+});
+
 export default router;

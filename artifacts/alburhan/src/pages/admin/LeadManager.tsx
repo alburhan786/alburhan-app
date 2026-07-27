@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { LeadConvertModal } from "@/components/leads/LeadConvertModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -411,7 +412,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
   const [savingStage, setSavingStage] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [score, setScore] = useState({ score: lead.score||"cold" });
-  const [converting, setConverting] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   useEffect(()=>{
@@ -455,24 +456,26 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
     setScoring(false);
   };
 
-  const convertToBooking = async () => {
-    setConverting(true);
-    try {
-      const d = await apiFetch(`/api/leads/${lead.id}/create-booking`,{
-        method:"POST", headers:{"Content-Type":"application/json"}
-      });
-      toast({ title:"Lead converted to booking" });
-      onUpdated({ ...lead, status:"converted", converted_booking_id: d.bookingId || d.id });
-      window.location.href = `/admin/bookings?open=${d.bookingId || d.id}`;
-    } catch(e:any){ toast({ title:"Error", description:e.message, variant:"destructive" }); }
-    setConverting(false);
+  const handleConvertSuccess = (result: any) => {
+    toast({ title: "Lead converted to booking!", description: `Booking ${result.bookingNumber || ""} created` });
+    onUpdated({ ...lead, status: "converted", converted_booking_id: result.bookingId });
+    setShowConvertModal(false);
   };
 
   const L = detail?.lead || lead;
   const scoreMeta = SCORE_META[score.score] || SCORE_META.cold;
-  const canConvert = ["qualified","proposal","negotiation","won"].includes(stage) && !L.converted_booking_id;
+  const canConvert = !L.converted_booking_id && L.status !== "converted" && L.mobile;
 
   return (
+    <>
+    {showConvertModal && (
+      <LeadConvertModal
+        leadId={lead.id}
+        leadNumber={L.lead_number}
+        onClose={() => setShowConvertModal(false)}
+        onSuccess={handleConvertSuccess}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/40" onClick={onClose}>
       <div className="w-full max-w-xl bg-background h-full flex flex-col shadow-2xl" onClick={e=>e.stopPropagation()}>
         {/* Header */}
@@ -507,10 +510,16 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
             {scoring?<RefreshCw size={11} className="animate-spin"/>:<Target size={11}/>} Score
           </Button>
           {canConvert && (
-            <Button size="sm" className="h-7 text-xs gap-1 bg-[#0A3D2A] hover:bg-[#0A3D2A]/90 text-[#C9A84C]" onClick={convertToBooking} disabled={converting}>
-              {converting?<RefreshCw size={11} className="animate-spin"/>:<Plus size={11}/>}
-              Create Booking
+            <Button size="sm" className="h-7 text-xs gap-1 bg-[#0A3D2A] hover:bg-[#0A3D2A]/90 text-[#C9A84C]"
+              onClick={() => setShowConvertModal(true)}>
+              <Plus size={11}/> Convert to Booking
             </Button>
+          )}
+          {L.converted_booking_id && (
+            <a href={`/admin/bookings?open=${L.converted_booking_id}`}
+              className="text-xs px-2.5 py-1.5 rounded-lg border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center gap-1">
+              ✅ View Booking
+            </a>
           )}
         </div>
 
@@ -643,6 +652,7 @@ function LeadDetailPanel({ lead, onClose, onUpdated }:{
         </div>
       </div>
     </div>
+    </>
   );
 }
 

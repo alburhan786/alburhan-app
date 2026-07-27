@@ -9,7 +9,7 @@ import {
   Search, RefreshCw, X, Send, Phone, Mail, MessageCircle, Users,
   ChevronDown, Filter, Check, AlertTriangle, Clock, Star, Archive,
   MoreVertical, StickyNote, UserPlus, Calendar, Zap, Tag, Edit2,
-  ArrowLeft, Info, CheckCheck, Bell,
+  ArrowLeft, Info, CheckCheck, Bell, Sparkles,
 } from "lucide-react";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
@@ -564,6 +564,25 @@ export default function OmnichannelInbox() {
     ...outgoing.map((m: any) => ({ ...m, direction: "outgoing", _sort: new Date(m.created_at).getTime() })),
   ].sort((a, b) => a._sort - b._sort);
 
+  // ── AI Suggest ──────────────────────────────────────────────────
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fetchAiSuggest = async () => {
+    if (!activeConv) return;
+    setAiLoading(true);
+    setAiSuggestions([]);
+    try {
+      const r = await fetch(`${BASE_API}/api/inbox/conversations/${activeConv.id}/ai-suggest`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const d = await r.json();
+      if (d.suggestions?.length) setAiSuggestions(d.suggestions);
+    } catch {}
+    setAiLoading(false);
+  };
+
   // ── Send reply ──────────────────────────────────────────────────
   const sendReply = async () => {
     if (!replyText.trim() || !activeConv) return;
@@ -752,6 +771,24 @@ export default function OmnichannelInbox() {
 
             {/* Reply Area */}
             <div className="border-t bg-background p-4 flex-shrink-0">
+              {/* AI Suggestions */}
+              {aiSuggestions.length > 0 && !noteMode && (
+                <div className="mb-2 space-y-1.5">
+                  <p className="text-[10px] font-semibold text-violet-700 flex items-center gap-1">
+                    <Sparkles size={10} /> AI Suggestions — click to use
+                  </p>
+                  {aiSuggestions.map((s, i) => (
+                    <button key={i} onClick={() => { setReplyText(s); setAiSuggestions([]); }}
+                      className="w-full text-left text-xs px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors text-violet-900 leading-relaxed">
+                      {s}
+                    </button>
+                  ))}
+                  <button onClick={() => setAiSuggestions([])} className="text-[10px] text-muted-foreground hover:text-foreground">
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {/* Channel + mode selectors */}
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <div className="flex gap-1">
@@ -772,6 +809,15 @@ export default function OmnichannelInbox() {
                     {activeConv.email && <option value="email">✉️ Email</option>}
                     {(activeConv.platform?.includes("telegram") || activeConv.telegram_username) && <option value="telegram">✈️ Telegram</option>}
                   </select>
+                )}
+                {!noteMode && (
+                  <button onClick={fetchAiSuggest} disabled={aiLoading}
+                    className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50">
+                    {aiLoading
+                      ? <RefreshCw size={10} className="animate-spin" />
+                      : <Sparkles size={10} />}
+                    AI Suggest
+                  </button>
                 )}
                 <span className="text-[10px] text-muted-foreground ml-auto">Ctrl+Enter to send</span>
               </div>
