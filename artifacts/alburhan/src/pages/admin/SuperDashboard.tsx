@@ -42,7 +42,7 @@ const MODULES: { section: string; color: string; items: Module[] }[] = [
     section: "Portals",
     color: "from-violet-600 to-violet-800",
     items: [
-      { label: "Super Admin Dashboard",     sub: "Command center",              icon: Sparkles,       href: "/admin/super",            kpiKey: "totalBookings",  kpiLabel: "bookings",  color: "bg-violet-100",  textColor: "text-violet-700",  borderHover: "hover:border-violet-400" },
+      { label: "Admin Dashboard",           sub: "Main operations hub",         icon: LayoutDashboard,href: "/admin/dashboard",        kpiKey: "totalBookings",  kpiLabel: "bookings",  color: "bg-violet-100",  textColor: "text-violet-700",  borderHover: "hover:border-violet-400" },
       { label: "Branch Dashboard",          sub: "Branch performance",          icon: Building2,      href: "/admin/branch-dashboard", kpiKey: "branches",       kpiLabel: "branches",  color: "bg-blue-100",    textColor: "text-blue-700",    borderHover: "hover:border-blue-400" },
       { label: "Branch Login Management",   sub: "Branch login & access",       icon: KeyRound,       href: "/admin/branch-login",     kpiKey: "branches",       kpiLabel: "branches",  color: "bg-indigo-100",  textColor: "text-indigo-700",  borderHover: "hover:border-indigo-400" },
       { label: "Agent Dashboard",           sub: "Agent analytics",             icon: UserCheck,      href: "/admin/agent-dashboard",  kpiKey: "agents",         kpiLabel: "agents",    color: "bg-cyan-100",    textColor: "text-cyan-700",    borderHover: "hover:border-cyan-400" },

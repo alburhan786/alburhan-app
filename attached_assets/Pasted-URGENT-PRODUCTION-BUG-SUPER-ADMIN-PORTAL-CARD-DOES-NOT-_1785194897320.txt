@@ -1,0 +1,58 @@
+URGENT PRODUCTION BUG — SUPER ADMIN PORTAL CARD DOES NOT OPEN
+
+The “Super Admin Dashboard” card is visible on the Portals page, but clicking it does nothing. No page opens.
+
+Do not make unrelated changes.
+
+Investigate and fix this exact issue in production.
+
+Check all of the following:
+
+1. Find the component that renders the “Super Admin Dashboard” card.
+2. Verify whether it uses:
+   - onClick
+   - Link
+   - navigate()
+   - setLocation()
+   - window.location
+3. Confirm the target route is correct.
+4. The expected Super Admin route is likely:
+   /admin/super
+   but verify the actual route from the router before changing anything.
+5. Check whether the click handler is missing, returning early, or using an undefined route.
+6. Check whether the card is disabled by role/permission logic.
+7. Check whether a transparent element, overlay, pseudo-element, or CSS layer is blocking pointer events.
+8. Check browser console errors when clicking the card.
+9. Check whether the card is inside another element that prevents navigation.
+10. Check mobile and desktop behavior.
+11. Confirm the logged-in user role is normalized to:
+    super_admin
+12. Confirm backend and frontend authorization both allow access.
+13. Confirm direct navigation to the route works.
+14. Confirm browser refresh on the Super Admin route works.
+15. Redeploy to the correct VPS frontend and API paths.
+16. Restart the correct PM2 process only if required.
+17. Clear stale frontend bundle/service-worker cache if needed.
+
+Acceptance test:
+
+1. Login as Super Admin.
+2. Open the Portals page.
+3. Click “Super Admin Dashboard”.
+4. Confirm the browser navigates to the correct route.
+5. Confirm the dashboard header, sidebar, cards, and modules load.
+6. Confirm no blank page, 404, 401, 403, or redirect loop.
+7. Confirm direct refresh still works.
+8. Confirm other portal cards still work.
+
+Provide:
+- Exact root cause
+- Exact Super Admin route
+- File(s) changed
+- Click handler before and after
+- Permission issue found, if any
+- Deployment result
+- Final live test result
+- Checkpoint/commit reference
+
+Do not mark complete until clicking the card opens the real production Super Admin Dashboard.
