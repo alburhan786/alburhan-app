@@ -26,6 +26,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";
+import multer from "multer";
 import {
   createOrUpdateLead,
   findDuplicateLead,
@@ -381,203 +382,11 @@ router.post("/bulk-assign", requireAdmin, async (req: AuthenticatedRequest, res)
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SINGLE LEAD OPERATIONS (must come after specific routes)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-router.get("/:id", requireAdmin, async (req, res) => {
-  try {
-    const [lead, activities, followups, consents] = await Promise.all([
-      pool.query(`SELECT * FROM leads WHERE id=$1`, [req.params.id]),
-      pool.query(`SELECT * FROM lead_activities WHERE lead_id=$1 ORDER BY created_at DESC LIMIT 100`, [req.params.id]),
-      pool.query(`SELECT * FROM lead_followups WHERE lead_id=$1 ORDER BY due_at ASC NULLS LAST LIMIT 50`, [req.params.id]),
-      pool.query(`SELECT channel, status, updated_at FROM communication_consents WHERE lead_id=$1 OR (mobile IS NOT NULL AND mobile=(SELECT REGEXP_REPLACE(mobile,'\\D','','g') FROM leads WHERE id=$1))`, [req.params.id]),
-    ]);
-    if (!lead.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
-    res.json({ ok: true, lead: lead.rows[0], activities: activities.rows, followups: followups.rows, consents: consents.rows });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.patch("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const allowed = [
-      "name","first_name","last_name","mobile","whatsapp_number","email","city","state","country",
-      "source","platform","package_interest","budget","num_travellers","travel_month",
-      "assigned_to","assigned_name","assigned_branch","expected_conversion_amount",
-      "lost_reason","notes","priority","status","tags",
-    ];
-    const sets: string[] = ["updated_at=NOW()"];
-    const params: any[] = [];
-
-    for (const key of allowed) {
-      if (req.body[key] !== undefined) {
-        params.push(req.body[key]);
-        sets.push(`${key}=$${params.length}`);
-      }
-    }
-    if (sets.length === 1) return res.status(400).json({ ok: false, error: "No fields to update" });
-
-    params.push(req.params.id);
-    const row = await pool.query(
-      `UPDATE leads SET ${sets.join(",")} WHERE id=$${params.length} RETURNING *`,
-      params
-    );
-    if (!row.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
-
-    // Log update activity
-    const changed = Object.keys(req.body).filter(k => allowed.includes(k));
-    await pool.query(
-      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
-       VALUES ($1,$2,'update','Lead updated',$3,$4,$5)`,
-      [randomUUID(), req.params.id, JSON.stringify({ fields: changed }), req.user?.id?.toString(), req.user?.name]
-    );
-
-    res.json({ ok: true, lead: row.rows[0] });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.post("/:id/score", requireAdmin, async (req, res) => {
-  try {
-    const lead = await pool.query(`SELECT * FROM leads WHERE id=$1`, [req.params.id]);
-    if (!lead.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
-    const l = lead.rows[0];
-    const { score, score_factors, score_points } = calculateLeadScore({
-      name: l.name, mobile: l.mobile, email: l.email, source: l.source,
-      package_interest: l.package_interest, budget: l.budget,
-      num_travellers: l.num_travellers, travel_month: l.travel_month,
-      message: l.message, city: l.city, state: l.state, priority: l.priority,
-    });
-    await pool.query(
-      `UPDATE leads SET score=$1, score_factors=$2, updated_at=NOW() WHERE id=$3`,
-      [score, JSON.stringify(score_factors), req.params.id]
-    );
-    res.json({ ok: true, score, score_factors, score_points });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.post("/:id/assign", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { assigned_to, assigned_name, assigned_branch, reason } = req.body;
-    if (!assigned_to) return res.status(400).json({ ok: false, error: "assigned_to required" });
-
-    await pool.query(
-      `UPDATE leads SET assigned_to=$1, assigned_name=$2, assigned_branch=$3,
-       assignment_notified_at=NOW(), updated_at=NOW() WHERE id=$4`,
-      [assigned_to, assigned_name, assigned_branch, req.params.id]
-    );
-
-    await pool.query(
-      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
-       VALUES ($1,$2,'assignment','Lead manually assigned to ' || $3,$4,$5,$6)`,
-      [randomUUID(), req.params.id, assigned_name, JSON.stringify({ assigned_to, reason, method: "manual" }),
-       req.user?.id?.toString(), req.user?.name]
-    );
-
-    res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.post("/:id/convert", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { booking_id, notes } = req.body;
-    await pool.query(
-      `UPDATE leads SET status='converted', pipeline_stage='full_payment_received',
-       conversion_booking_id=$1, converted_at=NOW(), updated_at=NOW() WHERE id=$2`,
-      [booking_id || null, req.params.id]
-    );
-    await pool.query(
-      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
-       VALUES ($1,$2,'conversion','Lead converted to booking',$3,$4,$5)`,
-      [randomUUID(), req.params.id, JSON.stringify({ booking_id, notes }), req.user?.id?.toString(), req.user?.name]
-    );
-    res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-router.delete("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    await pool.query(
-      `UPDATE leads SET status='spam', pipeline_stage='spam', inbox_status='closed', updated_at=NOW() WHERE id=$1`,
-      [req.params.id]
-    );
-    await pool.query(
-      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
-       VALUES ($1,$2,'marked_spam','Lead marked as spam / deleted','{}',$3,$4)`,
-      [randomUUID(), req.params.id, req.user?.id?.toString(), req.user?.name]
-    );
-    res.json({ ok: true });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  PHASE B ROUTES
-// ═══════════════════════════════════════════════════════════════════════════
-import {
-  aiScoreLead,
-  createBookingFromLead,
-  exportLeadsToExcel,
-  importLeadsFromExcel,
-  syncFbAdsData,
-  getReportPipelineVelocity,
-  getReportSourceROI,
-  getReportAgentPerformance,
-  getReportConversionFunnel,
-  listWebForms,
-  createWebForm,
-  updateWebForm,
-  getWebFormEmbed,
-  submitWebForm,
-  getLeadAuditLog,
-  ensureLeadEnginePhaseBSchema,
-} from "../lib/leadEnginePhaseB.js";
-import multer from "multer";
-
+// ── multer for file uploads ───────────────────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Run Phase B schema on load
 ensureLeadEnginePhaseBSchema().catch(e => console.error("[LeadEnginePhaseB] Schema error:", e));
-
-// ── AI Scoring ───────────────────────────────────────────────────────────────
-router.post("/:id/ai-score", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const result = await aiScoreLead(req.params.id);
-    res.json({ ok: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// ── Create Booking from Lead ─────────────────────────────────────────────────
-router.post("/:id/create-booking", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const result = await createBookingFromLead(req.params.id, req.user?.id?.toString() || "");
-    res.json({ ok: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// ── Audit Log ────────────────────────────────────────────────────────────────
-router.get("/:id/audit-log", requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const log = await getLeadAuditLog(req.params.id);
-    res.json(log);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ── Export ───────────────────────────────────────────────────────────────────
 router.get("/export/excel", requireAdmin, async (req: AuthenticatedRequest, res) => {
@@ -775,6 +584,197 @@ async function submitForm(e){
 }
 </script></body></html>`);
   } catch (err: any) { res.status(500).send("<p>Error loading form</p>"); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SINGLE LEAD OPERATIONS (must come after all specific routes above)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get("/:id", requireAdmin, async (req, res) => {
+  try {
+    const [lead, activities, followups, consents] = await Promise.all([
+      pool.query(`SELECT * FROM leads WHERE id=$1`, [req.params.id]),
+      pool.query(`SELECT * FROM lead_activities WHERE lead_id=$1 ORDER BY created_at DESC LIMIT 100`, [req.params.id]),
+      pool.query(`SELECT * FROM lead_followups WHERE lead_id=$1 ORDER BY due_at ASC NULLS LAST LIMIT 50`, [req.params.id]),
+      pool.query(`SELECT channel, status, updated_at FROM communication_consents WHERE lead_id=$1 OR (mobile IS NOT NULL AND mobile=(SELECT REGEXP_REPLACE(mobile,'\\D','','g') FROM leads WHERE id=$1))`, [req.params.id]),
+    ]);
+    if (!lead.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
+    res.json({ ok: true, lead: lead.rows[0], activities: activities.rows, followups: followups.rows, consents: consents.rows });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.patch("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const allowed = [
+      "name","first_name","last_name","mobile","whatsapp_number","email","city","state","country",
+      "source","platform","package_interest","budget","num_travellers","travel_month",
+      "assigned_to","assigned_name","assigned_branch","expected_conversion_amount",
+      "lost_reason","notes","priority","status","tags",
+    ];
+    const sets: string[] = ["updated_at=NOW()"];
+    const params: any[] = [];
+
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        params.push(req.body[key]);
+        sets.push(`${key}=$${params.length}`);
+      }
+    }
+    if (sets.length === 1) return res.status(400).json({ ok: false, error: "No fields to update" });
+
+    params.push(req.params.id);
+    const row = await pool.query(
+      `UPDATE leads SET ${sets.join(",")} WHERE id=$${params.length} RETURNING *`,
+      params
+    );
+    if (!row.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
+
+    // Log update activity
+    const changed = Object.keys(req.body).filter(k => allowed.includes(k));
+    await pool.query(
+      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+       VALUES ($1,$2,'update','Lead updated',$3,$4,$5)`,
+      [randomUUID(), req.params.id, JSON.stringify({ fields: changed }), req.user?.id?.toString(), req.user?.name]
+    );
+
+    res.json({ ok: true, lead: row.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post("/:id/score", requireAdmin, async (req, res) => {
+  try {
+    const lead = await pool.query(`SELECT * FROM leads WHERE id=$1`, [req.params.id]);
+    if (!lead.rows[0]) return res.status(404).json({ ok: false, error: "Lead not found" });
+    const l = lead.rows[0];
+    const { score, score_factors, score_points } = calculateLeadScore({
+      name: l.name, mobile: l.mobile, email: l.email, source: l.source,
+      package_interest: l.package_interest, budget: l.budget,
+      num_travellers: l.num_travellers, travel_month: l.travel_month,
+      message: l.message, city: l.city, state: l.state, priority: l.priority,
+    });
+    await pool.query(
+      `UPDATE leads SET score=$1, score_factors=$2, updated_at=NOW() WHERE id=$3`,
+      [score, JSON.stringify(score_factors), req.params.id]
+    );
+    res.json({ ok: true, score, score_factors, score_points });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post("/:id/assign", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { assigned_to, assigned_name, assigned_branch, reason } = req.body;
+    if (!assigned_to) return res.status(400).json({ ok: false, error: "assigned_to required" });
+
+    await pool.query(
+      `UPDATE leads SET assigned_to=$1, assigned_name=$2, assigned_branch=$3,
+       assignment_notified_at=NOW(), updated_at=NOW() WHERE id=$4`,
+      [assigned_to, assigned_name, assigned_branch, req.params.id]
+    );
+
+    await pool.query(
+      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+       VALUES ($1,$2,'assignment','Lead manually assigned to ' || $3,$4,$5,$6)`,
+      [randomUUID(), req.params.id, assigned_name, JSON.stringify({ assigned_to, reason, method: "manual" }),
+       req.user?.id?.toString(), req.user?.name]
+    );
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post("/:id/convert", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { booking_id, notes } = req.body;
+    await pool.query(
+      `UPDATE leads SET status='converted', pipeline_stage='full_payment_received',
+       conversion_booking_id=$1, converted_at=NOW(), updated_at=NOW() WHERE id=$2`,
+      [booking_id || null, req.params.id]
+    );
+    await pool.query(
+      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+       VALUES ($1,$2,'conversion','Lead converted to booking',$3,$4,$5)`,
+      [randomUUID(), req.params.id, JSON.stringify({ booking_id, notes }), req.user?.id?.toString(), req.user?.name]
+    );
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.delete("/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    await pool.query(
+      `UPDATE leads SET status='spam', pipeline_stage='spam', inbox_status='closed', updated_at=NOW() WHERE id=$1`,
+      [req.params.id]
+    );
+    await pool.query(
+      `INSERT INTO lead_activities (id, lead_id, type, content, metadata, performed_by, performed_by_name)
+       VALUES ($1,$2,'marked_spam','Lead marked as spam / deleted','{}',$3,$4)`,
+      [randomUUID(), req.params.id, req.user?.id?.toString(), req.user?.name]
+    );
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHASE B ROUTES
+// ═══════════════════════════════════════════════════════════════════════════
+import {
+  aiScoreLead,
+  createBookingFromLead,
+  exportLeadsToExcel,
+  importLeadsFromExcel,
+  syncFbAdsData,
+  getReportPipelineVelocity,
+  getReportSourceROI,
+  getReportAgentPerformance,
+  getReportConversionFunnel,
+  listWebForms,
+  createWebForm,
+  updateWebForm,
+  getWebFormEmbed,
+  submitWebForm,
+  getLeadAuditLog,
+  ensureLeadEnginePhaseBSchema,
+} from "../lib/leadEnginePhaseB.js";
+// ── AI Scoring ───────────────────────────────────────────────────────────────
+router.post("/:id/ai-score", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await aiScoreLead(req.params.id);
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Create Booking from Lead ─────────────────────────────────────────────────
+router.post("/:id/create-booking", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await createBookingFromLead(req.params.id, req.user?.id?.toString() || "");
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Audit Log ────────────────────────────────────────────────────────────────
+router.get("/:id/audit-log", requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const log = await getLeadAuditLog(req.params.id);
+    res.json(log);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Named export bypasses esbuild CJS default-export interop issue

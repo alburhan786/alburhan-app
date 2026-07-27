@@ -465,7 +465,7 @@ router.get("/leads", requireAdmin as any, async (req, res) => {
 
     params.push(limit, page * limit);
     const { rows } = await pool.query(`
-      SELECT l.id, l.lead_number, l.name, l.mobile, l.email, l.source, l.stage,
+      SELECT l.id, l.lead_number, l.name, l.mobile, l.email, l.source, l.pipeline_stage as stage,
              l.priority, l.unread_count, l.inbox_status, l.score, l.ai_score,
              l.ai_next_action, l.assigned_to,
              u.name as assigned_to_name,

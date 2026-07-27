@@ -68,6 +68,10 @@ export async function ensureLeadEnginePhaseBSchema() {
     )
   `);
 
+  // Reminder columns on lead_followups (must exist before runLeadReminders queries them)
+  await pool.query(`ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS upcoming_reminder_sent BOOLEAN DEFAULT false`);
+
   // Web form submissions
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lead_web_form_submissions (
@@ -277,7 +281,7 @@ export async function exportLeadsToExcel(filters: Record<string, string> = {}): 
   };
 
   if (filters.source) addFilter("l.source", filters.source);
-  if (filters.stage) addFilter("l.stage", filters.stage);
+  if (filters.stage) addFilter("l.pipeline_stage", filters.stage);
   if (filters.status) addFilter("l.status", filters.status);
   if (filters.assignedTo) addFilter("l.assigned_to", filters.assignedTo);
   if (filters.from) { params.push(filters.from); conditions.push(`l.created_at >= $${params.length}`); }
@@ -285,8 +289,8 @@ export async function exportLeadsToExcel(filters: Record<string, string> = {}): 
 
   const where = "WHERE " + conditions.join(" AND ");
   const res = await pool.query(`
-    SELECT l.lead_number, l.name, l.mobile, l.email, l.source, l.stage, l.status,
-           l.score, l.ai_score, l.priority, l.package_interest, l.budget, l.travellers,
+    SELECT l.lead_number, l.name, l.mobile, l.email, l.source, l.pipeline_stage as stage, l.status,
+           l.score, l.ai_score, l.priority, l.package_interest, l.budget, l.num_travellers as travellers,
            l.notes, l.follow_up_date, l.tags, l.converted_booking_id,
            u.name as assigned_to,
            l.created_at
@@ -419,11 +423,11 @@ export async function syncFbAdsData(accessToken: string, adAccountId: string, si
 export async function getReportPipelineVelocity(from: string, to: string) {
   const [stages, weekly, velocity] = await Promise.all([
     pool.query(`
-      SELECT stage, COUNT(*)::int as count,
+      SELECT pipeline_stage as stage, COUNT(*)::int as count,
              COUNT(CASE WHEN status='converted' THEN 1 END)::int as converted,
-             COALESCE(AVG(score),0)::int as avg_score
+             COALESCE(AVG(ai_score),0)::int as avg_score
       FROM leads WHERE created_at BETWEEN $1 AND $2 AND status != 'spam'
-      GROUP BY stage
+      GROUP BY pipeline_stage
     `, [from, to]),
     pool.query(`
       SELECT DATE_TRUNC('week', created_at)::date as week,
@@ -448,7 +452,7 @@ export async function getReportSourceROI(from: string, to: string) {
              COUNT(CASE WHEN l.status='converted' THEN 1 END)::int as converted,
              ROUND(100.0*COUNT(CASE WHEN l.status='converted' THEN 1 END)/NULLIF(COUNT(*),0),1)::numeric as conv_rate,
              COALESCE(SUM(CASE WHEN l.status='converted' THEN b.advance_amount END),0)::int as revenue,
-             COALESCE(AVG(l.score),0)::int as avg_score
+             COALESCE(AVG(l.ai_score),0)::int as avg_score
       FROM leads l LEFT JOIN bookings b ON b.id = l.converted_booking_id
       WHERE l.created_at BETWEEN $1 AND $2 AND l.status != 'spam'
       GROUP BY l.source ORDER BY total_leads DESC
@@ -469,7 +473,7 @@ export async function getReportAgentPerformance(from: string, to: string) {
            COUNT(l.id)::int as total_leads,
            COUNT(CASE WHEN l.status='converted' THEN 1 END)::int as converted,
            ROUND(100.0*COUNT(CASE WHEN l.status='converted' THEN 1 END)/NULLIF(COUNT(l.id),0),1)::numeric as conv_rate,
-           COALESCE(AVG(l.score),0)::int as avg_score,
+           COALESCE(AVG(l.ai_score),0)::int as avg_score,
            COUNT(DISTINCT lf.id) FILTER (WHERE lf.status='pending')::int as pending_tasks,
            COUNT(DISTINCT lf.id) FILTER (WHERE lf.due_at < CURRENT_DATE AND lf.status='pending')::int as overdue_tasks
     FROM users u
@@ -486,11 +490,11 @@ export async function getReportConversionFunnel(from: string, to: string) {
   const [funnel, monthly] = await Promise.all([
     pool.query(`
       SELECT COUNT(*)::int as total_leads,
-             COUNT(CASE WHEN stage != 'new' THEN 1 END)::int as contacted,
-             COUNT(CASE WHEN stage IN ('qualified','proposal','negotiation','won') THEN 1 END)::int as qualified,
-             COUNT(CASE WHEN stage IN ('proposal','negotiation','won') THEN 1 END)::int as proposal_sent,
-             COUNT(CASE WHEN status='converted' THEN 1 END)::int as converted,
-             COALESCE(SUM(CASE WHEN status='converted' THEN b.advance_amount END),0)::int as total_revenue
+             COUNT(CASE WHEN l.pipeline_stage != 'new_lead' THEN 1 END)::int as contacted,
+             COUNT(CASE WHEN l.pipeline_stage IN ('qualified','proposal','negotiation','won') THEN 1 END)::int as qualified,
+             COUNT(CASE WHEN l.pipeline_stage IN ('proposal','negotiation','won') THEN 1 END)::int as proposal_sent,
+             COUNT(CASE WHEN l.status='converted' THEN 1 END)::int as converted,
+             COALESCE(SUM(CASE WHEN l.status='converted' THEN b.advance_amount END),0)::int as total_revenue
       FROM leads l LEFT JOIN bookings b ON b.id = l.converted_booking_id
       WHERE l.created_at BETWEEN $1 AND $2 AND l.status != 'spam'
     `, [from, to]),
@@ -635,10 +639,6 @@ export async function runLeadReminderCron() {
         AND lf.title NOT ILIKE 'LD-SEQ-%'
         AND lf.upcoming_reminder_sent IS NOT TRUE
     `);
-
-    // Ensure upcoming_reminder_sent column exists
-    await pool.query(`ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS upcoming_reminder_sent BOOLEAN DEFAULT false`);
-    await pool.query(`ALTER TABLE lead_followups ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT false`);
 
     for (const task of upcoming.rows) {
       if (task.agent_mobile) {
