@@ -82,3 +82,4 @@
 - [Invoice & payment status architecture](invoice-payment-status-arch.md) — deriveStatusFromAmounts is the canonical status fn; paidAmount (not advanceAmount) is source of truth; receipt PDF has full fields; admin report includes partially_paid
 - [Agreement fires for all payments](agreement-all-payments.md) — autoGenerateAgreement must NOT be gated on isFullyPaid; partial payers need agreement too; agreements.ts already handles partially_paid status
 - [FCM multi-role push integration](fcm-multi-role.md) — customer_push_tokens stores user_id+user_type (not just customer_id); getTokensByFilter supports admin/staff/agent/branch/individual; sendPushForBooking injected in triggerWorkflow
+- [Inner component state reset](inner-component-state-reset.md) — components defined inside parent fn bodies get remounted on every parent re-render; never store state in them

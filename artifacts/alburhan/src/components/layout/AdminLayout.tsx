@@ -8,7 +8,7 @@
 import { ReactNode, useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, ChevronDown, ChevronRight, ChevronLeft, Home, Search } from "lucide-react";
+import { LogOut, Menu, ChevronDown, ChevronRight, ChevronLeft, Home, Search, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
@@ -35,12 +35,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const [commandOpen, setCommandOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");
+  const [notifOpen, setNotifOpen] = useState(false);
   const { can, roleLabel, roleColor, isSuper } = usePermissions();
 
   const {
     notifications, unreadCount, popupNotif, dismissPopup,
     markRead, markAllRead, deleteNotification, refresh,
   } = useAdminNotifications(isAdmin);
+
+  // Refresh notification list each time the drawer is opened
+  useEffect(() => {
+    if (notifOpen) refresh();
+  }, [notifOpen]);
 
   useEffect(() => {
     fetch(`${API}/api/feedback/admin/stats`, { credentials: "include" })
@@ -204,14 +210,20 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
       <FCMBell iconSize={15} />
-      <AdminNotificationCenter
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkRead={markRead}
-        onMarkAllRead={markAllRead}
-        onDelete={deleteNotification}
-        onOpen={refresh}
-      />
+      {/* Bell button — notifOpen state lives in AdminLayout so it survives SidebarHeader remounts */}
+      <button
+        type="button"
+        onClick={() => setNotifOpen(true)}
+        className="relative p-2 rounded-lg hover:bg-primary-foreground/10 text-primary-foreground/70 hover:text-white transition-colors"
+        title="Notifications"
+      >
+        <Bell size={18} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 pointer-events-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
     </div>
   );
 
@@ -310,6 +322,17 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       )}
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
+
+      {/* Notification drawer — rendered at layout root so it survives SidebarHeader remounts */}
+      <AdminNotificationCenter
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkRead={markRead}
+        onMarkAllRead={markAllRead}
+        onDelete={deleteNotification}
+      />
     </div>
   );
 }
