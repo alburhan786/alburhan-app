@@ -1,0 +1,1222 @@
+You are a senior full-stack SaaS engineer, CRM architect, Meta API integration specialist, security engineer, and workflow automation expert.
+
+PROJECT NAME:
+Al Burhan Tours & Travels ERP/CRM
+
+PRIMARY OBJECTIVE:
+Build and fully configure a professional Social Media Integration, Unified Inbox, Lead Capture, Marketing Automation, and Sales Follow-up system inside the existing Al Burhan ERP.
+
+IMPORTANT:
+First inspect the existing application, database, authentication system, API routes, UI components, environment variables, user roles, lead module, customer module, notification system, WhatsApp dashboard, SMS dashboard, email dashboard, marketing dashboard, automation center, workflow center, and reports.
+
+Do not remove or break any existing functionality.
+
+Extend the existing system using its current technology stack and coding conventions.
+
+Do not create only demo pages or static buttons. Every integration, form, button, workflow, webhook, filter, report, status, and automation must work with real backend logic and database records.
+
+==================================================
+1. SOCIAL MEDIA ACCOUNTS TO SUPPORT
+==================================================
+
+Create a Social Media Integration Center for:
+
+1. Facebook Pages
+2. Facebook Messenger
+3. Instagram Business Accounts
+4. Instagram Direct Messages
+5. Instagram and Facebook comments
+6. Meta Lead Ads
+7. WhatsApp Business API through BotBee or Meta Cloud API
+8. Google Business Profile enquiries
+9. Website enquiry forms
+10. Website live chat
+11. Email enquiries
+12. YouTube enquiry links and campaign tracking
+
+Create the page:
+
+Admin Dashboard
+→ Communication & Marketing
+→ Social Media Integration
+
+Display integration cards for every platform with:
+
+- Platform logo
+- Account name
+- Page/account ID
+- Connection status
+- Connected date
+- Token status
+- Token expiry date
+- Last synchronization
+- Webhook status
+- Permissions status
+- Leads received
+- Messages received
+- Reconnect button
+- Sync now button
+- Test connection button
+- Disconnect button
+- View logs button
+- Settings button
+
+Connection statuses:
+
+- Connected
+- Not Connected
+- Token Expired
+- Permission Missing
+- Webhook Failed
+- Configuration Required
+- Temporarily Disabled
+
+Never expose access tokens, app secrets, API keys, webhook secrets, passwords, or private credentials in frontend code or API responses.
+
+==================================================
+2. META FACEBOOK AND INSTAGRAM CONNECTION
+==================================================
+
+Implement secure Meta OAuth login and account connection.
+
+The admin must be able to:
+
+1. Click “Connect Meta Account”.
+2. Sign in with Facebook.
+3. Grant required permissions.
+4. Select one or more Facebook Pages.
+5. Select the linked Instagram Business Account.
+6. Confirm Messenger, Instagram messaging, comment, and lead access.
+7. Save the connection securely.
+8. Subscribe the selected Page to required webhooks.
+9. Test the webhook.
+10. Start receiving leads, messages, and comments.
+
+Create configuration fields for:
+
+- Meta App ID
+- Meta App Secret
+- Meta Redirect URI
+- Meta Webhook Callback URL
+- Meta Webhook Verify Token
+- Meta API Version
+- Facebook Page ID
+- Instagram Business Account ID
+- System User ID, if applicable
+- Business Manager ID, if applicable
+
+Store all secrets only in Replit Secrets or secure server-side environment variables.
+
+Use placeholders such as:
+
+META_APP_ID=
+META_APP_SECRET=
+META_REDIRECT_URI=
+META_WEBHOOK_VERIFY_TOKEN=
+META_API_VERSION=
+META_BUSINESS_ID=
+
+Do not hard-code any credential.
+
+Build:
+
+GET /api/integrations/meta/connect
+GET /api/integrations/meta/callback
+GET /api/webhooks/meta
+POST /api/webhooks/meta
+GET /api/integrations/meta/pages
+POST /api/integrations/meta/select-pages
+POST /api/integrations/meta/test
+POST /api/integrations/meta/sync
+POST /api/integrations/meta/disconnect
+GET /api/integrations/meta/logs
+
+The GET webhook endpoint must correctly verify the webhook verification challenge.
+
+The POST webhook endpoint must:
+
+- Validate the webhook signature where supported.
+- Reject invalid requests.
+- Prevent duplicate webhook processing.
+- Store event IDs for idempotency.
+- Log failures safely.
+- Return a fast success response.
+- Process heavy tasks in a background job queue.
+
+Subscribe to all permitted and applicable events for:
+
+- Facebook Messenger messages
+- Instagram messages
+- Facebook Page leads
+- Instagram/Facebook comments
+- Mentions
+- Message delivery events
+- Message read events
+- Postbacks
+- Referral events
+
+Only request permissions actually required by the enabled features.
+
+Display missing permissions clearly and provide a “Reconnect and Grant Permission” action.
+
+==================================================
+3. META LEAD ADS INTEGRATION
+==================================================
+
+Integrate Facebook and Instagram Lead Ads.
+
+When a customer submits a Meta lead form:
+
+1. Receive the webhook event.
+2. Retrieve the complete lead details securely.
+3. Map all available form fields.
+4. Check for duplicate leads.
+5. Create or update the customer.
+6. Create a CRM lead.
+7. assign the lead automatically.
+8. Save campaign, ad set, ad, form, and platform details.
+9. Trigger welcome messages.
+10. Create a follow-up task.
+11. Notify the assigned executive and admin.
+
+Save:
+
+- Full name
+- First name
+- Last name
+- Mobile number
+- WhatsApp number
+- Email
+- City
+- State
+- Country
+- Preferred language
+- Interested package
+- Travel month
+- Number of travellers
+- Estimated budget
+- Passport availability
+- Customer message
+- Meta Lead ID
+- Meta Form ID
+- Campaign ID and name
+- Ad Set ID and name
+- Ad ID and name
+- Facebook Page ID
+- Platform
+- Submission date and time
+- UTM parameters
+- Source
+- Medium
+- Assigned employee
+- Lead score
+- Consent information
+
+Lead source examples:
+
+- Facebook Organic
+- Facebook Lead Ad
+- Facebook Messenger
+- Facebook Comment
+- Instagram Organic
+- Instagram Lead Ad
+- Instagram Direct Message
+- Instagram Comment
+- WhatsApp
+- Website
+- Google Business
+- Email
+- Manual Entry
+- Referral
+- Branch
+- Agent
+
+==================================================
+4. COMMENTS-TO-LEAD AUTOMATION
+==================================================
+
+Create Comment Automation Rules.
+
+Admin can create rules such as:
+
+When a person comments:
+
+- Hajj
+- Umrah
+- Price
+- Details
+- Interested
+- Package
+- Visa
+- Call me
+- Send details
+- Any configured keyword
+
+Then automatically:
+
+1. Capture the comment and profile information permitted by the platform.
+2. Create or update a lead.
+3. Send an approved public reply.
+4. Send a private message where platform policies allow.
+5. Assign the lead.
+6. Create a follow-up task.
+7. Record campaign attribution.
+
+Example public reply:
+
+“Assalamu Alaikum. Thank you for your interest in Al Burhan Tours & Travels. We have sent the package details to your inbox. You may also contact us on WhatsApp.”
+
+Create safeguards:
+
+- Do not send the same reply repeatedly.
+- Add configurable cooldown periods.
+- Avoid spam-like behaviour.
+- Allow admin approval before reply.
+- Maintain an exclusion list.
+- Stop automation when a staff member takes control.
+
+==================================================
+5. UNIFIED OMNICHANNEL INBOX
+==================================================
+
+Upgrade the existing Omni Channel Inbox.
+
+Combine these channels in one inbox:
+
+- WhatsApp
+- Facebook Messenger
+- Instagram Direct
+- Facebook comments
+- Instagram comments
+- Website chat
+- Email
+- SMS replies, if provider supports inbound messages
+
+Inbox layout:
+
+Left panel:
+- Conversations
+- Search
+- Filters
+- Unread count
+- Assigned executive
+- Source
+- Lead stage
+- Priority
+- Tags
+
+Middle panel:
+- Full message conversation
+- Attachments
+- Delivery status
+- Read status
+- Message time
+- Internal notes
+- Reply composer
+- Approved template selector
+- Quick replies
+
+Right panel:
+- Customer profile
+- Lead information
+- Interested package
+- Booking history
+- Payment status
+- Documents
+- Follow-up date
+- Assigned executive
+- Tags
+- Lead score
+- Activity timeline
+- Convert to booking button
+
+Support:
+
+- Assign conversation
+- Transfer conversation
+- Internal notes
+- Mention team member
+- Mark open or resolved
+- Snooze conversation
+- Add tags
+- Block spam
+- Merge duplicate contacts
+- Convert conversation to lead
+- Convert lead to booking
+- Attach documents
+- Send package brochure
+- Send quotation
+- Send payment link
+- Send agreement
+- Send invoice
+- Send receipt
+- Send visa, ticket, and hotel voucher
+
+Ensure channel-specific messaging rules are respected.
+
+Do not send free-form WhatsApp messages outside the permitted customer service window. Use approved WhatsApp templates when required.
+
+==================================================
+6. WHATSAPP BOTBEE INTEGRATION
+==================================================
+
+Integrate the existing BotBee WhatsApp Business API.
+
+Create BotBee configuration fields:
+
+BOTBEE_BASE_URL=
+BOTBEE_API_KEY=
+BOTBEE_ACCESS_TOKEN=
+BOTBEE_WEBHOOK_SECRET=
+BOTBEE_PHONE_NUMBER_ID=
+BOTBEE_WABA_ID=
+BOTBEE_DEFAULT_BOT_FLOW_ID=
+
+Use the exact BotBee API documentation and currently available endpoints. Do not invent API endpoints.
+
+Create an abstraction layer so the ERP can support:
+
+- BotBee provider
+- Meta WhatsApp Cloud API provider
+- Future WhatsApp providers
+
+Create a provider interface for:
+
+- Send text message
+- Send template message
+- Send media
+- Send document
+- Send buttons
+- Send list message
+- Trigger bot flow
+- Retrieve templates
+- Retrieve message status
+- Retrieve conversations
+- Create/update subscriber
+- Assign chat to team member
+- Set custom fields
+- Process incoming webhook
+- Process delivery status
+
+Create a WhatsApp test console:
+
+- Select provider
+- Enter test phone number
+- Select template
+- Enter template variables
+- Preview final message
+- Validate variables
+- Send test
+- View request and response log with secrets masked
+
+==================================================
+7. AUTOMATIC WELCOME BOT
+==================================================
+
+When a new enquiry arrives through social media, send the following automated menu where permitted:
+
+“Assalamu Alaikum wa Rahmatullahi wa Barakatuh.
+
+Thank you for contacting Al Burhan Tours & Travels, your trusted Hajj and Umrah partner.
+
+Please select the service you need:
+
+1. Hajj Package
+2. Umrah Package
+3. Ramadan Umrah
+4. Ziyarat Tour
+5. Air Ticket
+6. Visa Assistance
+7. Existing Booking Support
+8. Speak to Our Executive”
+
+Bot flow:
+
+If Hajj:
+- Ask departure city.
+- Ask preferred year/package.
+- Ask number of travellers.
+- Ask room-sharing preference.
+- Ask budget range.
+- Create or update lead.
+
+If Umrah:
+- Ask travel month.
+- Ask departure city.
+- Ask number of travellers.
+- Ask duration.
+- Ask economy or premium package.
+- Create or update lead.
+
+If existing booking:
+- Ask booking ID or registered mobile number.
+- Retrieve booking securely after OTP verification.
+- Show limited status only.
+- Do not reveal personal data without verification.
+
+After collecting information:
+
+- Save answers in the lead.
+- Calculate lead score.
+- Assign an executive.
+- Send package information.
+- Create follow-up.
+- Notify the sales team.
+
+Allow staff takeover at any time.
+
+When staff takes over:
+
+- Pause the bot.
+- Display “Human agent active”.
+- Record the assigned staff member.
+- Resume bot only after the conversation is resolved or manually reactivated.
+
+==================================================
+8. LEAD MANAGEMENT PIPELINE
+==================================================
+
+Create or upgrade the CRM pipeline with these stages:
+
+1. New Lead
+2. Auto Response Sent
+3. Assigned
+4. Contact Attempted
+5. Contacted
+6. Interested
+7. Package Shared
+8. Quotation Sent
+9. Passport Awaited
+10. Documents Received
+11. Advance Payment Pending
+12. Advance Paid
+13. Agreement Pending
+14. Agreement Signed
+15. Visa Processing
+16. Ticket Pending
+17. Ticket Issued
+18. Hotel Confirmed
+19. Balance Payment Pending
+20. Full Payment Received
+21. Travel Ready
+22. Travel Completed
+23. Review Requested
+24. Future Remarketing
+25. Lost
+26. Spam
+
+Provide Kanban, list, and calendar views.
+
+Every lead must contain:
+
+- Lead number
+- Customer ID
+- Source
+- Campaign
+- Interested package
+- Lead stage
+- Lead status
+- Lead score
+- Priority
+- Assigned branch
+- Assigned employee
+- Next follow-up
+- Last communication
+- Expected conversion amount
+- Lost reason
+- Notes
+- Tags
+- Complete activity history
+
+==================================================
+9. DUPLICATE LEAD CONTROL
+==================================================
+
+Before creating a new lead, check:
+
+- Normalized mobile number
+- WhatsApp number
+- Email
+- Meta Lead ID
+- Social platform user ID
+- Existing customer ID
+
+If a duplicate exists:
+
+- Do not create unnecessary duplicates.
+- Add the new enquiry to the existing activity timeline.
+- Update the most recent source and campaign.
+- Notify the assigned employee.
+- Allow admin to merge records manually.
+- Keep an audit trail of merged records.
+
+Normalize Indian and international mobile numbers using country codes.
+
+==================================================
+10. AUTOMATIC LEAD ASSIGNMENT
+==================================================
+
+Create configurable lead assignment rules.
+
+Supported methods:
+
+- Round robin
+- Least active leads
+- Package-based
+- City-based
+- State-based
+- Language-based
+- Branch-based
+- Campaign-based
+- Working-hours-based
+- VIP lead assignment
+- Manual assignment
+
+Examples:
+
+Hajj enquiries → Hajj Team
+Umrah enquiries → Umrah Team
+Mumbai leads → Mumbai Branch
+Burhanpur leads → Burhanpur Branch
+Urdu-language leads → Urdu-speaking executive
+
+If an executive does not respond within a configurable SLA:
+
+- Notify the executive.
+- Notify the manager.
+- Reassign the lead if enabled.
+- Record the reassignment history.
+
+==================================================
+11. FOLLOW-UP AUTOMATION
+==================================================
+
+Create a visual workflow builder with triggers, conditions, delays, and actions.
+
+Triggers:
+
+- New lead created
+- Social message received
+- Comment received
+- Lead form submitted
+- Lead assigned
+- Lead stage changed
+- Package shared
+- No reply received
+- Follow-up overdue
+- Payment received
+- Payment overdue
+- Agreement generated
+- Agreement signed
+- Passport uploaded
+- Visa approved
+- Ticket uploaded
+- Travel date approaching
+- Travel completed
+
+Conditions:
+
+- Lead source
+- Package
+- City
+- Language
+- Branch
+- Assigned employee
+- Lead score
+- Lead stage
+- Payment status
+- Number of travellers
+- Travel date
+- Last customer reply
+- Consent status
+
+Actions:
+
+- Send WhatsApp template
+- Send SMS
+- Send email
+- Send push notification
+- Assign executive
+- Create task
+- Change lead stage
+- Add tag
+- Create notification
+- Send brochure
+- Send quotation
+- Send payment link
+- Generate agreement
+- Notify manager
+- Wait for customer reply
+- Stop workflow
+
+Default follow-up workflow:
+
+Immediately:
+- Create lead.
+- Send welcome response.
+- Assign sales executive.
+- Notify executive.
+
+After 30 minutes:
+- Alert executive if the lead has not been opened.
+
+After 2 hours:
+- Send a polite follow-up if there is no reply and channel policy permits.
+
+After 24 hours:
+- Create a call task.
+- Send an approved WhatsApp template, email, or SMS based on consent.
+
+After 3 days:
+- Send the relevant package brochure.
+
+After 7 days:
+- Send one final follow-up or move the lead to remarketing.
+
+Stop all automatic sales follow-ups when:
+
+- Customer opts out.
+- Customer replies “STOP”.
+- Lead is marked spam.
+- Lead converts to booking.
+- Staff pauses automation.
+- Customer requests no further communication.
+
+==================================================
+12. MARKETING CAMPAIGN MANAGEMENT
+==================================================
+
+Create Marketing Dashboard functionality for:
+
+- Hajj campaigns
+- Umrah campaigns
+- Ramadan Umrah campaigns
+- After-Eid Umrah
+- After-Hajj Umrah
+- Iraq Ziyarat
+- Baitul Muqaddas
+- Syria and Jordan tours
+- Air ticket campaigns
+- Visa campaigns
+
+Track:
+
+- Platform
+- Campaign name
+- Ad set
+- Ad
+- Form
+- Spend, entered manually or synced when permitted
+- Impressions
+- Clicks
+- Leads
+- Qualified leads
+- Bookings
+- Conversion rate
+- Cost per lead
+- Cost per booking
+- Revenue
+- Return on ad spend
+- Lost leads
+- Lead response time
+
+Use the India currency format ₹ and en-IN number formatting.
+
+Provide filters by:
+
+- Date
+- Platform
+- Campaign
+- Package
+- Branch
+- Executive
+- Lead stage
+- Source
+- City
+
+==================================================
+13. SOCIAL MEDIA CONTENT SCHEDULER
+==================================================
+
+Create a social content planner only for platforms and actions supported by official APIs and approved permissions.
+
+Features:
+
+- Content calendar
+- Draft
+- Approval workflow
+- Scheduled date and time
+- Platform selection
+- Caption
+- Media upload
+- Campaign tag
+- Package link
+- UTM builder
+- Preview
+- Publish status
+- Failure reason
+- Retry option
+
+User roles:
+
+- Content Creator
+- Marketing Manager
+- Admin Approver
+- Super Admin
+
+Do not claim successful publishing unless the platform API confirms success.
+
+==================================================
+14. CUSTOMER CONSENT AND COMPLIANCE
+==================================================
+
+Create consent fields for:
+
+- WhatsApp communication
+- SMS communication
+- Email communication
+- Marketing communication
+- Privacy policy acceptance
+
+Store:
+
+- Consent status
+- Consent source
+- Consent date and time
+- IP address where applicable
+- User agent where applicable
+- Form/campaign reference
+
+Provide:
+
+- Opt-out link or method
+- STOP keyword processing
+- Suppression list
+- Do-not-contact flag
+- Consent audit trail
+- Data deletion request
+- Data export request
+
+Follow current Meta, WhatsApp, Instagram, Facebook, email, SMS, privacy, and anti-spam policies.
+
+Do not use unofficial scraping, browser automation, password collection, session-cookie theft, or prohibited APIs.
+
+==================================================
+15. DATABASE DESIGN
+==================================================
+
+Create or extend tables/models for:
+
+- social_integrations
+- social_accounts
+- oauth_tokens
+- webhook_subscriptions
+- webhook_events
+- webhook_delivery_logs
+- social_conversations
+- social_messages
+- social_comments
+- social_postbacks
+- social_leads
+- crm_leads
+- lead_sources
+- lead_stages
+- lead_assignments
+- lead_activities
+- lead_followups
+- lead_tags
+- campaigns
+- campaign_attribution
+- automation_workflows
+- automation_steps
+- automation_executions
+- message_templates
+- communication_consents
+- opt_out_records
+- integration_logs
+- api_error_logs
+- background_jobs
+
+Use:
+
+- Proper foreign keys
+- Unique constraints
+- Indexes
+- Soft deletion where appropriate
+- Created and updated timestamps
+- Tenant/company isolation if the ERP supports multiple organizations
+- Branch-level data isolation
+- Audit columns
+
+Encrypt sensitive tokens at rest.
+
+Do not store raw passwords or unnecessary personal data.
+
+==================================================
+16. USER ROLES AND PERMISSIONS
+==================================================
+
+Configure permissions for:
+
+Super Admin:
+- Full integration access
+- Add or remove accounts
+- View credentials status
+- Manage workflows
+- View all reports
+
+Admin:
+- Manage campaigns, leads, inbox, and automation
+
+Marketing Manager:
+- Manage campaigns, content, templates, and reports
+
+Branch Manager:
+- View and assign branch leads
+
+Sales Executive:
+- View assigned leads and conversations only
+
+Customer Support:
+- Handle assigned conversations
+
+Finance:
+- View payment-related lead and booking information only
+
+Agent:
+- View their own referred leads and bookings only
+
+Never allow frontend route protection alone. Enforce authorization in backend APIs.
+
+==================================================
+17. SECURITY REQUIREMENTS
+==================================================
+
+Implement:
+
+- OAuth state validation
+- CSRF protection
+- Secure cookies
+- Token encryption
+- Token refresh handling
+- Webhook signature validation
+- Rate limiting
+- Request validation
+- Server-side permission checks
+- Audit logs
+- IP/device logs for sensitive actions
+- Idempotent webhook processing
+- Protection against replay attacks
+- Masked API logs
+- Error monitoring
+- Retry queue with exponential backoff
+- Dead-letter queue for failed jobs
+
+Never log:
+
+- App secrets
+- Access tokens
+- Passwords
+- OTP values
+- Complete payment details
+- Full passport information
+
+==================================================
+18. INTEGRATION HEALTH DASHBOARD
+==================================================
+
+Create an Integration Health Dashboard showing:
+
+- Meta connection
+- Facebook Page connection
+- Instagram connection
+- WhatsApp provider connection
+- Email provider connection
+- SMS provider connection
+- Webhook status
+- Token expiry
+- Last successful event
+- Failed events
+- Pending background jobs
+- Message delivery success rate
+- Lead synchronization status
+
+Add:
+
+- Test connection
+- Test webhook
+- Send test message
+- Retry failed event
+- Refresh account data
+- Reconnect account
+- Download diagnostics report
+
+The diagnostics report must hide all secrets.
+
+==================================================
+19. AUTOMATION LOGS
+==================================================
+
+Every automatic action must show:
+
+- Workflow name
+- Trigger
+- Lead/customer
+- Channel
+- Action
+- Scheduled time
+- Execution time
+- Status
+- Provider response
+- Failure reason
+- Retry count
+- Next retry time
+- Initiated by
+- Correlation ID
+
+Statuses:
+
+- Queued
+- Processing
+- Completed
+- Failed
+- Retrying
+- Cancelled
+- Skipped
+- Opted Out
+- Policy Blocked
+
+==================================================
+20. UI AND DESIGN
+==================================================
+
+Match the existing Al Burhan ERP visual design visible in the current dashboard.
+
+Use:
+
+- Clean professional cards
+- Responsive layouts
+- Mobile-friendly interface
+- Clear status badges
+- Proper empty states
+- Loading indicators
+- Confirmation dialogs
+- Toast notifications
+- Search, filters, sorting, and pagination
+- Accessible forms
+- Consistent icons and spacing
+
+Do not replace the current ERP dashboard design.
+
+Add these functional modules under “Communication & Marketing”:
+
+1. Social Media Integration
+2. Unified Inbox
+3. Lead Automation
+4. Comment Automation
+5. Meta Lead Forms
+6. Marketing Campaigns
+7. Content Calendar
+8. Template Manager
+9. Integration Health
+10. Communication Logs
+11. Consent and Opt-Out Management
+
+==================================================
+21. TESTING REQUIREMENTS
+==================================================
+
+Create automated tests for:
+
+- Meta OAuth callback
+- OAuth state validation
+- Webhook verification
+- Webhook signature validation
+- Duplicate webhook prevention
+- Lead creation
+- Duplicate lead matching
+- Lead assignment
+- Follow-up workflow
+- Opt-out processing
+- Role permissions
+- Token encryption
+- Template variable mapping
+- BotBee webhook processing
+- Failed job retry
+- Conversation creation
+- Customer conversion
+- Campaign attribution
+
+Also create a safe sandbox/test mode.
+
+Test mode must:
+
+- Avoid sending messages to real customers.
+- Use a permitted test number/account.
+- Mark records as test data.
+- Display a visible “Test Mode” badge.
+- Allow easy deletion of test records.
+
+==================================================
+22. SETUP WIZARD
+==================================================
+
+Create a guided setup wizard:
+
+Step 1:
+Select channels to connect.
+
+Step 2:
+Enter server-side credentials using secure environment variables.
+
+Step 3:
+Connect Meta account.
+
+Step 4:
+Select Facebook Pages and Instagram account.
+
+Step 5:
+Configure webhook.
+
+Step 6:
+Connect BotBee or WhatsApp provider.
+
+Step 7:
+Map lead form fields.
+
+Step 8:
+Configure lead assignment.
+
+Step 9:
+Select welcome templates.
+
+Step 10:
+Configure follow-up workflow.
+
+Step 11:
+Send test lead and test messages.
+
+Step 12:
+Review diagnostics.
+
+Step 13:
+Activate integration.
+
+Show completion status for each step.
+
+Do not activate the production automation until all mandatory tests pass.
+
+==================================================
+23. IMPLEMENTATION METHOD
+==================================================
+
+Work in the following order:
+
+PHASE 1:
+Inspect existing application and prepare an implementation report.
+
+PHASE 2:
+Create database migrations and backend integration services.
+
+PHASE 3:
+Implement Meta OAuth and webhook verification.
+
+PHASE 4:
+Implement Lead Ads, Messenger, Instagram, and comment event processing.
+
+PHASE 5:
+Implement BotBee/WhatsApp provider abstraction.
+
+PHASE 6:
+Build unified inbox and lead pipeline.
+
+PHASE 7:
+Build workflow automation and lead assignment.
+
+PHASE 8:
+Build integration settings, health dashboard, and logs.
+
+PHASE 9:
+Add security, permissions, idempotency, and retry handling.
+
+PHASE 10:
+Run tests and resolve all errors.
+
+PHASE 11:
+Provide setup instructions for Meta Developer Dashboard, BotBee, webhook URLs, environment variables, and production deployment.
+
+Before changing code, show:
+
+1. Existing architecture detected
+2. Files that will be modified
+3. Database changes required
+4. New APIs to be added
+5. Security plan
+6. Integration assumptions
+7. Any credentials or external approvals required from the administrator
+
+After approval, implement the system.
+
+==================================================
+24. STRICT ACCEPTANCE CRITERIA
+==================================================
+
+The task is complete only when:
+
+- Social accounts can be connected from the ERP.
+- Meta OAuth callback works.
+- Webhook verification succeeds.
+- Webhook signatures are validated.
+- Facebook Lead Ads create CRM leads.
+- Instagram and Messenger enquiries enter the unified inbox.
+- Comment keywords can create leads.
+- Duplicate leads are controlled.
+- Leads are automatically assigned.
+- Welcome messages use correct templates and variables.
+- Follow-up workflows execute and are logged.
+- Opt-outs immediately stop marketing automation.
+- Every message and lead has source attribution.
+- All secrets remain server-side.
+- Integration errors are visible to admin.
+- Admin can test, reconnect, and disable integrations.
+- Role permissions work correctly.
+- Existing ERP modules continue working.
+- No placeholder buttons or fake data remain.
+- Automated tests pass.
+- Production deployment instructions are provided.
+
+==================================================
+25. FINAL DELIVERY
+==================================================
+
+At completion, provide:
+
+1. Summary of work completed
+2. Files created and modified
+3. Database migrations
+4. Environment variable list
+5. Meta Developer configuration instructions
+6. Exact OAuth redirect URL
+7. Exact webhook callback URL
+8. Required Meta permissions
+9. BotBee configuration instructions
+10. Lead field-mapping guide
+11. Workflow configuration guide
+12. Testing checklist
+13. Production deployment checklist
+14. Security checklist
+15. Known limitations
+16. Screenshots or route list for every new module
+
+Do not mark the work complete until the complete end-to-end flow has been tested:
+
+Social media enquiry
+→ Webhook received
+→ Customer identified
+→ Lead created
+→ Lead assigned
+→ Welcome message sent
+→ Follow-up task created
+→ Conversation visible in unified inbox
+→ Lead converted to booking
+→ Activity and reports updated.

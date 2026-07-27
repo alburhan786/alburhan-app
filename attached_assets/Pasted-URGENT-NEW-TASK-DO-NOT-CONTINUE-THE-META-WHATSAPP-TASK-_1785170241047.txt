@@ -1,0 +1,368 @@
+URGENT NEW TASK — DO NOT CONTINUE THE META/WHATSAPP TASK.
+
+The Meta Cloud API and WhatsApp notification work is already completed and confirmed working. Preserve those fixes. Do not edit the WhatsApp, Meta template, notification logging, WAMID, sent_at, BotBee token, SMS, email, or push-notification code unless the Super Admin dashboard problem directly requires it.
+
+CURRENT PRODUCTION BUG:
+
+The Al Burhan Tours & Travels ERP Super Admin Dashboard does not open.
+
+Your only task is to diagnose and permanently fix the Super Admin dashboard in the real production application.
+
+PROJECT:
+Al Burhan Tours & Travels ERP
+Domain: alburhantravels.com
+
+STRICT INSTRUCTIONS:
+
+1. Create a checkpoint before making changes.
+2. Reproduce the Super Admin dashboard failure first.
+3. Find the actual Super Admin route from the existing router. Do not invent a new dashboard or duplicate route.
+4. Check the browser console, network requests, redirect chain, backend logs, authentication session, current-user response, user role, dashboard APIs, frontend route guards, deployment configuration, and production build.
+5. Do not remove authentication or role security.
+6. Do not hard-code any user as super_admin.
+7. Do not change all Admin accounts to Super Admin.
+8. Do not declare success based only on a successful build.
+9. Test the real production dashboard after deployment.
+10. Preserve all existing ERP modules and recent Meta Cloud API fixes.
+
+==================================================
+A. IDENTIFY THE EXACT FAILURE
+==================================================
+
+Open the application in a fresh private/incognito browser session and reproduce the issue.
+
+Determine whether the Super Admin dashboard produces:
+
+- Blank page
+- Infinite loading
+- Login redirect
+- Customer dashboard redirect
+- Normal Admin dashboard redirect
+- 401 error
+- 403 error
+- 404 error
+- 500 error
+- JavaScript runtime crash
+- Dynamic chunk loading error
+- Dashboard API failure
+- Cookie/session problem
+- Role-permission problem
+
+Record:
+
+- Exact requested URL
+- Final URL after redirects
+- HTTP status
+- Browser console error
+- Failed network requests
+- Backend error
+- Logged-in user role
+- Session status
+- Current-user API response
+- Production server logs
+
+==================================================
+B. FIND THE REAL SUPER ADMIN ROUTE
+==================================================
+
+Inspect:
+
+- Frontend router
+- Sidebar links
+- Login redirect logic
+- ProtectedRoute
+- RequireAuth
+- RequireRole
+- AdminRoute
+- Dashboard layouts
+- Existing Super Admin dashboard component
+- Backend routes
+- Previous commits
+
+Find the real route. Possible examples may include:
+
+/super-admin
+/super-admin/dashboard
+/admin/dashboard
+/dashboard
+
+Do not add several duplicate routes.
+
+Confirm that refreshing the exact dashboard URL directly does not return a server 404.
+
+==================================================
+C. VERIFY THE SUPER ADMIN USER
+==================================================
+
+Inspect the actual production database record for the Super Admin account.
+
+Check:
+
+- User exists
+- Correct username/email/mobile
+- Role
+- Account status
+- is_active
+- is_verified
+- deleted_at
+- Company or tenant ID
+- Branch assignment
+- Permissions
+- Duplicate accounts
+- Current sessions
+
+Never expose passwords, password hashes, tokens, OTP values, access tokens, or private credentials.
+
+Support legitimate legacy role formats using one central role-normalization function:
+
+- super_admin
+- superadmin
+- SUPER_ADMIN
+- Super Admin
+- super-admin
+
+Normalize them internally to:
+
+super_admin
+
+Do not use loose matching such as role.includes("admin").
+
+==================================================
+D. FIX AUTHENTICATION AND REDIRECTION
+==================================================
+
+Inspect:
+
+- Login API
+- Session creation
+- JWT verification
+- Refresh token
+- Cookies
+- Cookie domain
+- SameSite
+- Secure flag
+- HTTPS handling
+- Current-user endpoint
+- Post-login redirect
+- Route restoration
+- Logout
+
+Correct role redirects:
+
+super_admin → Super Admin Dashboard
+admin → Admin Dashboard
+branch_manager → Branch Dashboard
+agent → Agent Dashboard
+finance → Finance Dashboard
+customer → Customer Dashboard
+
+Prevent redirect loops.
+
+The current-user API must return a valid authenticated response similar to:
+
+{
+  "id": "valid-id",
+  "name": "valid-name",
+  "role": "super_admin",
+  "isActive": true
+}
+
+Remove or mask sensitive information from debugging output.
+
+==================================================
+E. CHECK FRONTEND CRASHES
+==================================================
+
+Inspect for:
+
+- Wrong component import
+- Filename case mismatch
+- Default/named export mismatch
+- Failed lazy-loaded module
+- ChunkLoadError
+- undefined.map
+- Null property access
+- Incorrect context provider
+- Infinite useEffect
+- Missing environment variables
+- Invalid hook usage
+- Broken sidebar permission filtering
+- Chart component error
+- BigInt JSON serialization
+- Malformed API response
+- CSS overlay hiding dashboard
+- Failed localStorage parsing
+
+Linux production filenames are case-sensitive.
+
+Add an error boundary and useful loading/error states, but do not hide the actual root cause.
+
+==================================================
+F. CHECK DASHBOARD APIS
+==================================================
+
+Find every real API called by the Super Admin dashboard.
+
+Test each endpoint using an authenticated Super Admin session.
+
+Check:
+
+- HTTP status
+- Permission middleware
+- Database response
+- Response shape
+- Null values
+- Timeout
+- Error handling
+
+One optional widget failure must not crash the whole dashboard.
+
+Use isolated widget error states or Promise.allSettled where appropriate.
+
+Do not create fake data to make the dashboard appear functional.
+
+==================================================
+G. FIX BACKEND ROLE PERMISSIONS
+==================================================
+
+Inspect backend authorization for incorrect conditions such as:
+
+role === "admin"
+
+that unintentionally deny:
+
+role === "super_admin"
+
+Create centralized helpers:
+
+isSuperAdmin(user)
+isAdminOrSuperAdmin(user)
+hasPermission(user, permission)
+canAccessModule(user, module)
+
+Enforce permissions on backend APIs, not only by hiding sidebar items.
+
+Super Admin must be authorised for all legitimate ERP modules, including:
+
+- Dashboard
+- Branches
+- Agents
+- Employees
+- Customers
+- Leads
+- Bookings
+- Packages
+- Families
+- Rooms
+- Flights
+- Hotels
+- Transport
+- Visa
+- Documents
+- Agreements
+- Invoices
+- Payments
+- Finance
+- GST reports
+- Reports
+- WhatsApp
+- SMS
+- Email
+- Notifications
+- Marketing
+- Social integration
+- Automation
+- Website CMS
+- Print center
+- KYC
+- Audit logs
+- Users, roles and permissions
+- Integration settings
+- System settings
+
+==================================================
+H. PRODUCTION BUILD AND DEPLOYMENT
+==================================================
+
+Inspect:
+
+- TypeScript errors
+- Build command
+- Start command
+- Deployment logs
+- Node version
+- Environment variables
+- Frontend base path
+- Static asset paths
+- Replit deployment
+- VPS process
+- PM2 or systemd
+- Reverse proxy
+- Nginx SPA fallback
+- Browser/service-worker cache
+- Old deployment assets
+
+Run:
+
+- Type check
+- Production build
+- Relevant automated tests
+- Start server
+- Health check
+- Direct route test
+- Dashboard API test
+
+If this is a React SPA behind Nginx, verify the real deployment supports frontend route fallback to index.html.
+
+Back up any server configuration before editing it.
+
+==================================================
+I. LIVE PRODUCTION ACCEPTANCE TEST
+==================================================
+
+Do not mark the task complete until all these tests pass:
+
+1. Open production login in a fresh private session.
+2. Sign in using the real Super Admin account.
+3. Confirm login succeeds.
+4. Confirm current-user returns role super_admin.
+5. Confirm redirect opens the Super Admin dashboard.
+6. Confirm dashboard header appears.
+7. Confirm Super Admin sidebar appears.
+8. Confirm summary cards load.
+9. Open at least five major ERP modules.
+10. Refresh directly on the Super Admin URL.
+11. Confirm no 404, blank screen, or wrong redirect.
+12. Log out.
+13. Confirm the dashboard cannot be opened after logout.
+14. Log in again.
+15. Confirm the dashboard opens without manually clearing storage.
+16. Check browser and backend logs for critical errors.
+17. Test desktop and mobile-width layouts.
+18. Confirm a normal customer cannot access the Super Admin route.
+19. Confirm a normal Admin is directed to the correct Admin portal.
+
+==================================================
+J. REQUIRED FINAL REPORT
+==================================================
+
+Provide:
+
+1. Exact root cause
+2. Exact Super Admin production URL
+3. Super Admin role found in database
+4. Authentication issue found
+5. Routing issue found
+6. API or permission issue found
+7. Files modified
+8. Database changes
+9. Deployment changes
+10. Tests completed
+11. Production test results
+12. Remaining warnings
+13. Rollback instructions
+14. Checkpoint or commit reference
+
+Do not respond only with “fixed”, “server is running”, or “build succeeded”.
+
+Prove that the real production Super Admin dashboard opens successfully and remains open after a direct browser refresh.

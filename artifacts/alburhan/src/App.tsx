@@ -156,6 +156,8 @@ import PaymentReminderSettings from "@/pages/admin/PaymentReminderSettings";
 import AutoNotificationSettings from "@/pages/admin/AutoNotificationSettings";
 import AttendanceScanPublic from "@/pages/public/AttendanceScanPublic";
 import StaffVerify from "@/pages/public/StaffVerify";
+import LeadPipeline from "@/pages/admin/LeadPipeline";
+import CommentAutomation from "@/pages/admin/CommentAutomation";
 import VerifyPilgrim from "@/pages/public/VerifyPilgrim";
 import VerifyHotelAssignment from "@/pages/public/VerifyHotelAssignment";
 import VerifyFamily from "@/pages/public/VerifyFamily";
@@ -450,6 +452,8 @@ function Router() {
       <Route path="/admin/agent-login"      component={() => <AdminRoute component={AgentLoginManager} />} />
       <Route path="/admin/customer360"       component={() => <AdminRoute component={Customer360} />} />
       <Route path="/admin/crm"              component={() => <AdminRoute component={CRMDashboard} />} />
+      <Route path="/admin/lead-pipeline"    component={() => <AdminRoute component={LeadPipeline} />} />
+      <Route path="/admin/comment-automation" component={() => <AdminRoute component={CommentAutomation} />} />
       <Route path="/admin/srm"              component={() => <AdminRoute component={SRMDashboard} />} />
       <Route path="/admin/hr"               component={() => <AdminRoute component={HRDashboard} />} />
       <Route path="/admin/inventory"        component={() => <AdminRoute component={InventoryDashboard} />} />
