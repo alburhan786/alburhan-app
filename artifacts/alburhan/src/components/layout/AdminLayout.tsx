@@ -39,7 +39,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const {
     notifications, unreadCount, popupNotif, dismissPopup,
-    markRead, markAllRead, deleteNotification,
+    markRead, markAllRead, deleteNotification, refresh,
   } = useAdminNotifications(isAdmin);
 
   useEffect(() => {
@@ -210,6 +210,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         onMarkRead={markRead}
         onMarkAllRead={markAllRead}
         onDelete={deleteNotification}
+        onOpen={refresh}
       />
     </div>
   );

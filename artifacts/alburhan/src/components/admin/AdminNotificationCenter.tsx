@@ -10,6 +10,7 @@ interface Props {
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onDelete: (id: string) => void;
+  onOpen?: () => void;
 }
 
 function typeColor(type: AdminNotifType) {
@@ -48,7 +49,7 @@ function timeAgo(iso: string) {
   }
 }
 
-export function AdminNotificationCenter({ notifications, unreadCount, onMarkRead, onMarkAllRead, onDelete }: Props) {
+export function AdminNotificationCenter({ notifications, unreadCount, onMarkRead, onMarkAllRead, onDelete, onOpen }: Props) {
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
   const ref = useRef<HTMLDivElement>(null);
@@ -65,7 +66,11 @@ export function AdminNotificationCenter({ notifications, unreadCount, onMarkRead
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const opening = !open;
+          setOpen(opening);
+          if (opening) onOpen?.();
+        }}
         className="relative p-2 rounded-lg hover:bg-primary-foreground/10 text-primary-foreground/70 hover:text-white transition-colors"
         title="Notifications"
       >

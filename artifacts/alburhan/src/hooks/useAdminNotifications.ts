@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const API = import.meta.env.VITE_API_URL || "";
+const POLL_INTERVAL_MS = 60_000;
 
 export type AdminNotifType =
   | "booking_new"
@@ -66,22 +67,25 @@ export function useAdminNotifications(isAdmin: boolean) {
   const [popupNotif, setPopupNotif] = useState<AdminNotification | null>(null);
   const esRef = useRef<EventSource | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isAdminRef = useRef(isAdmin);
+  isAdminRef.current = isAdmin;
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const fetchExisting = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdminRef.current) return;
     try {
       const r = await fetch(`${API}/api/admin-notifications`, { credentials: "include" });
       if (r.ok) {
         const data: AdminNotification[] = await r.json();
         setNotifications(data);
       }
-    } catch { /* ignore */ }
-  }, [isAdmin]);
+    } catch { /* network error — keep previous state */ }
+  }, []);
 
   const connectSse = useCallback(() => {
-    if (!isAdmin) return;
+    if (!isAdminRef.current) return;
     if (esRef.current) {
       esRef.current.close();
       esRef.current = null;
@@ -124,17 +128,26 @@ export function useAdminNotifications(isAdmin: boolean) {
     es.onerror = () => {
       es.close();
       esRef.current = null;
-      reconnectTimer.current = setTimeout(connectSse, 5000);
+      reconnectTimer.current = setTimeout(() => {
+        connectSse();
+        fetchExisting();
+      }, 5000);
     };
-  }, [isAdmin]);
+  }, [fetchExisting]);
 
   useEffect(() => {
     if (!isAdmin) return;
+
     fetchExisting();
     connectSse();
+
+    pollTimer.current = setInterval(fetchExisting, POLL_INTERVAL_MS);
+
     return () => {
       esRef.current?.close();
+      esRef.current = null;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (pollTimer.current) clearInterval(pollTimer.current);
     };
   }, [isAdmin, fetchExisting, connectSse]);
 
@@ -180,5 +193,6 @@ export function useAdminNotifications(isAdmin: boolean) {
     markRead,
     markAllRead,
     deleteNotification,
+    refresh: fetchExisting,
   };
 }

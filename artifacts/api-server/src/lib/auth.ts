@@ -47,10 +47,24 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   }
 }
 
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+const PORTAL_ROLES = new Set(["admin", "super_admin", "branch_manager", "agent", "staff"]);
+
 export async function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, async () => {
-    if (req.user?.role !== "admin") {
+    if (!ADMIN_ROLES.has(req.user?.role ?? "")) {
       res.status(403).json({ message: "Admin access required." });
+      return;
+    }
+    next();
+  });
+}
+
+/** Allows admin, super_admin, branch_manager, agent, staff — all roles that use the admin layout */
+export async function requirePortalUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  await requireAuth(req, res, async () => {
+    if (!PORTAL_ROLES.has(req.user?.role ?? "")) {
+      res.status(403).json({ message: "Portal access required." });
       return;
     }
     next();

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAdmin } from "../lib/auth.js";
+import { requirePortalUser } from "../lib/auth.js";
 import {
   registerSseClient,
   unregisterSseClient,
@@ -13,7 +13,7 @@ import {
 const router = Router();
 
 // GET /admin-notifications/stream — SSE stream (long-lived connection)
-router.get("/stream", requireAdmin as any, (req, res) => {
+router.get("/stream", requirePortalUser as any, (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
@@ -36,7 +36,7 @@ router.get("/stream", requireAdmin as any, (req, res) => {
 });
 
 // GET /admin-notifications — list recent notifications
-router.get("/", requireAdmin as any, async (req, res) => {
+router.get("/", requirePortalUser as any, async (req, res) => {
   try {
     const unreadOnly = req.query.unread === "true";
     const limit = Math.min(Number(req.query.limit) || 50, 200);
@@ -48,7 +48,7 @@ router.get("/", requireAdmin as any, async (req, res) => {
 });
 
 // GET /admin-notifications/unread-count
-router.get("/unread-count", requireAdmin as any, async (_req, res) => {
+router.get("/unread-count", requirePortalUser as any, async (_req, res) => {
   try {
     const count = await getUnreadCount();
     res.json({ count });
@@ -58,7 +58,7 @@ router.get("/unread-count", requireAdmin as any, async (_req, res) => {
 });
 
 // PATCH /admin-notifications/:id/read
-router.patch("/:id/read", requireAdmin as any, async (req, res) => {
+router.patch("/:id/read", requirePortalUser as any, async (req, res) => {
   try {
     await markNotificationRead(req.params.id);
     res.json({ ok: true });
@@ -68,7 +68,7 @@ router.patch("/:id/read", requireAdmin as any, async (req, res) => {
 });
 
 // POST /admin-notifications/mark-all-read
-router.post("/mark-all-read", requireAdmin as any, async (_req, res) => {
+router.post("/mark-all-read", requirePortalUser as any, async (_req, res) => {
   try {
     await markAllNotificationsRead();
     res.json({ ok: true });
@@ -78,7 +78,7 @@ router.post("/mark-all-read", requireAdmin as any, async (_req, res) => {
 });
 
 // DELETE /admin-notifications/:id
-router.delete("/:id", requireAdmin as any, async (req, res) => {
+router.delete("/:id", requirePortalUser as any, async (req, res) => {
   try {
     await deleteAdminNotification(req.params.id);
     res.json({ ok: true });
