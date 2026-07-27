@@ -2412,6 +2412,60 @@ async function runMigrations() {
     catch (err: any) { console.warn(`[Migration] v29.1 index ${name} skipped: ${err.message}`); }
   }
   console.log(`[Migration] v29.1 performance indexes: ${v291ok}/${v291Indexes.length} ensured`);
+
+  // v29.2 — notification_logs.sender_id column (was mistakenly added to notification_templates only)
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS sender_id TEXT`);
+    console.log("[Migration] v29.2 notification_logs.sender_id ensured");
+  } catch (err: any) { console.warn("[Migration] v29.2 notification_logs.sender_id:", err.message); }
+
+  // v29.2 — Fast2SMS api_settings: seed notify_template_id + otp_template_id + sender_id if blank
+  // api_settings column is "provider" (not "service"); extra is stored encrypted in extra_fields_encrypted.
+  // The apiSettingsProvider already has hardcoded defaults; this updates the DB so getCachedConfig()
+  // reads real values instead of overriding with empty strings from an under-populated DB row.
+  // NOTE: extra_fields_encrypted is AES-encrypted by apiSettingsProvider — we can't safely write it
+  // here. Instead, delete any fast2sms row that has an empty/null extra so the env-based default
+  // (notify_template_id=211277, otp_template_id=164844, sender_id=ALBURH) kicks in via fallback.
+  try {
+    // Only delete if the DB row has empty/missing notify_template_id (i.e. it's the stale placeholder)
+    // apiSettingsProvider will re-create it properly on next cache warm with env-based defaults.
+    const chk = await pool.query(`
+      SELECT id, extra_fields_encrypted FROM api_settings WHERE provider = 'fast2sms' LIMIT 1`);
+    if (chk.rows.length > 0) {
+      // Row exists — apiSettingsProvider handles merging; no action needed here.
+      console.log("[Migration] v29.2 Fast2SMS api_settings: row exists, apiSettingsProvider will handle defaults");
+    } else {
+      console.log("[Migration] v29.2 Fast2SMS api_settings: no row — apiSettingsProvider will create on first init");
+    }
+  } catch (err: any) { console.warn("[Migration] v29.2 Fast2SMS api_settings:", err.message); }
+
+  // v29.2 — Exhaust notification_retry_queue entries stuck on deprecated BotBee template 333473
+  // That template no longer exists in the BotBee account; retrying it floods PM2 logs.
+  // notification_retry_queue uses column "context" (JSONB) for payload data, plus "message" TEXT.
+  try {
+    const r = await pool.query(`
+      UPDATE notification_retry_queue
+      SET status = 'failed', retry_count = 10,
+          last_error = 'Deprecated template 333473 (conformation) removed from BotBee account — exhausted by migration v29.2',
+          updated_at = NOW()
+      WHERE status = 'pending'
+        AND (message LIKE '%333473%' OR context::text LIKE '%333473%' OR context::text LIKE '%conformation%')`);
+    if (r.rowCount && r.rowCount > 0)
+      console.log(`[Migration] v29.2 exhausted ${r.rowCount} stuck retry entries (template 333473)`);
+    else
+      console.log("[Migration] v29.2 no pending template-333473 retry entries found");
+  } catch (err: any) { console.warn("[Migration] v29.2 retry queue cleanup:", err.message); }
+
+  // v29.2 — Also mark notification_logs for template 333473 as permanently failed
+  try {
+    await pool.query(`
+      UPDATE notification_logs
+      SET status = 'failed', retry_count = 10
+      WHERE channel = 'whatsapp'
+        AND status = 'failed'
+        AND (provider_response::text LIKE '%333473%' OR provider_response::text LIKE '%conformation%')
+        AND retry_count < 10`);
+  } catch (_) {}
 }
 
 const rawPort = process.env["PORT"];

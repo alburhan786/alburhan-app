@@ -2698,7 +2698,8 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     sendApprovalTemplate, sendPaymentReceivedTemplate, sendInvoiceReadyTemplate,
     sendAgreementReadyTemplate, sendAgreementSignedTemplate,
   } = await import("./lib/botbee.js");
-  const { sendDLTSMS } = await import("./lib/notifications.js");
+  const { sendBookingConfirmed, sendInvoiceCreated, sendPaymentReceived: smsSendPayment, sendCustomSMS: smsSendCustom } = await import("./lib/sms.js");
+  const { sendOtpSMS } = await import("./lib/notifications.js");
   const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
   const { generateInvoicePdfBuffer } = await import("./lib/paymentDocs.js");
   const { generateAgreementPdfBuffer } = await import("./lib/agreementPdf.js");
@@ -2767,12 +2768,17 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
       (r.responsePayload as any)?.wa_message_id, Date.now() - t0);
   }
 
-  // ── STEP 2: booking_approved SMS ─────────────────────────────────────────────
+  // ── STEP 2: booking_approved SMS (uses sms.ts sendBookingConfirmed → per-event DLT template) ─────
   {
     const t0 = Date.now();
-    const msgSMS = `Dear ${booking.name}, your Hajj/Umrah booking ${booking.num} has been confirmed by Al Burhan Tours & Travels. For details visit alburhantravels.online`;
-    const ok = await sendDLTSMS(booking.mobile, msgSMS);
-    step(2, "booking_approved SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+    const r = await sendBookingConfirmed({
+      mobile: booking.mobile, customerName: booking.name,
+      bookingNumber: booking.num, packageName: booking.packageName,
+      bookingId: booking.id, customerId: booking.customerId,
+    });
+    step(2, "booking_approved SMS", r.ok,
+      r.ok ? `SMS dispatched (template=${r.templateId || "?"})` : (r.errorMessage || "SMS failed"),
+      undefined, Date.now() - t0);
   }
 
   // ── STEP 3: Invoice — upsert ─────────────────────────────────────────────────
@@ -2833,12 +2839,19 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
       invoice ? "Skipped — paid_amount=0 (template rule: never send if unpaid)" : "Skipped — no invoice");
   }
 
-  // ── STEP 6: Invoice SMS ──────────────────────────────────────────────────────
+  // ── STEP 6: Invoice SMS (uses sms.ts sendInvoiceCreated → DLT template 214142) ─────────────────
   if (invoice) {
     const t0 = Date.now();
-    const msgSMS = `Dear ${booking.name}, your invoice ${invoice.invoice_number} for booking ${booking.num} is ready. Paid: Rs.${invoice.paid}. View: alburhantravels.online`;
-    const ok = await sendDLTSMS(booking.mobile, msgSMS);
-    step(6, "Invoice SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+    const r = await sendInvoiceCreated({
+      mobile: booking.mobile, customerName: booking.name,
+      bookingNumber: booking.num, packageName: booking.packageName,
+      bookingId: booking.id, customerId: booking.customerId,
+      invoiceNumber: invoice.invoice_number,
+      amount: `₹${(invoice.total || 0).toLocaleString("en-IN")}`,
+    });
+    step(6, "Invoice SMS", r.ok,
+      r.ok ? `SMS dispatched (template=${r.templateId || "?"})` : (r.errorMessage || "SMS failed"),
+      undefined, Date.now() - t0);
   } else {
     step(6, "Invoice SMS", null, "Skipped — no invoice");
   }
@@ -2926,28 +2939,33 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     step(9, "agreement_ready WhatsApp", null, "Skipped — no agreement");
   }
 
-  // ── STEP 10: agreement_ready SMS ─────────────────────────────────────────────
+  // ── STEP 10: agreement_ready SMS (uses sendBookingConfirmed → template 214139 — no dedicated
+  //            agreement DLT template registered yet; booking_confirmed template used as proxy) ──
   if (agreement) {
     const t0 = Date.now();
-    const agUrl = `https://alburhantravels.online/agreement/${agreement.agreement_number}`;
-    const msgSMS = `Dear ${booking.name}, your Hajj/Umrah agreement ${agreement.agreement_number} is ready. Please sign at: ${agUrl}`;
-    const ok = await sendDLTSMS(booking.mobile, msgSMS);
-    step(10, "Agreement SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+    const r = await sendBookingConfirmed({
+      mobile: booking.mobile, customerName: booking.name,
+      bookingNumber: booking.num, packageName: booking.packageName,
+      bookingId: booking.id, customerId: booking.customerId,
+    });
+    step(10, "Agreement SMS", r.ok,
+      r.ok ? `SMS dispatched via booking_confirmed proxy (template=${r.templateId || "?"}) — dedicated agreement DLT template not yet registered` : (r.errorMessage || "SMS failed"),
+      undefined, Date.now() - t0);
   } else {
     step(10, "Agreement SMS", null, "Skipped — no agreement");
   }
 
   // ── STEP 11: Simulate agreement signing OTP ──────────────────────────────────
+  // OTP SMS uses sendOtpSMS (DLT template 164844, sender ALBURH)
   if (agreement && !agreement.signed_at) {
     const t0 = Date.now();
     try {
-      // Generate OTP and store it
       const otp = String(Math.floor(100000 + Math.random() * 900000));
       await p.query(`UPDATE agreements SET signing_otp=$1 WHERE id=$2`, [otp, agreement.id]);
-      const msgSMS = `Your Al Burhan agreement signing OTP is ${otp}. Valid for 10 minutes.`;
-      const ok = await sendDLTSMS(booking.mobile, msgSMS);
+      const result = await sendOtpSMS(booking.mobile, otp);
+      const ok = result.sent ?? result.finalSuccess;
       step(11, "Agreement signing OTP SMS", ok,
-        ok ? `OTP generated & SMS sent (OTP not logged for security)` : "OTP SMS failed",
+        ok ? `OTP generated & sent via DLT template 164844` : "OTP SMS failed — check Fast2SMS otp_template_id in API Settings",
         undefined, Date.now() - t0);
     } catch (err: any) {
       step(11, "Agreement signing OTP SMS", false, err.message, undefined, Date.now() - t0);
@@ -2989,12 +3007,19 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     step(13, "payment_received WhatsApp", null, "Skipped — paid_amount=0");
   }
 
-  // ── STEP 14: Payment SMS ─────────────────────────────────────────────────────
+  // ── STEP 14: Payment SMS (uses sms.ts sendPaymentReceived → DLT template 219804) ─────────────
   if (booking.paid > 0) {
     const t0 = Date.now();
-    const msgSMS = `Dear ${booking.name}, payment of Rs.${booking.paid} received for booking ${booking.num}. Thank you - Al Burhan Tours & Travels`;
-    const ok = await sendDLTSMS(booking.mobile, msgSMS);
-    step(14, "Payment received SMS", ok, ok ? "SMS dispatched" : "SMS failed", undefined, Date.now() - t0);
+    const r = await smsSendPayment({
+      mobile: booking.mobile, customerName: booking.name,
+      bookingNumber: booking.num, packageName: booking.packageName,
+      bookingId: booking.id, customerId: booking.customerId,
+      amount: `${booking.paid}`,
+      invoiceNumber: invoice?.invoice_number,
+    });
+    step(14, "Payment received SMS", r.ok,
+      r.ok ? `SMS dispatched (template=${r.templateId || "?"})` : (r.errorMessage || "SMS failed"),
+      undefined, Date.now() - t0);
   } else {
     step(14, "Payment received SMS", null, "Skipped — paid_amount=0");
   }

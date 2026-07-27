@@ -192,7 +192,15 @@ export function getCachedConfig(provider: ProviderName): ProviderConfig {
   }
 
   if (dbConfig && dbConfig.apiKey) {
-    return dbConfig;
+    // Merge env-based defaults into DB extra so that any field the DB left empty
+    // still gets a working value (e.g. notify_template_id, otp_template_id, sender_id).
+    // DB non-empty values always win; env defaults fill only blank/missing slots.
+    const envFallback = buildEnvFallback(provider);
+    const merged: Record<string, string> = { ...envFallback.extra };
+    for (const [k, v] of Object.entries(dbConfig.extra)) {
+      if (v && v.trim() !== "") merged[k] = v;
+    }
+    return { ...dbConfig, extra: merged };
   }
 
   // Fall back to process.env

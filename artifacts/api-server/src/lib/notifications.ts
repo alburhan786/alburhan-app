@@ -60,14 +60,15 @@ function getFast2SMSKey(): string | undefined {
 function getFast2SMSExtra() {
   const dbCfg = getCachedConfig("fast2sms");
   const ex = dbCfg.extra || {};
-  const globalSender = ex.sender_id || "ABURHA";
+  const globalSender = ex.sender_id || "ALBURH";  // ALBURH is the approved DLT header (NOT ABURHA)
   return {
     sender_id: globalSender,
     // Per-event OTP sender — falls back to global sender_id
     otp_sender: ex.otp_sender || globalSender,
-    // No hardcoded fallbacks — empty string means "not configured"
-    otp_template_id:    ex.otp_template_id    || "",
-    notify_template_id: ex.notify_template_id  || "",
+    // Hardcoded DLT defaults: otp_template_id=164844, notify_template_id=211277, sender=ALBURH
+    // DB non-empty values override these via getCachedConfig() merge logic.
+    otp_template_id:    ex.otp_template_id    || "164844",
+    notify_template_id: ex.notify_template_id  || "211277",
   };
 }
 

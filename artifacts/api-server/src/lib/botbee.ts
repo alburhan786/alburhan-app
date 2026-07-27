@@ -765,15 +765,19 @@ export async function sendPDFDocument(
 // Do NOT use for: flight reminder, visa, tickets, travel docs, payment reminders,
 // or any other general notification.
 
+// Template 333473 ("conformation") was removed from the BotBee account July 2026.
+// Replaced by production templates 409950–410040.  sendConfirmationTemplate is kept
+// for backward-compat but now returns a graceful no-op instead of generating failures.
 export const CONFIRMATION_TEMPLATE_NAME = "conformation";
-export const CONFIRMATION_TEMPLATE_ID   = "333473";
+export const CONFIRMATION_TEMPLATE_ID   = "333473"; // DEPRECATED — no longer exists in BotBee
 
 export async function sendConfirmationTemplate(
-  to: string,
+  _to: string,
   _ctx: { customerName: string; packageName: string; bookingRef: string; attachmentLink: string },
-  opts?: BotBeeTemplateOpts
+  _opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
-  return sendTemplate(to, CONFIRMATION_TEMPLATE_ID, opts);
+  console.warn("[BotBee] sendConfirmationTemplate: template 333473 (conformation) is deprecated and has been removed from BotBee. Use sendApprovalTemplate (409950) or sendPaymentReceivedTemplate (409990) instead.");
+  return { ok: false, errorMessage: "Template 333473 deprecated — use sendApprovalTemplate instead", responsePayload: null };
 }
 
 // ── Al Burhan Production Templates — env-var backed, never hardcoded ─────────

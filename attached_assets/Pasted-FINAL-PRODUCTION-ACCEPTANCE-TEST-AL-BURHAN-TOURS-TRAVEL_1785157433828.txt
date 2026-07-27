@@ -1,0 +1,75 @@
+FINAL PRODUCTION ACCEPTANCE TEST – AL BURHAN TOURS & TRAVELS ERP
+
+Do not assume the ERP is complete based on implementation alone. Perform a real production verification using actual workflows.
+
+Create a complete end-to-end test booking and verify every step.
+
+Customer Flow
+
+1. Customer signs up with OTP.
+2. Customer logs in.
+3. Customer dashboard opens.
+4. Customer selects a package.
+5. Customer submits booking.
+6. Admin receives notification.
+7. Admin approves booking.
+8. Invoice is generated automatically.
+9. Customer receives:
+   - Dashboard notification
+   - Push notification
+   - WhatsApp
+   - SMS
+   - Email
+10. Customer makes payment.
+11. Receipt is generated automatically.
+12. Agreement is generated automatically.
+13. Customer photo is mandatory.
+14. Passport photo is mandatory.
+15. OTP digital signature works.
+16. Signed agreement PDF is stored automatically.
+17. Customer uploads documents.
+18. Admin verifies documents.
+19. Visa is approved.
+20. Ticket is uploaded.
+21. Hotel is assigned.
+22. Hotel voucher is generated automatically.
+23. Room allocation PDF is generated automatically.
+24. Pilgrim ID card is generated automatically.
+25. Departure reminders are sent.
+26. Return reminder is sent.
+27. Journey is marked complete.
+
+For every step verify that:
+
+- Dashboard notification works.
+- Firebase push works.
+- WhatsApp is delivered.
+- SMS is delivered.
+- Email is delivered.
+- PDFs are generated correctly.
+- Customer dashboard updates automatically.
+- Admin dashboard updates automatically.
+- Delivery logs are created.
+- Failed notifications retry automatically.
+
+Run a complete production audit and report:
+
+- Total workflows tested
+- Total workflows passed
+- Total workflows failed
+- Missing APIs
+- Broken routes
+- 404 pages
+- Notification failures
+- PDF generation failures
+- Database errors
+- Console errors
+- Background worker status
+- Cron jobs status
+- Retry queue status
+- WhatsApp status
+- SMS status
+- Email status
+- Firebase status
+
+Only report "100% Production Ready" if every workflow has been successfully tested end-to-end in production. Otherwise, list every remaining issue with its priority and exact fix.
