@@ -99,3 +99,4 @@
 - [Notification audit July 2026](notif-audit-jul28.md) — channel root causes, delivery rates, what needs admin config vs code fix
 - [Notification Health Endpoints](notification-health-endpoints.md) — GET+2 POST health endpoints must live in app.ts (not admin.ts); E2E WA needs template ID 409950 + forceTemplateApi:true; SMS uses sendBookingConfirmed
 - [RCS Template Engine](rcs-template-engine.md) — sendRCSForEvent is the ERP entry point; rcs_template_mappings table (9 approved IDs seeded); 7 new notification_logs cols; user_id NEVER logged; template_not_found = failure not success
+- [Lemin RCS variable key formats](lemin-rcs-variable-keys.md) — 3 distinct formats per template family; message_id at body.data.id; status endpoint redirects (webhook-only delivery updates)
