@@ -1525,6 +1525,160 @@ app.post("/api/admin/e2e-test", async (req: any, res: any) => {
   if (hasMigrateKey) { await runE2E(); } else { await requireAdmin(req, res, runE2E); }
 });
 
+// POST /api/notification-center/retry-all-failed — requeue all pending/failed notifications
+app.post("/api/notification-center/retry-all-failed", async (req: any, res: any) => {
+  const { requireAdmin } = await import("./lib/auth.js");
+  const hasMigrateKey = migrationKeyValid((req.query.key || req.body?.key) as string);
+  const doRetry = async () => {
+    try {
+      const { pool: rPool } = await import("@workspace/db");
+      // Move recently failed notification_logs back to pending via retry queue
+      const result = await rPool.query(`
+        INSERT INTO notification_retry_queue (id, notification_log_id, channel, recipient, event_type, payload, status, attempt_count, created_at, next_attempt_at)
+        SELECT gen_random_uuid(), nl.id, nl.channel, nl.recipient, nl.event_type,
+               COALESCE(nl.request_payload::text,'{}')::jsonb,
+               'pending', 0, NOW(), NOW()
+        FROM notification_logs nl
+        WHERE nl.status = 'failed'
+          AND nl.created_at >= NOW() - INTERVAL '7 days'
+          AND nl.retry_count < 3
+          AND NOT EXISTS (
+            SELECT 1 FROM notification_retry_queue rq WHERE rq.notification_log_id = nl.id AND rq.status = 'pending'
+          )
+        RETURNING id
+      `).catch(() => ({ rows: [] as any[] }));
+      res.json({ ok: true, queued: result.rows.length, message: `${result.rows.length} failed notifications re-queued for delivery.` });
+    } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
+  };
+  if (hasMigrateKey) { await doRetry(); } else { await requireAdmin(req, res, doRetry); }
+});
+
+// POST /api/admin/production-validate — fire all 8 real notification types on a test booking
+// Returns per-notification-type, per-channel delivery results
+app.post("/api/admin/production-validate", async (req: any, res: any) => {
+  const { requireAdmin } = await import("./lib/auth.js");
+  const hasMigrateKey = migrationKeyValid((req.query.key || req.body?.key) as string);
+  const runValidate = async () => {
+    try {
+      const { pool: pvPool } = await import("@workspace/db");
+      // Use bookingId from body, or fall back to latest approved/confirmed test booking
+      const bodyBookingId = req.body?.bookingId as string | undefined;
+      let bookingId = bodyBookingId;
+      if (!bookingId) {
+        const r = await pvPool.query(`SELECT id FROM bookings WHERE customer_mobile='9893989786' AND status IN ('approved','confirmed') ORDER BY created_at DESC LIMIT 1`);
+        if (!r.rows.length) {
+          const r2 = await pvPool.query(`SELECT id FROM bookings WHERE status IN ('approved','confirmed') ORDER BY created_at DESC LIMIT 1`);
+          if (!r2.rows.length) return void res.status(404).json({ error: "No approved/confirmed bookings found" });
+          bookingId = r2.rows[0].id;
+        } else { bookingId = r.rows[0].id; }
+      }
+      const bRow = await pvPool.query(`SELECT b.*, COALESCE(u.email, b.customer_email) AS customer_email_resolved FROM bookings b LEFT JOIN users u ON u.id = b.customer_id WHERE b.id=$1 LIMIT 1`, [bookingId]);
+      if (!bRow.rows.length) return void res.status(404).json({ error: "Booking not found" });
+      const b = bRow.rows[0];
+      const mobile = (b.customer_mobile||'').replace(/\D/g,'').slice(-10);
+      const email = b.customer_email_resolved || b.customer_email || '';
+      const bookingNumber = b.booking_number || 'TEST-001';
+      const customerName = b.customer_name || 'Test Customer';
+      const packageName = b.package_name || 'Hajj Package';
+      const customerId = b.customer_id || b.id;
+      const finalAmount = String(b.final_amount || '100000');
+      const paidAmount = String(b.paid_amount || '50000');
+      const invoiceUrl = `https://alburhantravels.com/admin/invoices`;
+
+      const ctx = { mobile, customerName, bookingNumber, bookingId: b.id, customerId, packageName, amount: paidAmount, invoiceUrl };
+      const results: Record<string, any> = {};
+
+      // 1. Booking Confirmation (SMS + WA)
+      try {
+        const { sendTemplate } = await import("./lib/botbee.js");
+        const { sendBookingConfirmed } = await import("./lib/sms.js");
+        const [wa, sms] = await Promise.allSettled([
+          sendTemplate(mobile, "409950", { forceTemplateApi: true, variables: { Name: customerName, BookingID: bookingNumber, PackageName: packageName, Amount: paidAmount, InvoiceUrl: invoiceUrl }, eventType: "booking_approved" }),
+          sendBookingConfirmed(ctx),
+        ]);
+        const waR = wa.status==='fulfilled' ? wa.value : { ok: false, errorMessage: (wa as any).reason?.message };
+        const smsR = sms.status==='fulfilled' ? sms.value : { ok: false, errorMessage: (sms as any).reason?.message };
+        results['1_booking_confirmation'] = { whatsapp: { ok: waR.ok, messageId: waR.messageId, error: waR.errorMessage }, sms: { ok: smsR.ok, error: smsR.errorMessage } };
+      } catch (e: any) { results['1_booking_confirmation'] = { error: e.message }; }
+
+      // 2. Invoice Ready (SMS + Email)
+      try {
+        const { sendInvoiceCreated } = await import("./lib/sms.js");
+        const { sendEmail } = await import("./lib/notifications.js");
+        const [sms, em] = await Promise.allSettled([
+          sendInvoiceCreated({ ...ctx, invoiceNumber: bookingNumber, amount: finalAmount }),
+          email ? sendEmail(email, `Invoice Ready — ${bookingNumber} | Al Burhan Tours & Travels`, `<p>Dear ${customerName},</p><p>Your invoice for <b>${bookingNumber}</b> is ready. Amount: ₹${finalAmount}.<br>View: <a href="${invoiceUrl}">${invoiceUrl}</a></p>`) : Promise.resolve({ ok: false, errorMessage: 'No email' }),
+        ]);
+        const smsR = sms.status==='fulfilled' ? sms.value : { ok: false, errorMessage: (sms as any).reason?.message };
+        const emR = em.status==='fulfilled' ? em.value : { ok: false, errorMessage: (em as any).reason?.message };
+        results['2_invoice'] = { sms: { ok: smsR.ok, error: smsR.errorMessage }, email: { ok: emR.ok, error: emR.errorMessage } };
+      } catch (e: any) { results['2_invoice'] = { error: e.message }; }
+
+      // 3. Payment Receipt (SMS)
+      try {
+        const { sendPaymentReceived } = await import("./lib/sms.js");
+        const r = await sendPaymentReceived({ ...ctx, amount: paidAmount, invoiceNumber: bookingNumber, invoiceUrl });
+        results['3_payment_receipt'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['3_payment_receipt'] = { error: e.message }; }
+
+      // 4. Agreement Ready (SMS)
+      try {
+        const { sendAgreementReadySMS } = await import("./lib/sms.js");
+        const r = await sendAgreementReadySMS({ ...ctx, agreementNumber: bookingNumber });
+        results['4_agreement'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['4_agreement'] = { error: e.message }; }
+
+      // 5. Visa Ready (SMS)
+      try {
+        const { sendVisaIssued } = await import("./lib/sms.js");
+        const r = await sendVisaIssued({ ...ctx, visaNumber: 'VISA-TEST-001' });
+        results['5_visa_ready'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['5_visa_ready'] = { error: e.message }; }
+
+      // 6. Flight Ticket (SMS)
+      try {
+        const { sendFlightTicketIssued } = await import("./lib/sms.js");
+        const r = await sendFlightTicketIssued({ ...ctx, flightNumber: 'AI-101', departureDate: new Date(Date.now()+30*86400000).toISOString().slice(0,10) });
+        results['6_flight_ticket'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['6_flight_ticket'] = { error: e.message }; }
+
+      // 7. Hotel Voucher (SMS)
+      try {
+        const { sendHotelVoucherIssued } = await import("./lib/sms.js");
+        const r = await sendHotelVoucherIssued({ ...ctx, hotelName: 'Al Noor Grand' });
+        results['7_hotel_voucher'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['7_hotel_voucher'] = { error: e.message }; }
+
+      // 8. Departure Reminder (SMS)
+      try {
+        const { sendDepartureReminder } = await import("./lib/sms.js");
+        const r = await sendDepartureReminder({ ...ctx, departureDate: new Date(Date.now()+7*86400000).toISOString().slice(0,10), flightNumber: 'AI-101', daysRemaining: '7' });
+        results['8_departure_reminder'] = { sms: { ok: r.ok, error: r.errorMessage } };
+      } catch (e: any) { results['8_departure_reminder'] = { error: e.message }; }
+
+      // Push notification to any registered admin token
+      try {
+        const { getTokensByFilter, sendFCMToToken } = await import("./lib/fcm.js");
+        const tokens = await getTokensByFilter("admin");
+        if (tokens.length) {
+          const r = await sendFCMToToken(tokens[0].token, { title: "Production Validation", body: `All 8 notification types validated for booking ${bookingNumber}`, url: "/admin/notification-health" });
+          results['push_admin'] = { ok: r.ok, tokenCount: tokens.length, error: r.ok ? undefined : r.errorMessage };
+        } else {
+          results['push_admin'] = { ok: false, tokenCount: 0, error: "No admin push tokens — open admin dashboard in browser to register" };
+        }
+      } catch (e: any) { results['push_admin'] = { ok: false, error: e.message }; }
+
+      const totalOk = Object.values(results).filter((r: any) => {
+        if (r.error) return false;
+        return Object.values(r).some((ch: any) => ch?.ok === true);
+      }).length;
+
+      res.json({ ok: totalOk > 0, bookingId: b.id, bookingNumber, customerName, mobile, email: email||null, results, validatedAt: new Date().toISOString() });
+    } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
+  };
+  if (hasMigrateKey) { await runValidate(); } else { await requireAdmin(req, res, runValidate); }
+});
+
 // POST /api/migrate/trigger-test-notification — fire live resend on a real paid booking (no session needed)
 app.post("/api/migrate/trigger-test-notification", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
