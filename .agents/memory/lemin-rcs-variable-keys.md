@@ -71,3 +71,23 @@ Stores the exact Lemin key names (not internal field names), so `sendRCSForEvent
 filter `resolved` directly using these keys. `resolveVariables` populates every variant.
 
 **Why:** Sending ALL resolved vars (50+ keys) to Lemin caused "Variable mismatch" errors on every template. Each template expects a specific key set. Storing the exact keys in `variables_required` and filtering on send was the fix.
+
+## OTP template (3663 — alburhan_login_otp)
+
+Variable: `{"otp": "VALUE"}` only — single key, plain (not double-brace or hash-bang).
+
+9 alias events all map to template 3663: `login_otp`, `otp_login`, `customer_login_otp`,
+`admin_login_otp`, `agent_login_otp`, `branch_login_otp`, `staff_login_otp`,
+`password_reset_otp`, `mobile_verification_otp`.
+
+Use `sendRCSForOTP(mobile, otp)` — NOT `sendRCSForEvent`. The dedicated function:
+- Masks OTP as `"******"` in notification_logs.request_payload (never stored plaintext)
+- Enforces a 2-minute per-mobile resend cooldown
+- Never exposes LEMIN_API_KEY in any log
+
+## OTP security in auth.ts
+
+- `otps` table: `otp="[hashed]"`, `otp_hash=SHA256(otp+":"+mobile)` — plaintext never stored
+- `verify-otp` matches: `(otp_hash=$hash OR (otp_hash IS NULL AND otp=$plain))` — backward-compatible
+- Fallback delivery chain: RCS → WA template → SMS DLT → Email (sequential, never simultaneous)
+- `otp_hash TEXT` column added via migration on startup
