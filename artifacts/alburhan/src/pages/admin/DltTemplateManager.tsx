@@ -21,7 +21,8 @@ const DLT_FIELDS: DltField[] = [
   { key: "payment_received_tid",      label: "4. Full Payment Received",             event: "payment_received",     senderKey: "payment_received_sender" },
   { key: "partial_payment_tid",       label: "5. Partial Payment",                   event: "partial_payment",      senderKey: "partial_payment_sender" },
   { key: "invoice_created_tid",       label: "6. Invoice Generated",                 event: "invoice_generated",    senderKey: "invoice_created_sender" },
-  { key: "agreement_signed_tid",      label: "7. Agreement Signed",                  event: "agreement_signed",     senderKey: "agreement_signed_sender" },
+  { key: "agreement_ready_tid",       label: "7a. Agreement Ready",                  event: "agreement_ready",      senderKey: "agreement_ready_sender" },
+  { key: "agreement_signed_tid",      label: "7b. Agreement Signed",                 event: "agreement_signed",     senderKey: "agreement_signed_sender" },
   { key: "pending_payment_tid",       label: "8. Payment Reminder",                  event: "payment_due",          senderKey: "pending_payment_sender" },
   { key: "ticket_issued_tid",         label: "9. Flight Ticket Issued",              event: "ticket_issued",        senderKey: "ticket_issued_sender" },
   { key: "visa_issued_tid",           label: "10. Visa Issued",                      event: "visa_approved",        senderKey: "visa_issued_sender" },
@@ -101,7 +102,7 @@ export default function DltTemplateManager() {
       const d = await r.json();
       if (!r.ok || !d.ok) throw new Error(d.error || await r.text());
       toast({ title: "DLT settings saved", description: "Template IDs saved to notification_templates. SMS will use new IDs immediately." });
-      setOriginal(values);
+      await load();
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     } finally {

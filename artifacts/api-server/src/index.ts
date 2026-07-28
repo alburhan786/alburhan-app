@@ -2615,6 +2615,49 @@ async function start() {
     console.log("[Migration] v30.0 notification_templates sender_id ABURHA→ALBURH updated");
   } catch (err: any) { console.warn("[Migration] v30.0 sender_id update:", err.message); }
 
+  // v30.1 — notification_templates: seed missing SMS event rows (disabled by default; admin enables + sets TID)
+  try {
+    // Events with no working DLT template yet — seeded as disabled placeholders
+    const disabledSeeds = [
+      ["booking_rejected",      "Booking Rejected",              "new_booking"],
+      ["partial_payment",       "Partial Payment Received",      "payment_received"],
+      ["visa_approved",         "Visa Issued",                   "ticket_issued"],
+      ["hotel_assigned",        "Hotel Voucher Issued",          "ticket_issued"],
+      ["arrival_reminder",      "Arrival Reminder",              "departure_reminder"],
+      ["welcome_saudi_arabia",  "Welcome to Saudi Arabia",       "departure_reminder"],
+      ["return_reminder",       "Return Reminder",               "departure_reminder"],
+      ["eid_greeting",          "Eid Greeting",                  "eid_greeting"],
+      ["room_allocation",       "Room Allocated",                "hotel_assigned"],
+      ["agreement_ready",       "Agreement Ready to Sign",       "agreement_signed"],
+    ];
+    for (const [event_type, name] of disabledSeeds) {
+      await pool.query(`
+        INSERT INTO notification_templates
+          (id, channel, event_type, name, body, dlt_template_id, sender_id, enabled, created_at, updated_at)
+        SELECT gen_random_uuid(), 'sms', $1, $2, '', '', 'ALBURH', false, NOW(), NOW()
+        WHERE NOT EXISTS (
+          SELECT 1 FROM notification_templates WHERE channel='sms' AND event_type=$1
+        )
+      `, [event_type, name]);
+    }
+    // OTP events — enabled but blank TID (admin must fill in)
+    const otpSeeds = [
+      ["mobile_otp",          "Login / Registration OTP"],
+      ["forgot_password_otp", "Forgot Password OTP"],
+    ];
+    for (const [event_type, name] of otpSeeds) {
+      await pool.query(`
+        INSERT INTO notification_templates
+          (id, channel, event_type, name, body, dlt_template_id, sender_id, enabled, created_at, updated_at)
+        SELECT gen_random_uuid(), 'sms', $1, $2, '', '', 'ALBURH', true, NOW(), NOW()
+        WHERE NOT EXISTS (
+          SELECT 1 FROM notification_templates WHERE channel='sms' AND event_type=$1
+        )
+      `, [event_type, name]);
+    }
+    console.log("[Migration] v30.1 missing SMS notification_templates rows seeded");
+  } catch (err: any) { console.warn("[Migration] v30.1 SMS template seed:", err.message); }
+
   // ── v31.0 — RCS Template Mappings + notification_logs RCS columns ───────────
   try {
     await pool.query(`

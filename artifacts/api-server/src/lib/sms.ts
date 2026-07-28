@@ -213,6 +213,7 @@ async function logSMS(data: {
   httpStatus?: number;
   responsePayload?: unknown;
   errorMessage?: string;
+  errorCode?: string;                 // structured code: dlt_template_missing | invalid_template_id | invalid_sender_id | dlt_rejected | fast2sms_error
   messageId?: string | null;
   requestUrl?: string | null;         // masked GET URL sent to Fast2SMS
   variablesCount?: number;            // how many variable substitutions were sent
@@ -236,10 +237,10 @@ async function logSMS(data: {
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload,
-        sent_at, retry_count, sender_id, wamid, customer_name, booking_number)
+        sent_at, retry_count, sender_id, wamid, customer_name, booking_number, error_code)
        VALUES ($1,$2,$3,$4,'sms',$5,$6,$7,$8,'Fast2SMS',
                'https://www.fast2sms.com/dev/bulkV2',
-               $9,$10,NOW(),$11,$12,$13,$14,$15)`,
+               $9,$10,NOW(),$11,$12,$13,$14,$15,$16)`,
       [
         id, data.eventType,
         data.customerId || null, data.bookingId || null,
@@ -254,6 +255,7 @@ async function logSMS(data: {
           httpStatus: data.httpStatus || null,
           providerError: providerErrorMsg || null,
           errorMessage: data.errorMessage || null,
+          errorCode: data.errorCode || null,
           rawResponse: data.responsePayload,
         }),
         data.httpStatus || null,
@@ -274,6 +276,7 @@ async function logSMS(data: {
         data.messageId || null,
         data.customerName || null,
         data.bookingNumber || null,
+        data.errorCode || null,
       ]
     );
   } catch (e) {
@@ -401,13 +404,13 @@ async function sendDLT(
 
   if (!enabled) {
     const msg = "Fast2SMS disabled in API Settings";
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
   if (!apiKey) {
     const msg = "Fast2SMS API key not configured — set FAST2SMS_API_KEY in Admin → API Settings → Fast2SMS";
     console.warn("[SMS] API key not configured for", opts.eventType, "→", mobile);
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
 
@@ -420,7 +423,7 @@ async function sendDLT(
   if (!approvedIds.includes(effectiveSenderId)) {
     const msg = `SMS BLOCKED — sender_id "${effectiveSenderId}" is not in the approved list [${approvedIds.join(", ")}]. Add it in Admin → SMS Settings → Sender ID Management.`;
     console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "invalid_sender_id", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
   // 2. Route must be DLT (hardcoded — this guard catches any future drift)
@@ -442,9 +445,9 @@ async function sendDLT(
         dltSenderIdAttempted: effectiveSenderId,
       });
     }
-    const msg = `DLT template not configured for "${opts.eventType}". Set ${opts.eventType}_tid in Admin → DLT Template Manager. Quick route is disabled — enable Emergency SMS Fallback to use it temporarily.`;
+    const msg = `DLT Template not configured for event "${opts.eventType}". Register a TRAI DLT template and enter the ID in Admin → DLT Template Manager.`;
     console.warn(`[SMS][${opts.eventType}] ⛔ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, errorCode: "dlt_template_missing", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: msg };
   }
   console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=${effectiveSenderId} route=DLT template=${templateId} → ${mobile}`);
@@ -492,6 +495,7 @@ async function sendDLT(
         message: opts.message, status: "failed",
         httpStatus, responsePayload,
         errorMessage: dltFailMsg,
+        errorCode: "invalid_template_id",
         requestUrl: maskedUrl,
         variablesCount: variables.length,
         bookingId: opts.bookingId, customerId: opts.customerId,
@@ -509,6 +513,7 @@ async function sendDLT(
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: ok ? "sent" : "failed",
       httpStatus, responsePayload, errorMessage, messageId,
+      errorCode: ok ? undefined : "dlt_rejected",
       requestUrl: maskedUrl,
       variablesCount: variables.length,
       bookingId: opts.bookingId, customerId: opts.customerId,
@@ -528,6 +533,7 @@ async function sendDLT(
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: "failed",
       httpStatus, responsePayload, errorMessage,
+      errorCode: "fast2sms_error",
       requestUrl: maskedUrl,
       variablesCount: variables.length,
       bookingId: opts.bookingId, customerId: opts.customerId,
@@ -685,7 +691,7 @@ export async function sendEidGreeting(ctx: { mobile: string; customerName: strin
   return sendDLT(
     ctx.mobile, tids.eid_greeting,
     [ctx.customerName, "Al Burhan Tours & Travels", ""],
-    { eventType: "feedback_request", message: `Eid greeting to ${ctx.customerName}`, customerId: ctx.customerId, senderOverride: senders.eid_greeting }
+    { eventType: "eid_greeting", message: `Eid greeting to ${ctx.customerName}`, customerId: ctx.customerId, senderOverride: senders.eid_greeting }
   );
 }
 
