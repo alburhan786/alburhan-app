@@ -1487,12 +1487,53 @@ app.post("/api/admin/notification-health/run-checks", async (req: any, res: any)
         }
       } catch (e: any) { results.firebase = { ok: false, status: "error", message: e.message }; }
 
-      // Lemin AI RCS
+      // Lemin AI RCS — real POST to /api/send/template; only mark connected on HTTP 200 + success
       try {
         const l = getCachedConfig("lemin");
-        const userId = l.apiKey || l.extra?.user_id || "";
-        if (!userId) { results.lemin = { ok: false, status: "unconfigured", message: "Developer API Key not set — configure in Communication Center" }; }
-        else { results.lemin = { ok: true, status: "configured", message: `API key configured (${String(userId).slice(0, 6)}...)` }; }
+        // Env vars take precedence; never expose key value in response or logs
+        const leminKey      = process.env.LEMIN_API_KEY  || l.apiKey || l.extra?.user_id || "";
+        const leminBaseUrl  = process.env.LEMIN_BASE_URL || l.apiUrl  || "https://rcs.leminai.com";
+        const dialCode      = process.env.LEMIN_DIAL_CODE || l.extra?.dial_code || "+91";
+        const rcsAgent      = process.env.LEMIN_AGENT     || l.extra?.agent     || "jio";
+        const templateId    = l.extra?.template_id || "1473";
+
+        if (!leminKey) {
+          results.lemin = { ok: false, status: "unconfigured", message: "LEMIN_API_KEY secret not set" };
+          await hcPool.query(`UPDATE api_settings SET status='unconfigured', last_tested=NOW() WHERE provider='lemin'`).catch(() => {});
+        } else {
+          const leminEndpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
+          // Use a known test number; no sensitive fields returned
+          const probePhone = "9893989786";
+          const probePayload = {
+            type: "single", dial_code: dialCode, template: templateId,
+            phone: probePhone, user_id: leminKey,
+          };
+          const leminResp = await axios.post(leminEndpoint, probePayload, {
+            headers: { "Content-Type": "application/json" }, timeout: 12000,
+          }).catch((e: any) => e.response || { data: { message: e.message, error: e.message }, status: 0 });
+
+          const httpStatus = leminResp.status;
+          const body = leminResp.data || {};
+          const errText = String(body.message || body.error || "").toLowerCase();
+          // "connected" = key authenticated (Lemin responded, no auth error)
+          // "failed"    = API key is invalid / HTTP 401-403 / network unreachable
+          const authFailed = errText.includes("invalid user") || errText.includes("invalid_user")
+            || errText.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
+          const reached = httpStatus > 0;    // got an HTTP response at all
+          const apiOk = reached && !authFailed;
+          const statusLabel = apiOk ? "connected" : (reached ? "failed" : "unreachable");
+
+          results.lemin = {
+            ok: apiOk,
+            status: statusLabel,
+            message: apiOk
+              ? `RCS connected — agent: ${rcsAgent}, dial: ${dialCode}`
+              : (reached
+                  ? `Lemin auth failed: ${body.message || body.error || `HTTP ${httpStatus}`}`
+                  : `Cannot reach Lemin API at ${leminEndpoint.split("/api")[0]}`),
+          };
+          await hcPool.query(`UPDATE api_settings SET status=$1, last_tested=NOW() WHERE provider='lemin'`, [statusLabel]).catch(() => {});
+        }
       } catch (e: any) { results.lemin = { ok: false, status: "error", message: e.message }; }
 
       res.json({ ok: true, checkedAt: new Date().toISOString(), providers: results });

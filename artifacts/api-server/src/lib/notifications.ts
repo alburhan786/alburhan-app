@@ -444,56 +444,62 @@ export async function sendRCS(
   richData?: RcsRichData
 ): Promise<SendResult> {
   const leminCfg = getCachedConfig("lemin");
-  const endpoint = leminCfg.apiUrl || process.env.LEMIN_API_URL || "https://rcs.leminai.com/api/send/template";
+  // Env vars take precedence over DB-stored values; secrets never reach the frontend
+  const baseUrl     = process.env.LEMIN_BASE_URL || leminCfg.apiUrl || "https://rcs.leminai.com";
+  const endpoint    = `${baseUrl.replace(/\/$/, "")}/api/send/template`;
+  const dial_code   = process.env.LEMIN_DIAL_CODE || leminCfg.extra?.dial_code || "+91";
+  const rcs_agent   = process.env.LEMIN_AGENT     || leminCfg.extra?.agent     || "jio";
+  const lemin_user_id = process.env.LEMIN_API_KEY || leminCfg.apiKey || leminCfg.extra?.user_id || "";
+  const lemin_template_id = leminCfg.extra?.template_id || "1473";
+
   if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Missing or invalid mobile number" };
   }
   if (leminCfg.enabled === false) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS disabled in API Settings" };
   }
-  // apiKey IS the Developer API Key (user_id); fall back to legacy extra.user_id
-  const lemin_user_id = leminCfg.apiKey || leminCfg.extra.user_id || process.env.LEMIN_USER_ID || "";
-  const lemin_template_id = leminCfg.extra.template_id || process.env.LEMIN_TEMPLATE_ID || "1473";
   if (!lemin_user_id) {
-    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Lemin Developer API Key (user_id) not configured" };
+    return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Lemin Developer API Key not configured" };
   }
   try {
     const clean = mobile.replace(/\D/g, "");
     const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean;
     const payload: Record<string, unknown> = {
-      type: "single", dial_code: "+91", template: lemin_template_id,
-      phone, user_id: lemin_user_id,
+      type: "single", dial_code, template: lemin_template_id,
+      phone,
+      user_id: lemin_user_id,   // sent to Lemin only — never returned to callers
       variables: { name: customerName || "Pilgrim", message: messageText },
     };
     if (richData?.active && richData?.url) {
-      payload.rich_data = { url: richData.url, agent: richData.agent || "jio", active: "true" };
+      payload.rich_data = { url: richData.url, agent: rcs_agent, active: "true" };
     }
     const response = await withRetry(() =>
-      axios.post(endpoint, payload, {
-        headers: { "Content-Type": "application/json" },
-        timeout: 10000,
-      })
+      axios.post(endpoint, payload, { headers: { "Content-Type": "application/json" }, timeout: 10000 })
     );
     const result = response.data;
     if (result?.status === false || result?.success === false) {
-      console.warn("[RCS] Send failed for", mobile, ":", result?.message || result?.error);
-      return { ok: false, provider: "Lemin AI", endpoint, httpStatus: response.status, requestPayload: payload, responsePayload: result, errorMessage: result?.message || result?.error || "RCS delivery failed" };
+      console.warn("[RCS] Send failed for", phone, "—", result?.message || result?.error);
+      // Return safe payload — never expose user_id
+      return { ok: false, provider: "Lemin AI", endpoint, httpStatus: response.status,
+        requestPayload: { type: "single", dial_code, template: lemin_template_id, phone },
+        responsePayload: result, errorMessage: result?.message || result?.error || "RCS delivery failed" };
     }
-    console.log("[RCS] Sent to", mobile, result);
-    return { ok: true, provider: "Lemin AI", endpoint, httpStatus: response.status, requestPayload: payload, responsePayload: result };
+    console.log("[RCS] Sent to", phone, "— status:", result?.status);
+    return { ok: true, provider: "Lemin AI", endpoint, httpStatus: response.status,
+      requestPayload: { type: "single", dial_code, template: lemin_template_id, phone },
+      responsePayload: result };
   } catch (err: any) {
     const resp = err?.response;
     const rcsErrMsg: string = resp?.data?.message || resp?.data?.error || err.message || "";
-    // "Invalid User ID" means Lemin credentials aren't configured correctly — treat as "not configured"
     if (rcsErrMsg.toLowerCase().includes("invalid user") || rcsErrMsg.toLowerCase().includes("invalid_user")) {
-      console.warn("[RCS] Lemin user_id is invalid — configure LEMIN_USER_ID in API Settings to enable RCS");
-      return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS not configured: invalid Lemin user_id. Set in Admin → API Settings." };
+      console.warn("[RCS] Lemin API key invalid — update LEMIN_API_KEY secret");
+      return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "RCS not configured: invalid Lemin API key." };
     }
-    console.error("[RCS] Error after retries for", mobile, ":", resp?.data || err.message);
+    console.error("[RCS] Error after retries —", resp?.data?.message || err.message);
     return {
       ok: false, provider: "Lemin AI", endpoint,
       httpStatus: resp?.status,
-      requestPayload: { phone: mobile, dial_code: "+91", template: lemin_template_id },
+      requestPayload: { type: "single", dial_code, template: lemin_template_id, phone: mobile },
       responsePayload: resp?.data,
       errorCode: String(resp?.data?.code || resp?.data?.error_code || ""),
       errorMessage: rcsErrMsg,

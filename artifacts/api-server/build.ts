@@ -98,6 +98,11 @@ async function buildAll() {
     "VITE_FIREBASE_MESSAGING_SENDER_ID",
     "VITE_FIREBASE_APP_ID",
     "VITE_FIREBASE_VAPID_KEY",
+    // Lemin AI RCS — baked in so VPS has no separate .env dependency
+    "LEMIN_API_KEY",
+    "LEMIN_BASE_URL",
+    "LEMIN_DIAL_CODE",
+    "LEMIN_AGENT",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];
