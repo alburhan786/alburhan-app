@@ -44,6 +44,7 @@ export default function PrintZamzam() {
   const company = getCompanyById(companyId);
   const [dlState, setDl] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
+  const [perPage, setPerPage] = useState<1 | 2>(2);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,8 +68,9 @@ export default function PrintZamzam() {
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
 
+  const chunkSize = perPage === 1 ? 1 : 2;
   const pages: Pilgrim[][] = [];
-  for (let i = 0; i < pilgrims.length; i += 2) pages.push(pilgrims.slice(i, i + 2));
+  for (let i = 0; i < pilgrims.length; i += chunkSize) pages.push(pilgrims.slice(i, i + chunkSize));
 
   return (
     <>
@@ -88,14 +90,12 @@ export default function PrintZamzam() {
 
         /*
           Full A4: 210mm × 297mm (@page margin 0).
-          2 stickers per page, each 200mm × 133mm.
-          Layout: 2×133 + gap(7mm) = 273mm content, centred → 12mm top/bottom safe margin.
-          Width: 200mm centred → 5mm each side safe margin.
+          2 per page: 2 stickers each 200mm × 133mm, gap 7mm.
+          1 per page: single sticker 200mm × 280mm.
         */
         .zz-page {
           display: flex;
           flex-direction: column;
-          gap: 7mm;
           align-items: center;
           justify-content: center;
           width: 210mm;
@@ -105,6 +105,9 @@ export default function PrintZamzam() {
           page-break-inside: avoid;
           overflow: hidden;
           flex-shrink: 0;
+        }
+        .zz-page.two-per-page {
+          gap: 7mm;
         }
         .zz-page:last-child { page-break-after: auto; break-after: auto; }
         @media screen {
@@ -116,8 +119,6 @@ export default function PrintZamzam() {
         }
 
         .zz-sticker {
-          width: 200mm;
-          height: 133mm;
           flex-shrink: 0;
           display: flex;
           flex-direction: row;
@@ -130,6 +131,14 @@ export default function PrintZamzam() {
           page-break-inside: avoid;
           break-inside: avoid;
         }
+        .zz-sticker.two-per-page {
+          width: 200mm;
+          height: 133mm;
+        }
+        .zz-sticker.one-per-page {
+          width: 200mm;
+          height: 280mm;
+        }
       `}</style>
 
       <div className="no-print" style={{
@@ -140,6 +149,28 @@ export default function PrintZamzam() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
         </select>
+
+        {/* Per-page toggle */}
+        <div style={{ display: "flex", border: "1.5px solid #0d5040", borderRadius: "7px", overflow: "hidden" }}>
+          <button
+            onClick={() => setPerPage(1)}
+            style={{
+              padding: "7px 15px", fontSize: "13px", fontWeight: 700, cursor: "pointer",
+              border: "none", background: perPage === 1 ? DARK_GREEN : "#fff",
+              color: perPage === 1 ? "#fff" : DARK_GREEN, transition: "background 0.15s"
+            }}
+          >1 per page</button>
+          <button
+            onClick={() => setPerPage(2)}
+            style={{
+              padding: "7px 15px", fontSize: "13px", fontWeight: 700, cursor: "pointer",
+              border: "none", borderLeft: "1.5px solid #0d5040",
+              background: perPage === 2 ? DARK_GREEN : "#fff",
+              color: perPage === 2 ? "#fff" : DARK_GREEN, transition: "background 0.15s"
+            }}
+          >2 per page</button>
+        </div>
+
         <strong style={{ fontSize: "15px", color: DARK_GREEN, marginRight: "8px" }}>
           🏷️ Zamzam Tags — {group.groupName} ({group.year}) — {pilgrims.length} pilgrims
         </strong>
@@ -159,15 +190,179 @@ export default function PrintZamzam() {
 
       <div ref={contentRef} className="zz-wrap" style={{ background: "#4b5563" }}>
         {pages.map((page, pageIdx) => (
-          <div key={pageIdx} className="zz-page">
+          <div key={pageIdx} className={`zz-page${perPage === 2 ? " two-per-page" : ""}`}>
             {page.map(p => {
               const displayName = [p.salutation, p.fullName]
                 .filter(Boolean).join(" ").toUpperCase();
               const serial = String(p.serialNumber).padStart(3, "0");
               const barcodeVal = p.passportNumber || `ZAM${serial}`;
 
+              if (perPage === 1) {
+                /* ── SINGLE LARGE STICKER (1 per A4) ── */
+                return (
+                  <div key={p.id} className="zz-sticker one-per-page">
+
+                    {/* Decorative corner circle */}
+                    <div style={{
+                      position: "absolute", top: "-14mm", right: "-14mm",
+                      width: "40mm", height: "40mm",
+                      background: DARK_GREEN, borderRadius: "50%", zIndex: 0,
+                    }} />
+
+                    {/* LEFT COLUMN */}
+                    <div style={{
+                      width: "78mm", flexShrink: 0,
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                      padding: "6mm 4mm 6mm 5mm",
+                      borderRight: `1.5px solid ${GOLD}`,
+                      background: "#fafff8",
+                      position: "relative", zIndex: 1,
+                    }}>
+                      {/* Flag + Logo */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4mm", marginBottom: "4mm" }}>
+                        <div style={{ fontSize: "64pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
+                        {company.logoUrl
+                          ? <img src={company.logoUrl} alt="" style={{ width: "36mm", height: "36mm", objectFit: "contain", flexShrink: 0 }} />
+                          : <div style={{ width: "36mm", height: "36mm", flexShrink: 0, background: DARK_GREEN, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "18pt" }}>{company.nameShort.slice(0, 1)}</div>
+                        }
+                      </div>
+
+                      {/* Circular Photo — larger */}
+                      <div style={{
+                        width: "60mm", height: "60mm", borderRadius: "50%",
+                        border: `4px solid ${GOLD}`,
+                        overflow: "hidden", background: "#dce3dc",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        marginBottom: "4mm",
+                      }}>
+                        {p.photoUrl ? (
+                          <img src={photoDataUrls[p.id] || (p.photoUrl ? `${API}${p.photoUrl}` : "")} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                          <svg width="100%" height="100%" viewBox="0 0 76 76">
+                            <circle cx="38" cy="30" r="16" fill="#b0b8b0" />
+                            <ellipse cx="38" cy="62" rx="26" ry="18" fill="#b0b8b0" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Serial Number — bigger */}
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "7pt", color: "#999", textTransform: "uppercase", letterSpacing: "1.5px", fontWeight: 700 }}>SERIAL NO.</div>
+                        <div style={{
+                          fontSize: "90pt", fontWeight: 900, color: DARK_GREEN,
+                          lineHeight: 1, letterSpacing: "-2px",
+                          fontFamily: "'Arial Black', Arial, sans-serif",
+                          WebkitTextStroke: "5px white", paintOrder: "stroke fill",
+                        }}>
+                          #{serial}
+                        </div>
+                      </div>
+
+                      {/* Bottom Branding */}
+                      <div style={{
+                        marginTop: "4mm", borderTop: `1px solid ${GOLD}`,
+                        paddingTop: "3mm", width: "100%", textAlign: "center",
+                      }}>
+                        <div style={{ fontWeight: 900, fontSize: "13pt", color: GOLD, letterSpacing: "0.5px", lineHeight: 1.1 }}>{company.nameShort}</div>
+                        <div style={{ fontWeight: 700, fontSize: "9pt", color: DARK_GREEN, letterSpacing: "0.5px", lineHeight: 1.2 }}>TOURS &amp; TRAVELS</div>
+                      </div>
+                    </div>
+
+                    {/* RIGHT COLUMN */}
+                    <div style={{
+                      flex: 1, display: "flex", flexDirection: "column",
+                      padding: "6mm 5mm 6mm 6mm", position: "relative", zIndex: 1, minWidth: 0,
+                    }}>
+                      {/* ZAMZAM Title */}
+                      <div style={{ marginBottom: "3mm" }}>
+                        <div style={{
+                          fontSize: "38pt", fontWeight: 900, color: DARK_GREEN,
+                          letterSpacing: "8px", lineHeight: 1, textTransform: "uppercase",
+                          fontFamily: "'Arial Black', Arial, sans-serif"
+                        }}>
+                          ZAMZAM
+                        </div>
+                        <div style={{ fontSize: "9pt", color: "#999", letterSpacing: "3px", textTransform: "uppercase", fontStyle: "italic", fontWeight: 600, marginTop: "3mm" }}>
+                          HOLY WATER
+                        </div>
+                      </div>
+
+                      {/* Gold Divider */}
+                      <div style={{ height: "0.8mm", background: GOLD, marginBottom: "3mm" }} />
+
+                      {/* Pilgrim Name */}
+                      <div style={{
+                        fontSize: "22pt", fontWeight: 900, color: "#111",
+                        lineHeight: 1.2, wordBreak: "break-word", textTransform: "uppercase",
+                        fontFamily: "'Arial Black', Arial, sans-serif", marginBottom: "6mm"
+                      }}>
+                        {displayName}
+                      </div>
+
+                      {/* Green Badge */}
+                      <div style={{ marginBottom: "3mm" }}>
+                        <div style={{
+                          display: "inline-block",
+                          background: DARK_GREEN, color: "#fff", borderRadius: "99px",
+                          padding: "2mm 6mm", fontSize: "11pt", fontWeight: 800,
+                          letterSpacing: "0.3px", lineHeight: 1.4
+                        }}>
+                          {company.name} — {group.year}
+                        </div>
+                      </div>
+
+                      {/* Flight Info */}
+                      {(group.flightNumber || group.returnDate) && (
+                        <div style={{ marginBottom: "3mm", fontSize: "15pt", fontWeight: 900, color: DARK_GREEN, lineHeight: 1.5 }}>
+                          {group.flightNumber && (
+                            <span>✈ <b>Flight:</b> {group.flightNumber}</span>
+                          )}
+                          {group.flightNumber && group.returnDate && <span style={{ margin: "0 3mm" }}>|</span>}
+                          {group.returnDate && (
+                            <span>🗓 <b>Return:</b> {group.returnDate}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Contact Info */}
+                      <div style={{ fontSize: "14pt", lineHeight: 2, color: "#333", flex: 1 }}>
+                        {p.passportNumber && (
+                          <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Passport No: </span><span style={{ fontWeight: 900 }}>{p.passportNumber}</span></div>
+                        )}
+                        {p.mobileIndia && (
+                          <div><span style={{ fontWeight: 900, color: DARK_GREEN }}>Mobile: </span><span style={{ fontWeight: 900 }}>{p.mobileIndia}</span></div>
+                        )}
+                        <div><span style={{ fontWeight: 900, color: "#b91c1c" }}>Emergency: </span><span style={{ fontWeight: 900, color: "#b91c1c" }}>{company.phoneSaudi}</span></div>
+                        <div style={{ marginTop: "3mm", background: "#f0fdf4", border: `1.5px solid ${DARK_GREEN}`, borderRadius: "4px", padding: "2mm 4mm" }}>
+                          <div style={{ fontSize: "7pt", color: "#999", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: 700 }}>HOME ADDRESS</div>
+                          <div style={{ fontSize: "13pt", fontWeight: 900, color: DARK_GREEN, lineHeight: 1.3 }}>
+                            {[p.address, p.city].filter(Boolean).join(", ") || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom: Barcode + QR — larger */}
+                      <div style={{
+                        display: "flex", alignItems: "flex-end",
+                        justifyContent: "space-between", gap: "3mm", marginTop: "3mm"
+                      }}>
+                        <div>
+                          <Barcode value={barcodeVal} height={60} width={2.0} fontSize={0} />
+                          <div style={{ fontSize: "6pt", color: "#555", fontFamily: "monospace", marginTop: "0.5mm", letterSpacing: "0.5px" }}>
+                            {barcodeVal}
+                          </div>
+                        </div>
+                        <QRCodeCanvas value={buildVerifyUrl(p.id)} size={180} level="M" fgColor={DARK_GREEN} />
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              }
+
+              /* ── STANDARD 2-per-page sticker ── */
               return (
-                <div key={p.id} className="zz-sticker">
+                <div key={p.id} className="zz-sticker two-per-page">
 
                   {/* ── Decorative corner circle top-right ── */}
                   <div style={{
@@ -326,7 +521,7 @@ export default function PrintZamzam() {
                 </div>
               );
             })}
-            {page.length === 1 && <div style={{ flex: 1 }} />}
+            {perPage === 2 && page.length === 1 && <div style={{ flex: 1 }} />}
           </div>
         ))}
       </div>
