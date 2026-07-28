@@ -11,7 +11,7 @@ interface Pilgrim {
   mobileIndia?: string; mobileSaudi?: string; address?: string; city?: string; state?: string;
   coverNumber?: string; medicalCondition?: string; relation?: string;
 }
-interface Group { id: string; groupName: string; year: number; startingSerialNumber?: number; }
+interface Group { id: string; groupName: string; year: number; startingSerialNumber?: number; hotels?: { groupLeader?: string }; }
 
 function calcAge(dob?: string): string {
   if (!dob) return "—";
@@ -46,7 +46,7 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
         <div><b>NAME:</b> {p.serialNumber} &nbsp; {p.fullName.toUpperCase()}</div>
         <div style={{ marginTop: "1.5mm" }}>
           <div><b>GUARDIAN / ACCOMPANYING</b></div>
-          <div><b>PERSON'S NAME:</b> {p.relation || "—"}</div>
+          <div><b>PERSON'S NAME:</b> {p.relation || group.hotels?.groupLeader || "—"}</div>
         </div>
         <div style={{ marginTop: "1.5mm" }}>
           <div><b>AGE:</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {calcAge(p.dateOfBirth)}</div>
