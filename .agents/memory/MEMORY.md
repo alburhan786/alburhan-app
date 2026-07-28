@@ -97,6 +97,8 @@
 - [marketing_campaigns pre-existing schema mismatch](marketing-campaigns-schema.md) — analytics module adds tenant_id/budget/spend/etc via ALTER TABLE; enterprise.ts migration must run these ALTERs for idempotency; analytics.ts ensureAnalyticsTables may fail silently if table exists
 - [feedback status enum](feedback-status-enum.md) — feedback.status enum is {open,in_review,resolved,closed} NOT in_progress; Drizzle schema must match exactly or insert/update fails
 - [Notification audit July 2026](notif-audit-jul28.md) — channel root causes, delivery rates, what needs admin config vs code fix
+- [WA OTP session message](wa-otp-session-message.md) — use sendText() NOT sendTemplate for OTP; AUTHENTICATION template + BotBee #!key!# wrapping = param-length error
+- [RCS notifications routing](rcs-notifications-routing.md) — notifications.ts helpers must use sendRCSForEvent() (event-specific Jio); sendRCS() is generic Lemin fallback, wrong for ERP events
 - [Notification Health Endpoints](notification-health-endpoints.md) — GET+2 POST health endpoints must live in app.ts (not admin.ts); E2E WA needs template ID 409950 + forceTemplateApi:true; SMS uses sendBookingConfirmed
 - [RCS Template Engine](rcs-template-engine.md) — sendRCSForEvent is the ERP entry point; rcs_template_mappings table (9 approved IDs seeded); 7 new notification_logs cols; user_id NEVER logged; template_not_found = failure not success
 - [Lemin RCS variable key formats](lemin-rcs-variable-keys.md) — 3 distinct formats per template family; message_id at body.data.id; status endpoint redirects (webhook-only delivery updates)
