@@ -191,6 +191,42 @@ router.get("/system-health", requireAdmin as any, async (_req, res) => {
     results.retry_queue = { status: "warn", message: "Could not read retry queue", detail: e.message };
   }
 
+  // 9b. Notification delivery rates (last 7 days per channel)
+  try {
+    const dr = await pool.query(`
+      SELECT
+        channel,
+        COUNT(*) FILTER (WHERE status IN ('sent','delivered'))::int AS sent,
+        COUNT(*) FILTER (WHERE status IN ('failed','permanently_failed'))::int AS failed,
+        COUNT(*) FILTER (WHERE status = 'skipped')::int AS skipped,
+        COUNT(*)::int AS total,
+        MAX(created_at) AS last_attempt
+      FROM notification_logs
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+        AND status NOT IN ('pending')
+      GROUP BY channel
+      ORDER BY channel
+    `);
+    const rates: Record<string, { sent: number; failed: number; skipped: number; total: number; rate: string; status: "ok"|"warn"|"error"; lastAttempt: string }> = {};
+    for (const row of dr.rows) {
+      const total = row.total || 1;
+      const pct   = Math.round((row.sent / total) * 100);
+      rates[row.channel] = {
+        sent: row.sent, failed: row.failed, skipped: row.skipped, total: row.total,
+        rate: `${pct}%`,
+        status: pct >= 80 ? "ok" : pct >= 50 ? "warn" : "error",
+        lastAttempt: row.last_attempt,
+      };
+    }
+    results.delivery_rates = {
+      status: Object.values(rates).some(r => r.status === "error") ? "warn" : "ok",
+      message: Object.entries(rates).map(([ch, r]) => `${ch}: ${r.rate} (${r.sent}/${r.total})`).join(" | ") || "No notifications in last 7 days",
+      detail: rates,
+    };
+  } catch (e: any) {
+    results.delivery_rates = { status: "warn", message: "Could not compute delivery rates", detail: e.message };
+  }
+
   // 10. Razorpay — live API ping
   {
     const keyId  = process.env.RAZORPAY_KEY_ID;

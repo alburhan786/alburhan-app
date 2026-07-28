@@ -2581,6 +2581,39 @@ async function start() {
     console.log("[Migration] feedback table ensured");
   } catch (err) { console.error("[Migration] feedback table failed:", err); }
 
+  // v30.0 — notification_templates: add custom/custom_sms/custom_admin SMS template entries
+  // These allow admin to configure DLT template IDs for custom admin notifications via
+  // Admin → DLT Template Manager. Inserted with enabled=false until DLT IDs are configured.
+  try {
+    const customEntries = [
+      { id: "tpl_seed_custom_sms",   name: "Custom SMS",         event_type: "custom_sms" },
+      { id: "tpl_seed_custom_admin", name: "Custom Admin SMS",   event_type: "custom_admin" },
+      { id: "tpl_seed_custom",       name: "Generic Custom SMS", event_type: "custom" },
+      { id: "tpl_seed_agr_ready",    name: "Agreement Ready",    event_type: "agreement_ready" },
+      { id: "tpl_seed_agr_signed",   name: "Agreement Signed",   event_type: "agreement_signed" },
+    ];
+    for (const e of customEntries) {
+      await pool.query(`
+        INSERT INTO notification_templates
+          (id, name, event_type, channel, body, is_default, enabled, provider, language, category, created_at, updated_at)
+        VALUES ($1,$2,$3,'sms',''::text,false,false,'fast2sms','en','UTILITY',NOW(),NOW())
+        ON CONFLICT (id) DO NOTHING
+      `, [e.id, e.name, e.event_type]);
+    }
+    console.log("[Migration] v30.0 custom SMS notification_templates seed ensured");
+  } catch (err: any) { console.warn("[Migration] v30.0 custom SMS templates:", err.message); }
+
+  // v30.0 — notification_templates: update sender_id from ABURHA → ALBURH on all SMS rows
+  // ALBURH is the registered transactional sender ID per DLT config (OTP DLT doc)
+  try {
+    await pool.query(`
+      UPDATE notification_templates
+      SET sender_id='ALBURH', updated_at=NOW()
+      WHERE channel='sms' AND (sender_id='ABURHA' OR sender_id IS NULL OR sender_id='')
+    `);
+    console.log("[Migration] v30.0 notification_templates sender_id ABURHA→ALBURH updated");
+  } catch (err: any) { console.warn("[Migration] v30.0 sender_id update:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

@@ -96,3 +96,4 @@
 - [bookings no agent_name — use agents join](bookings-no-agent-name.md) — bookings has no agent_name column; analytics agent-performance must JOIN agents ag ON ag.id=b.agent_id (both UUID); users.id is TEXT, not UUID
 - [marketing_campaigns pre-existing schema mismatch](marketing-campaigns-schema.md) — analytics module adds tenant_id/budget/spend/etc via ALTER TABLE; enterprise.ts migration must run these ALTERs for idempotency; analytics.ts ensureAnalyticsTables may fail silently if table exists
 - [feedback status enum](feedback-status-enum.md) — feedback.status enum is {open,in_review,resolved,closed} NOT in_progress; Drizzle schema must match exactly or insert/update fails
+- [Notification audit July 2026](notif-audit-jul28.md) — channel root causes, delivery rates, what needs admin config vs code fix

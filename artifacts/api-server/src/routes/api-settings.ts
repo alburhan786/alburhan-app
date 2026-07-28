@@ -566,8 +566,16 @@ router.post("/send-test-all", requireAdmin as any, requireSuperAdmin, async (req
     channels.map(async (ch) => {
       try {
         if (ch === "whatsapp") {
-          const { sendWhatsApp } = await import("../lib/notifications.js");
-          const r = await sendWhatsApp(phone, `Assalamu Alaikum Test User,\n\nAl Burhan Tours & Travels notification service is working correctly.\n\nTest Booking: #TEST-001\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`);
+          const { sendTemplate } = await import("../lib/botbee.js");
+          // Use booking_approved template (409950) — 5 vars: Name, BookingID, Package, Amount, InvoiceUrl
+          const r = await sendTemplate(
+            phone,
+            "409950",
+            {
+              eventType: "test_all",
+              variables: { Name: "Test User", BookingID: "TEST-001", Package: "Al Burhan Test Package", Amount: "1000", InvoiceUrl: "https://alburhantravels.online" },
+            }
+          );
           return { channel: ch, ok: r.ok, provider: "BotBee", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };
         }
         if (ch === "sms") {
@@ -582,6 +590,7 @@ router.post("/send-test-all", requireAdmin as any, requireSuperAdmin, async (req
         }
         if (ch === "email") {
           if (!email) return { channel: ch, ok: false, provider: "SMTP", errorMessage: "No email address provided" };
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { channel: ch, ok: false, provider: "SMTP", errorMessage: `Invalid email address: "${email}". Provide a valid email in the request body.` };
           const { sendEmail } = await import("../lib/notifications.js");
           const r = await sendEmail(email, "Test Notification – Al Burhan Tours & Travels", "<p>Assalamu Alaikum,</p><p>Al Burhan Tours & Travels <b>email notification</b> is working correctly.</p><p>Test Booking: <b>#TEST-001</b></p><p>Jazak Allah Khair!</p>");
           return { channel: ch, ok: r.ok, provider: "SMTP", httpStatus: r.httpStatus, responsePayload: r.responsePayload, errorMessage: r.ok ? undefined : r.errorMessage };

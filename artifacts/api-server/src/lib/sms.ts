@@ -152,6 +152,11 @@ async function resolveConfig() {
       visa_issued:        t("visa_approved",      "visa_issued"),
       hotel_voucher:      t("hotel_assigned",     "hotel_voucher"),
       arrival_reminder:   t("arrival_reminder",   "arrival_reminder"),
+      agreement_ready:    t("agreement_ready",   "agreement_ready"),
+      agreement_signed:   t("agreement_signed",  "agreement_signed"),
+      custom:             t("custom",             "custom"),
+      custom_sms:         t("custom_sms",         "custom"),
+      custom_admin:       t("custom_admin",        "custom"),
     },
     senders: {
       ...base.senders,
@@ -169,6 +174,11 @@ async function resolveConfig() {
       visa_issued:        s("visa_approved",      "visa_issued"),
       hotel_voucher:      s("hotel_assigned",     "hotel_voucher"),
       arrival_reminder:   s("arrival_reminder",   "arrival_reminder"),
+      agreement_ready:    s("agreement_ready",   "agreement_ready"),
+      agreement_signed:   s("agreement_signed",  "agreement_signed"),
+      custom:             s("custom",             "custom"),
+      custom_sms:         s("custom_sms",         "custom"),
+      custom_admin:       s("custom_admin",        "custom"),
     },
   };
 }

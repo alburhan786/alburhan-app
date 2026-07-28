@@ -405,7 +405,7 @@ export async function sendWhatsApp(mobile: string | null | undefined, message: s
       // 24-hour window: customer hasn't messaged the bot recently — template API not supported by BotBee
       if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
         console.log("[WhatsApp] 24h window for", mobile, "— cold contact, message skipped");
-        return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
+        return { ok: false, window24h: true, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
       }
       return { ok: false, provider: "BotBee", endpoint, httpStatus: response.status, requestPayload: safePayload, responsePayload: result, errorMessage: errMsg };
     }
@@ -418,7 +418,7 @@ export async function sendWhatsApp(mobile: string | null | undefined, message: s
     // 24-hour window error can also surface as an HTTP error
     if (errMsg.toLowerCase().includes("24 hour") || errMsg.toLowerCase().includes("outside")) {
       console.log("[WhatsApp] 24h window (catch) for", mobile, "— cold contact, message skipped");
-      return { ok: false, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: { phone_number: mobile, message: message.substring(0, 200) }, responsePayload: resp?.data, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
+      return { ok: false, window24h: true, provider: "BotBee", endpoint, httpStatus: resp?.status, requestPayload: { phone_number: mobile, message: message.substring(0, 200) }, responsePayload: resp?.data, errorMessage: "24h window: customer has not messaged in the last 24h. WhatsApp message not delivered." };
     }
     return {
       ok: false, provider: "BotBee", endpoint,
