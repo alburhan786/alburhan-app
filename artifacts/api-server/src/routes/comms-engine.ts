@@ -766,7 +766,7 @@ router.get("/production-report", async (_req, res) => {
         SELECT channel, COUNT(*)::int AS total,
                COUNT(*) FILTER (WHERE status IN ('sent','delivered'))::int AS sent,
                COUNT(*) FILTER (WHERE status='failed')::int AS failed
-        FROM notification_logs WHERE created_at >= NOW() - INTERVAL '7 days' AND channel != 'rcs'
+        FROM notification_logs WHERE created_at >= NOW() - INTERVAL '7 days'
         GROUP BY channel ORDER BY total DESC`),
       pool.query(`
         SELECT event_type, COUNT(*)::int AS total,
@@ -823,7 +823,7 @@ router.get("/production-report", async (_req, res) => {
     // Per-channel rates from post-July-13 data (excludes historical runaway cron July 9-12)
     const chMap: Record<string,{total:number;sent:number;failed:number}> = {};
     for (const r of channelBreakdown.rows) {
-      if (r.channel !== "rcs") chMap[r.channel] = { total: r.total, sent: r.sent, failed: r.failed };
+      chMap[r.channel] = { total: r.total, sent: r.sent, failed: r.failed };
     }
     // 7-day rates for scoring (most representative of current system health)
     const chMap7d: Record<string,{total:number;sent:number;failed:number}> = {};
@@ -923,7 +923,7 @@ router.get("/production-report", async (_req, res) => {
 
     res.json({
       generated_at: new Date().toISOString(),
-      version: "v27.8-meta-wapi-rcs-disabled",
+      version: "v28.0-rcs-enabled",
 
       // ── Main score ──────────────────────────────────────────────────────────
       readiness_score: score,
@@ -937,7 +937,7 @@ router.get("/production-report", async (_req, res) => {
         queue_health:           { score: queueScore,     max: 15, dlq: dlqPressure, pending: qm.pending || 0,  label: "Queue & Retry Health" },
         architecture:           { score: archScore,      max: 20, failover: failoverWorking, dedup: true, retry: retryWorking, monitoring: true, label: "Architecture Completeness" },
         enhanced_delivery:      { score: enhancedScore,  max: 10, whatsapp_rate: Math.round(waRate7d), dashboard_rate: Math.round(dashRate7d), label: "Enhanced Delivery (WhatsApp + Dashboard, 7-day)" },
-        note: "RCS excluded (disabled). Scores use 7-day window to exclude historical runaway cron (July 9-12). WhatsApp moves from Enhanced→Core when META_ACCESS_TOKEN is configured.",
+        note: "RCS re-enabled (Lemin AI). Scores use 7-day window to exclude historical runaway cron (July 9-12). WhatsApp moves from Enhanced→Core when META_ACCESS_TOKEN is configured.",
       },
 
       // ── Provider health ───────────────────────────────────────────────────
@@ -946,7 +946,7 @@ router.get("/production-report", async (_req, res) => {
         email:     { channel: "email",     rate_7d: Math.round(emailRate7d), rate_all: Math.round(emailRate), status: emailRate7d >= 80 ? "healthy" : "degraded", note: "SMTP — secondary channel; skipped when no email on file (not logged as failed)" },
         whatsapp:  { channel: "whatsapp",  rate_7d: Math.round(waRate7d),    rate_all: Math.round(waRate),    status: waRate7d >= 50 ? "degraded" : "limited",    note: "BotBee session-based (24h window). Meta Cloud API code deployed — add META_ACCESS_TOKEN to unlock 95%+ delivery." },
         dashboard: { channel: "dashboard", rate_7d: Math.round(dashRate7d),  rate_all: Math.round(dashRate),  status: "healthy",                                  note: "Admin notification dashboard — 100% delivery" },
-        rcs:       { channel: "rcs",       rate_7d: 0,                       rate_all: 0,                     status: "disabled",                                 note: "Disabled — Lemin AI provider non-functional. All 34 events set to enabled=false." },
+        rcs:       { channel: "rcs",       rate_7d: Math.round(rate7d("rcs") ?? 0), rate_all: Math.round((chMap["rcs"] && chMap["rcs"].total > 0 ? (chMap["rcs"].sent / chMap["rcs"].total) * 100 : 0)), status: (chMap["rcs"]?.total || 0) > 0 ? "active" : "standby", note: "Lemin AI RCS — enabled. Delivered to JIO RCS-capable subscribers." },
         meta_cloud_api: metaWapiStatus,
       },
 
@@ -966,7 +966,7 @@ router.get("/production-report", async (_req, res) => {
       queue:     { pending: qm.pending || 0, sent: qm.sent || 0, failed: qm.failed || 0, dlq: dlqPressure },
       workflows: { total: ws.total || 0, completed: ws.completed || 0, failed: ws.failed || 0, success_rate: Math.round(wfSuccessRate) },
 
-      channel_breakdown: channelBreakdown.rows.filter((r: any) => r.channel !== "rcs"),
+      channel_breakdown: channelBreakdown.rows,
       event_breakdown:   eventBreakdown.rows,
       top_workflows:     topEvents.rows,
       error_analysis:    errorBreakdown.rows,
@@ -1022,7 +1022,7 @@ router.get("/monitoring", async (_req, res) => {
           COUNT(*) FILTER (WHERE status='failed')::int           AS failed,
           ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('sent','delivered')) / NULLIF(COUNT(*),0), 1) AS rate
         FROM notification_logs
-        WHERE created_at >= NOW() - INTERVAL '24 hours' AND channel != 'rcs'
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
         GROUP BY channel ORDER BY total DESC`),
       pool.query(`
         SELECT
@@ -1040,7 +1040,7 @@ router.get("/monitoring", async (_req, res) => {
       pool.query(`
         SELECT channel, status, COUNT(*)::int AS cnt
         FROM notification_logs
-        WHERE created_at >= NOW() - INTERVAL '24 hours' AND channel != 'rcs'
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
         GROUP BY channel, status ORDER BY channel, cnt DESC`),
       pool.query(`
         SELECT

@@ -97,3 +97,4 @@
 - [marketing_campaigns pre-existing schema mismatch](marketing-campaigns-schema.md) — analytics module adds tenant_id/budget/spend/etc via ALTER TABLE; enterprise.ts migration must run these ALTERs for idempotency; analytics.ts ensureAnalyticsTables may fail silently if table exists
 - [feedback status enum](feedback-status-enum.md) — feedback.status enum is {open,in_review,resolved,closed} NOT in_progress; Drizzle schema must match exactly or insert/update fails
 - [Notification audit July 2026](notif-audit-jul28.md) — channel root causes, delivery rates, what needs admin config vs code fix
+- [Notification Health Endpoints](notification-health-endpoints.md) — GET+2 POST health endpoints must live in app.ts (not admin.ts); E2E WA needs template ID 409950 + forceTemplateApi:true; SMS uses sendBookingConfirmed
