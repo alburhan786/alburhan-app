@@ -1,0 +1,104 @@
+ADD LEMIN AI RCS OTP TEMPLATE
+
+The approved Lemin AI RCS OTP template is:
+
+Template name: alburhan_login_otp
+Template ID: 3663
+Carrier: Jio
+Type: Text
+Status: Approved
+
+Add a new RCS event mapping:
+
+login_otp → 3663
+
+Also support these aliases if they already exist in the ERP:
+
+otp_login
+customer_login_otp
+admin_login_otp
+agent_login_otp
+branch_login_otp
+staff_login_otp
+password_reset_otp
+mobile_verification_otp
+
+Use one central OTP template mapping and do not duplicate hardcoded template IDs.
+
+Required variables:
+
+- customer_name or user_name
+- otp
+- expiry_minutes
+- purpose
+- support_phone
+
+Before sending:
+
+1. Generate a secure random OTP.
+2. Store only a hashed OTP in the database.
+3. Set an expiry time, preferably 5 minutes.
+4. Limit verification attempts.
+5. Add resend cooldown and rate limiting.
+6. Never log the OTP, API key or full provider request.
+7. Never send an empty or unreplaced variable.
+8. Use template ID 3663 only for OTP/login verification events.
+
+Send through Lemin AI using:
+
+POST /api/send/template
+
+Payload requirements:
+
+- type: single
+- dial_code: process.env.LEMIN_DIAL_CODE
+- template: 3663
+- phone: recipient mobile number without country code, spaces or symbols
+- user_id: process.env.LEMIN_API_KEY
+- variables: use the exact variable names required by approved template 3663
+
+Add the OTP template to:
+
+Communication Center → RCS Template Mapping
+
+Display:
+
+- Event: login_otp
+- Template: alburhan_login_otp
+- Template ID: 3663
+- Carrier: Jio
+- Status: Enabled
+- Test Send button
+- Last successful send
+- Last failure
+
+OTP delivery fallback order:
+
+1. RCS
+2. WhatsApp approved OTP template
+3. SMS approved DLT OTP template
+4. Email OTP
+
+Do not send the same OTP repeatedly across all channels at once. Use fallback only when the previous enabled channel fails or times out.
+
+After sending:
+
+- Save provider message_id
+- Save delivery status
+- Call Lemin message-status API
+- Record sent, delivered, read or failed
+- Do not expose OTP or LEMIN_API_KEY in Notification Logs
+
+Run a live production OTP test using one authorised mobile number.
+
+Final report must confirm:
+
+- Template 3663 mapped
+- Variables correctly populated
+- Real message_id returned
+- OTP received
+- OTP verification succeeds
+- Expired OTP is rejected
+- Incorrect OTP is rejected
+- Resend rate limit works
+- Secrets and OTP are not exposed

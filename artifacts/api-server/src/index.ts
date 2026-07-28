@@ -621,9 +621,10 @@ async function runMigrations() {
   }
   try {
     await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
-    console.log("[Migration] otps.attempts column ensured");
+    await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS otp_hash TEXT`);
+    console.log("[Migration] otps.attempts + otps.otp_hash columns ensured");
   } catch (err) {
-    console.error("[Migration] otps.attempts failed:", err);
+    console.error("[Migration] otps columns failed:", err);
   }
   try {
     await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'approved'`);
@@ -2647,7 +2648,17 @@ async function start() {
         ('visa_ready',               'Visa_Issued',                '3660', ARRAY['customer_name','booking_id'],                                    NULL),
         ('agreement_ready',          'Agreement_Ready',            '3661', ARRAY['customer_name','booking_id','agreement_number','document_url'],  NULL),
         ('hotel_voucher',            'Hotel_Voucher',              NULL,   ARRAY['customer_name','booking_id','hotel_name'],                       'Template not mapped — add approved Lemin template ID'),
-        ('departure_reminder',       'Departure_Reminder',         NULL,   ARRAY['customer_name','booking_id','departure_date'],                   'Template not mapped — add approved Lemin template ID')
+        ('departure_reminder',       'Departure_Reminder',         NULL,   ARRAY['customer_name','booking_id','departure_date'],                   'Template not mapped — add approved Lemin template ID'),
+        -- OTP template 3663 (alburhan_login_otp) — all aliases share the same template
+        ('login_otp',              'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('otp_login',              'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('customer_login_otp',     'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('admin_login_otp',        'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('agent_login_otp',        'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('branch_login_otp',       'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('staff_login_otp',        'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('password_reset_otp',     'alburhan_login_otp', '3663', ARRAY['otp'], NULL),
+        ('mobile_verification_otp','alburhan_login_otp', '3663', ARRAY['otp'], NULL)
       ON CONFLICT (erp_event) DO NOTHING
     `);
     console.log("[Migration] v31.0 rcs_template_mappings seeded");

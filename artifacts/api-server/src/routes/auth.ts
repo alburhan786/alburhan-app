@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { createHash, randomBytes } from "node:crypto";
 import { db, usersTable, otpsTable } from "@workspace/db";
 import { pool } from "@workspace/db";
 import { eq, and, gt } from "drizzle-orm";
@@ -10,6 +11,11 @@ import {
 import { generateOtp, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 import { sendOTPEmail, sendGenericEmail } from "../services/emailService.js";
+
+/** SHA-256 hash of otp:mobile — used to store OTPs without plaintext in DB */
+function hashOtp(otp: string, mobile: string): string {
+  return createHash("sha256").update(`${otp}:${mobile}`).digest("hex");
+}
 
 export const ADMIN_MOBILES = ["9893989786", "9893225590", "8989701701"];
 
@@ -105,108 +111,101 @@ router.post("/send-otp", async (req, res) => {
   const otp = generateOtp();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  await db.insert(otpsTable).values({ mobile: cleanMobile, otp, expiresAt });
-
-  // ── PRIMARY channel: Fast2SMS (DLT → Quick fallback) ───────────────────────
-  // WhatsApp is a best-effort secondary notification only — it must NEVER
-  // block or fail the OTP request. The 24h-window / template-only restriction
-  // on WhatsApp Business API means it will legitimately fail for many users;
-  // that is expected and must not be treated as a delivery failure.
-  console.log(`[OTP-SEND][SMS] Calling sendOtpSMS with cleanMobile="${cleanMobile}", otp="${otp}"`);
-  const smsResult = await sendOtpSMS(cleanMobile, otp);
-  console.log(`[OTP-SEND][SMS] Result: sent=${smsResult.sent} route=${smsResult.route || "n/a"} error=${smsResult.error || "none"}`);
+  // ── Store hashed OTP — never persist plaintext OTP in the database ───────────
+  const otpHash = hashOtp(otp, cleanMobile);
+  const otpId   = randomBytes(8).toString("hex");
+  await pool.query(
+    `INSERT INTO otps (id, mobile, otp, otp_hash, expires_at) VALUES ($1,$2,$3,$4,$5)`,
+    [otpId, cleanMobile, "[hashed]", otpHash, expiresAt]
+  );
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  // Sanitize SMS error before sending to client — strip any API keys
-  const sanitizedError = smsResult.error
-    ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
-    : undefined;
+  // ── Fallback chain: RCS → WhatsApp → SMS → Email ─────────────────────────
+  // Try each channel in order. Respond after first success. Never send on multiple
+  // channels simultaneously — OTP must not be delivered more than once per request.
 
-  console.log(
-    `[OTP-SEND] Summary: mobile=${cleanMobile} e164=+91${cleanMobile} newUser=${isNewUser} ` +
-    `smsSent=${smsResult.sent} route=${smsResult.route || "n/a"} isAdmin=${isAdmin}` +
-    (smsResult.error ? ` smsError=${smsResult.error}` : "")
-  );
+  // 1. RCS (Lemin AI — Jio template 3663)
+  try {
+    const { sendRCSForOTP } = await import("../lib/rcs.js");
+    const rcsResult = await sendRCSForOTP(cleanMobile, otp);
+    if (rcsResult.ok) {
+      console.log(`[OTP-SEND] ✓ RCS delivered msg_id=${rcsResult.messageId || "?"}`);
+      res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "rcs" });
+      return;
+    }
+    console.log(`[OTP-SEND] RCS failed: ${rcsResult.errorMessage} → trying WhatsApp`);
+  } catch (rcsErr: any) {
+    console.log(`[OTP-SEND] RCS error: ${rcsErr?.message} → trying WhatsApp`);
+  }
 
-  // ── Respond immediately based on SMS result only — do not wait on WhatsApp ─
-  res.json({
-    success: smsResult.sent,
-    message: smsResult.sent
-      ? "OTP sent successfully"
-      : "OTP delivery failed — please contact support at +91 8989701701",
-    requestId: `otp_${Date.now()}`,
-    isNewUser,
-    smsSent: smsResult.sent,
-    smsRoute: smsResult.route,
-    smsFailReason: !smsResult.sent ? sanitizedError : undefined,
-    // Admin phones: full debug including OTP and raw provider response (all envs)
-    ...(isAdmin ? {
-      debugOtp: otp,
-      smsStatus: smsResult.sent ? "delivered" : "failed",
-      smsError: smsResult.error,
-      smsProviderResponse: smsResult.providerResponse,
-      smsUrlUsed: smsResult.urlUsed,
-      smsLogId: smsResult.logId,
-    } : {}),
-  });
+  // 2. WhatsApp (BotBee template — works outside 24h window)
+  try {
+    const { sendTemplate, sendText } = await import("../lib/botbee.js");
+    const tplRow = await pool.query(
+      `SELECT template_id FROM wa_templates WHERE event_type='mobile_otp' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+    );
+    const otpTemplateId = tplRow.rows[0]?.template_id as string | undefined;
+    const waTemplateResult = otpTemplateId
+      ? await sendTemplate(cleanMobile, otpTemplateId, {
+          eventType: "mobile_otp",
+          variables: { OTP: otp, Code: otp, Otp: otp },
+          forceTemplateApi: true,
+        })
+      : { ok: false as const, errorMessage: "No WA OTP template configured" };
+    if (waTemplateResult.ok) {
+      console.log(`[OTP-SEND] ✓ WhatsApp template delivered`);
+      res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "whatsapp" });
+      return;
+    }
+    console.log(`[OTP-SEND] WhatsApp template failed: ${waTemplateResult.errorMessage} → trying SMS`);
+  } catch (waErr: any) {
+    console.log(`[OTP-SEND] WhatsApp error: ${waErr?.message} → trying SMS`);
+  }
 
-  // ── SECONDARY channel: WhatsApp — fire-and-forget, template-first ───────────
-  // Template messages work even outside the 24h session window.
-  // sendText() is only tried as a last resort for users who have an open session.
-  // Any failure here is logged but never surfaces to the client.
-  (async () => {
+  // 3. SMS (Fast2SMS DLT)
+  const smsResult = await sendOtpSMS(cleanMobile, otp);
+  if (smsResult.sent) {
+    console.log(`[OTP-SEND] ✓ SMS delivered route=${smsResult.route || "?"}`);
+    res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "sms", smsRoute: smsResult.route });
+    return;
+  }
+  console.log(`[OTP-SEND] SMS failed → trying Email`);
+
+  // 4. Email (last resort — only if customer has an email on file)
+  const userEmail = existing[0]?.email;
+  if (userEmail) {
     try {
-      const { sendTemplate, sendText } = await import("../lib/botbee.js");
-      // Look up OTP template_id from DB (template_id-based, works outside 24h window)
-      const tplRow = await pool.query(
-        `SELECT template_id FROM wa_templates WHERE event_type='mobile_otp' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
-      );
-      const otpTemplateId = tplRow.rows[0]?.template_id as string | undefined;
-      // Pass the OTP code as a named variable so BotBee substitutes it in the template.
-      // forceTemplateApi:true bypasses 24h session window — required for login OTP delivery.
-      const templateResult = otpTemplateId
-        ? await sendTemplate(cleanMobile, otpTemplateId, {
-            eventType: "mobile_otp",
-            variables: { OTP: otp, Code: otp, Otp: otp },
-            forceTemplateApi: true,
-          })
-        : { ok: false as const, errorMessage: "No OTP template_id configured in DB" };
-      if (templateResult.ok) {
-        console.log(`[OTP-SEND][WhatsApp] Template sent ✓ (outside-window safe)`);
+      const userName = existing[0]?.name || "Pilgrim";
+      const emailResult = await sendOTPEmail(userEmail, userName, otp);
+      if (emailResult.ok) {
+        console.log(`[OTP-SEND] ✓ Email OTP delivered to ${userEmail}`);
+        res.json({ success: true, message: "OTP sent to your registered email", requestId: `otp_${Date.now()}`, isNewUser, channel: "email" });
         return;
       }
-      // If template fails (e.g. not approved yet), fall back to session text
-      const waResult = await sendText(
-        cleanMobile,
-        `Your Al Burhan Tours & Travels OTP is: *${otp}*\n\nValid for 5 minutes. Do not share with anyone.\n\nAl Burhan Tours & Travels\n+91 8989701701`,
-        { eventType: "mobile_otp" }
-      );
-      console.log(`[OTP-SEND][WhatsApp] Fallback text: ok=${waResult?.ok} err=${waResult?.errorMessage || "none"}`);
-    } catch (err: any) {
-      console.log(`[OTP-SEND][WhatsApp] Failed (secondary channel, ignored): ${err?.message || err}`);
+    } catch (emailErr: any) {
+      console.log(`[OTP-SEND] Email failed: ${emailErr?.message}`);
     }
-  })();
+  }
 
-  // ── TERTIARY channel: Email OTP — fire-and-forget ─────────────────────────
-  // Only fires if the customer already has an email address on their profile.
-  // Never blocks the response or affects success/failure status.
-  (async () => {
-    try {
-      const userEmail = existing[0]?.email;
-      if (!userEmail) return;
-      const userName = existing[0]?.name || "Pilgrim";
-      const result = await sendOTPEmail(userEmail, userName, otp);
-      console.log(`[OTP-SEND][Email] Sent to ${userEmail}: ok=${result.ok}${result.error ? ` err=${result.error}` : ""}`);
-    } catch (err: any) {
-      console.log(`[OTP-SEND][Email] Failed (tertiary channel, ignored): ${err?.message || err}`);
-    }
-  })();
+  // All channels failed
+  const sanitizedSmsError = smsResult.error
+    ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
+    : undefined;
+  res.json({
+    success: false,
+    message: "OTP delivery failed — please contact support at +91 8989701701",
+    requestId: `otp_${Date.now()}`,
+    isNewUser,
+    ...(isAdmin ? { smsFailReason: sanitizedSmsError } : {}),
+  });
 });
 
 router.post("/verify-otp", async (req, res) => {
   const rawBody = req.body;
-  console.log(`[OTP-VERIFY] Raw request body: mobile="${rawBody?.mobile}" otp="${rawBody?.otp}"`);
+  // Never log the OTP value — only log mobile (masked)
+  const maskedMobile = String(rawBody?.mobile || "").slice(-4).padStart(10, "*");
+  console.log(`[OTP-VERIFY] Request for mobile=****${maskedMobile}`);
 
   const parsed = VerifyOtpBody.safeParse(rawBody);
   if (!parsed.success) {
@@ -220,16 +219,17 @@ router.post("/verify-otp", async (req, res) => {
   const rawMobile: string = parsed.data.mobile ?? "";
   const cleanMobile = normaliseIndianMobile(rawMobile);
 
-  console.log(`[OTP-VERIFY] Received: "${rawMobile}" → normalised: "${cleanMobile}"`);
-
   const rejection = rejectMobile(cleanMobile);
   if (rejection) {
-    console.warn(`[OTP-VERIFY] Rejected "${rawMobile}": ${rejection}`);
     res.status(400).json({ message: `Invalid mobile number: ${rejection}` });
     return;
   }
 
-  const now = new Date();
+  const now     = new Date();
+  const otpHash = hashOtp(otp, cleanMobile);
+
+  // All OTP lookups match either hashed (new rows) OR plaintext (legacy rows).
+  // Parameter order: $1=mobile, $2=otpHash, $3=otp, $4=timestamp_where_needed.
 
   // Check for too many recent failed attempts
   const recentAttempts = await pool.query(
@@ -244,8 +244,11 @@ router.post("/verify-otp", async (req, res) => {
 
   // Check if OTP is expired
   const expiredCheck = await pool.query(
-    `SELECT id FROM otps WHERE mobile=$1 AND otp=$2 AND used=false AND expires_at <= $3 ORDER BY created_at DESC LIMIT 1`,
-    [cleanMobile, otp, now]
+    `SELECT id FROM otps
+     WHERE mobile=$1 AND (otp_hash=$2 OR (otp_hash IS NULL AND otp=$3))
+       AND used=false AND expires_at <= $4
+     ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, otpHash, otp, now]
   );
   if (expiredCheck.rows[0]) {
     res.status(401).json({ message: "OTP has expired. Please request a new OTP." });
@@ -254,39 +257,37 @@ router.post("/verify-otp", async (req, res) => {
 
   // Check if OTP was already used
   const usedCheck = await pool.query(
-    `SELECT id FROM otps WHERE mobile=$1 AND otp=$2 AND used=true ORDER BY created_at DESC LIMIT 1`,
-    [cleanMobile, otp]
+    `SELECT id FROM otps
+     WHERE mobile=$1 AND (otp_hash=$2 OR (otp_hash IS NULL AND otp=$3))
+       AND used=true
+     ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, otpHash, otp]
   );
   if (usedCheck.rows[0]) {
     res.status(401).json({ message: "This OTP has already been used. Please request a new OTP." });
     return;
   }
 
-  // Find valid OTP
-  const otpRecords = await db
-    .select()
-    .from(otpsTable)
-    .where(
-      and(
-        eq(otpsTable.mobile, cleanMobile),
-        eq(otpsTable.otp, otp),
-        eq(otpsTable.used, false),
-        gt(otpsTable.expiresAt, now)
-      )
-    )
-    .limit(1);
+  // Find valid OTP (hash-first, plaintext fallback for legacy rows)
+  const otpRecord = await pool.query(
+    `SELECT id FROM otps
+     WHERE mobile=$1 AND (otp_hash=$2 OR (otp_hash IS NULL AND otp=$3))
+       AND used=false AND expires_at > $4
+     ORDER BY created_at DESC LIMIT 1`,
+    [cleanMobile, otpHash, otp, now]
+  );
 
-  if (!otpRecords[0]) {
+  if (!otpRecord.rows[0]) {
     await pool.query(
       `UPDATE otps SET attempts = COALESCE(attempts, 0) + 1 WHERE mobile=$1 AND used=false AND expires_at > $2`,
       [cleanMobile, now]
     );
-    console.warn(`[OTP-VERIFY] Invalid OTP for mobile=${cleanMobile}`);
+    console.warn(`[OTP-VERIFY] Invalid OTP attempt for mobile=${cleanMobile}`);
     res.status(401).json({ message: "Invalid OTP. Please check and try again." });
     return;
   }
 
-  await db.update(otpsTable).set({ used: true }).where(eq(otpsTable.id, otpRecords[0].id));
+  await pool.query(`UPDATE otps SET used=true WHERE id=$1`, [otpRecord.rows[0].id]);
 
   const users = await db.select().from(usersTable).where(eq(usersTable.mobile, cleanMobile)).limit(1);
   const user = users[0];

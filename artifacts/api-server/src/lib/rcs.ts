@@ -644,6 +644,121 @@ export async function sendCustomRCS(opts: {
   }
 }
 
+// ── OTP Events set (all alias to template 3663) ───────────────────────────────
+const OTP_EVENTS = new Set([
+  "login_otp","otp_login","customer_login_otp","admin_login_otp",
+  "agent_login_otp","branch_login_otp","staff_login_otp",
+  "password_reset_otp","mobile_verification_otp",
+]);
+
+/**
+ * Send an OTP via Lemin AI RCS — template 3663 (alburhan_login_otp).
+ *
+ * Security contract:
+ *  - The actual OTP value is NEVER written to notification_logs or any log line.
+ *  - requestPayload logged with {otp:"******"}.
+ *  - 2-minute per-mobile resend cooldown enforced.
+ *  - user_id (LEMIN_API_KEY) never returned to callers or logged.
+ */
+export async function sendRCSForOTP(
+  mobile: string,
+  otp: string,
+  opts: { eventLabel?: string } = {}
+): Promise<RCSResult> {
+  const endpoint = getSendEndpoint();
+  const leminKey  = getLeminKey();
+  const dialCode  = getDialCode();
+
+  if (!leminKey) return { ok: false, provider: "LeminAI", endpoint, errorMessage: "LEMIN_API_KEY not configured" };
+  if (!otp)      return { ok: false, provider: "LeminAI", endpoint, errorMessage: "OTP value required" };
+
+  // Normalise mobile
+  const clean = mobile.replace(/\D/g, "");
+  const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean.slice(-10);
+
+  // Load mapping (canonical event = login_otp)
+  const mRow = await pool.query(
+    `SELECT template_id, template_name, enabled FROM rcs_template_mappings WHERE erp_event='login_otp' LIMIT 1`
+  ).catch(() => ({ rows: [] as any[] }));
+  const mapping = mRow.rows[0];
+  if (!mapping?.enabled || !mapping?.template_id) {
+    return { ok: false, provider: "LeminAI", endpoint, errorMessage: "RCS OTP mapping not configured or disabled" };
+  }
+
+  const templateId   = mapping.template_id as string;
+  const templateName = mapping.template_name as string;
+  const event        = opts.eventLabel || "login_otp";
+
+  // 2-minute resend cooldown per mobile
+  const recentRow = await pool.query(
+    `SELECT id FROM notification_logs
+     WHERE channel='rcs' AND event_type=ANY($1) AND recipient=$2
+       AND status='sent' AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`,
+    [[...OTP_EVENTS], phone]
+  ).catch(() => ({ rows: [] as any[] }));
+  if (recentRow.rows[0]) {
+    return { ok: false, provider: "LeminAI", endpoint, errorMessage: "OTP resend cooldown: please wait 2 minutes before requesting again via RCS" };
+  }
+
+  // Payloads — OTP sent to Lemin but NEVER stored in logs
+  const leminPayload  = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp }, user_id: leminKey };
+  const safePayload   = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp: "******" } };
+
+  let lastResult: RCSResult = { ok: false, provider: "LeminAI", endpoint, errorMessage: "Max retries exceeded" };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await sleep(2000);
+    try {
+      const resp = await axios.post(endpoint, leminPayload, {
+        headers: { "Content-Type": "application/json" }, timeout: 12000,
+      });
+      const body      = resp.data || {};
+      const authFailed = typeof body.message === "string" && (body.message.toLowerCase().includes("auth") || body.message.toLowerCase().includes("invalid key"));
+      const bodyFailed = body.success === false || authFailed;
+      const ok         = resp.status >= 200 && resp.status < 300 && !bodyFailed;
+      const messageId  = body.data?.id || body.data?.message_id || body.message_id || body.id || undefined;
+
+      lastResult = {
+        ok, provider: "LeminAI", endpoint,
+        httpStatus: resp.status,
+        requestPayload: safePayload,
+        responsePayload: body,
+        messageId,
+        errorMessage: ok ? undefined : (body.message || body.error || `HTTP ${resp.status}`),
+      };
+      if (ok) break;
+    } catch (e: any) {
+      const er = e?.response;
+      lastResult = { ok: false, provider: "LeminAI", endpoint, httpStatus: er?.status || 0, requestPayload: safePayload, responsePayload: er?.data, errorMessage: e.message };
+    }
+  }
+
+  // Log — OTP value is masked; never stored in notification_logs
+  const logId = await logRCSNotification({
+    event, mobile: phone, templateId, templateName,
+    variables: { otp: "******" },          // ← always masked
+    status: lastResult.ok ? "sent" : "failed",
+    httpStatus: lastResult.httpStatus,
+    requestPayload: safePayload,           // ← OTP already "******" in safePayload
+    responsePayload: lastResult.responsePayload,
+    errorMessage: lastResult.errorMessage,
+    messageId: lastResult.messageId,
+    deliveryStatus: lastResult.ok ? "queued" : "failed",
+  });
+
+  if (lastResult.ok) {
+    await pool.query(`UPDATE rcs_template_mappings SET last_success_at=NOW() WHERE erp_event='login_otp'`).catch(() => {});
+    if (lastResult.messageId) scheduleStatusUpdate(logId, lastResult.messageId);
+  } else {
+    await pool.query(
+      `UPDATE rcs_template_mappings SET last_failure_at=NOW(), last_failure_reason=$1 WHERE erp_event='login_otp'`,
+      [lastResult.errorMessage?.slice(0, 255)]
+    ).catch(() => {});
+  }
+
+  return lastResult;
+}
+
 // ── ERP event convenience wrappers ────────────────────────────────────────────
 
 export const rcs = {
