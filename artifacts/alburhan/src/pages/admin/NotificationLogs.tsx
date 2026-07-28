@@ -61,6 +61,11 @@ interface LogRow {
   wamid?: string | null;
   sender_id?: string | null;
   template?: string | null;
+  message_id?: string | null;
+  delivery_status?: string | null;
+  idempotency_key?: string | null;
+  template_id?: string | null;
+  template_name?: string | null;
 }
 
 interface Stats {
@@ -527,6 +532,23 @@ export default function NotificationLogs() {
                                   WAMID: <code className="select-all font-mono">{log.wamid}</code>
                                 </div>
                               )}
+                              {/* RCS / Provider message_id */}
+                              {log.message_id && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-50 border border-purple-200 text-purple-700">
+                                  Msg ID: <code className="select-all font-mono text-[10px]">{log.message_id}</code>
+                                </div>
+                              )}
+                              {/* Delivery status (RCS polling) */}
+                              {log.delivery_status && log.delivery_status !== "unknown" && (
+                                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                                  log.delivery_status === "delivered" ? "bg-green-50 border-green-200 text-green-700"
+                                  : log.delivery_status === "read"    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                  : log.delivery_status === "failed"  ? "bg-red-50 border-red-200 text-red-700"
+                                  : "bg-slate-100 border-slate-200 text-slate-600"
+                                }`}>
+                                  Delivery: {log.delivery_status}
+                                </div>
+                              )}
                               {/* SMS: Sender ID + Fast2SMS Request ID */}
                               {log.channel === "sms" && log.sender_id && (
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 border border-blue-200 text-blue-700">
@@ -536,6 +558,19 @@ export default function NotificationLogs() {
                               {log.channel === "sms" && log.wamid && (
                                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 border border-blue-200 text-blue-700">
                                   Fast2SMS ID: <code className="select-all font-mono">{log.wamid}</code>
+                                </div>
+                              )}
+                              {/* Template name & ID */}
+                              {(log.template_name || log.template_id) && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 border border-indigo-200 text-indigo-700">
+                                  Tpl: <code className="select-all font-mono">{log.template_name || log.template_id}</code>
+                                  {log.template_name && log.template_id && <span className="font-normal opacity-60">#{log.template_id}</span>}
+                                </div>
+                              )}
+                              {/* Idempotency key (dedup) */}
+                              {log.idempotency_key && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-200 text-amber-700" title={`Idempotency key: ${log.idempotency_key}`}>
+                                  Dedup: <code className="select-all font-mono text-[10px]">{log.idempotency_key.slice(-16)}</code>
                                 </div>
                               )}
                               {log.error_code && (

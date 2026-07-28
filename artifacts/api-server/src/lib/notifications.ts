@@ -666,7 +666,16 @@ export async function sendBookingSubmissionNotification(opts: {
       .then((r): SendResult => ({ ok: r.ok, provider: r.provider, endpoint: "sms-dlt", responsePayload: r.responsePayload, errorMessage: r.errorMessage }))
       .catch((e: any): SendResult => ({ ok: false, provider: "Fast2SMS", endpoint: "sms-dlt", errorMessage: e?.message || "SMS error" })),
     opts.email ? sendEmail(opts.email, "Booking Submitted – Al Burhan Tours & Travels", customerMsg) : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email" } as SendResult),
-    sendRCS(opts.mobile, opts.customerName, customerMsg),
+    // Use event-specific RCS template (booking_submitted → Jio template 3651)
+    import("./rcs.js").then(({ sendRCSForEvent }) =>
+      sendRCSForEvent("booking_submitted", opts.mobile, {
+        customerName: opts.customerName,
+        bookingId: opts.bookingId || undefined,
+        bookingNumber: opts.bookingNumber,
+        packageName: opts.packageName,
+      })
+    ).then((r): SendResult => ({ ok: r.ok, provider: "Lemin AI", endpoint: "rcs", errorMessage: r.errorMessage }))
+     .catch((e: any): SendResult => ({ ok: false, provider: "Lemin AI", endpoint: "rcs", errorMessage: e?.message || "RCS error" })),
   ]);
 
   // Fire admin WhatsApp alerts (fire-and-forget)
@@ -935,7 +944,15 @@ export async function sendAdminDocumentReadyNotification(opts: {
     smsKey ? docSmsMap[smsKey]() : smsSendInvoiceCreated({ mobile: opts.mobile, customerName: opts.customerName, bookingNumber: opts.bookingNumber }),
     sendWhatsApp(opts.mobile, message),
     opts.email ? sendEmail(opts.email, `Your ${docLabel} is Ready – Al Burhan Tours & Travels`, message) : Promise.resolve(),
-    sendRCS(opts.mobile, opts.customerName, message, { active: true, url: "https://www.alburhantravels.online/dashboard", agent: "jio" }),
+    // Use event-specific RCS template (document_ready → generic or fallback)
+    import("./rcs.js").then(({ sendRCSForEvent }) => {
+      const docType = opts.documentType.toLowerCase();
+      const rcsEvent = docType.includes("ticket") ? "flight_ticket"
+        : docType.includes("visa")   ? "visa_ready"
+        : docType.includes("hotel") || docType.includes("voucher") ? "hotel_voucher"
+        : "invoice_ready";
+      return sendRCSForEvent(rcsEvent, opts.mobile, { customerName: opts.customerName, bookingNumber: opts.bookingNumber });
+    }).catch(() => ({})),
   ]);
 }
 
@@ -1192,8 +1209,17 @@ Support:
           .catch((err: any): SendResult => ({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: err?.message || "Email failed" }))
       : Promise.resolve({ ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email provided" } as SendResult),
 
-    // ── RCS (Lemin AI / Jio) ──────────────────────────────────────────────────
-    sendRCS(opts.mobile, opts.customerName, smsMsg, { active: true, url: "https://www.alburhantravels.online/dashboard", agent: "jio" }),
+    // ── RCS (Lemin AI / Jio) — event-specific Jio template ───────────────────
+    import("./rcs.js").then(({ sendRCSForEvent }) =>
+      sendRCSForEvent("booking_approved", opts.mobile, {
+        customerName: opts.customerName,
+        bookingId: opts.bookingId || undefined,
+        bookingNumber: opts.bookingNumber,
+        packageName: opts.packageName || undefined,
+        amount: opts.totalAmount,
+      })
+    ).then((r): SendResult => ({ ok: r.ok, provider: "Lemin AI", endpoint: "rcs", errorMessage: r.errorMessage }))
+     .catch((e: any): SendResult => ({ ok: false, provider: "Lemin AI", endpoint: "rcs", errorMessage: e?.message || "RCS error" })),
   ]);
 
   let dashboardResult: { ok: boolean; errorMessage?: string } = { ok: false, errorMessage: "No bookingId" };

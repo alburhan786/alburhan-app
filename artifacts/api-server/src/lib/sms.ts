@@ -400,11 +400,15 @@ async function sendDLT(
   const { apiKey, sender_id, enabled } = getConfig();
 
   if (!enabled) {
-    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: "Fast2SMS disabled in API Settings" };
+    const msg = "Fast2SMS disabled in API Settings";
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
   if (!apiKey) {
+    const msg = "Fast2SMS API key not configured — set FAST2SMS_API_KEY in Admin → API Settings → Fast2SMS";
     console.warn("[SMS] API key not configured for", opts.eventType, "→", mobile);
-    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: "Fast2SMS API key not configured" };
+    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, bookingId: opts.bookingId, customerId: opts.customerId });
+    return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
 
   // Use per-template sender override if provided, otherwise fall back to global

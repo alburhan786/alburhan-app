@@ -139,26 +139,28 @@ router.post("/send-otp", async (req, res) => {
     console.log(`[OTP-SEND] RCS error: ${rcsErr?.message} → trying WhatsApp`);
   }
 
-  // 2. WhatsApp (BotBee template — works outside 24h window)
+  // 2. WhatsApp (BotBee session message — plain text, no template substitution needed)
+  // NOTE: The alburhan_login_otp template (330483) is AUTHENTICATION category with {{1}} positional
+  // vars. BotBee wraps named keys as #!1!# which never matches {{1}}, causing a substitution
+  // failure and "Parameter at index 0 exceeds length limit 15" from BotBee's pre-validation.
+  // Using a session message bypasses template variable handling entirely.
   try {
-    const { sendTemplate, sendText } = await import("../lib/botbee.js");
-    const tplRow = await pool.query(
-      `SELECT template_id FROM wa_templates WHERE event_type='mobile_otp' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
-    );
-    const otpTemplateId = tplRow.rows[0]?.template_id as string | undefined;
-    const waTemplateResult = otpTemplateId
-      ? await sendTemplate(cleanMobile, otpTemplateId, {
-          eventType: "mobile_otp",
-          variables: { OTP: otp, Code: otp, Otp: otp },
-          forceTemplateApi: true,
-        })
-      : { ok: false as const, errorMessage: "No WA OTP template configured" };
-    if (waTemplateResult.ok) {
-      console.log(`[OTP-SEND] ✓ WhatsApp template delivered`);
+    const { sendBotBeeWhatsApp } = await import("../lib/botbee.js");
+    const waMessage = `Your Al Burhan Tours & Travels OTP is *${otp}*. Valid for 5 minutes. Do not share with anyone.`;
+    const waResult = await sendBotBeeWhatsApp(cleanMobile, waMessage);
+    if (waResult?.ok) {
+      // Log to notification_logs for audit trail
+      await pool.query(
+        `INSERT INTO notification_logs
+           (id, event_type, channel, recipient, message, status, provider_name, sent_at, created_at)
+         VALUES ($1,'mobile_otp','whatsapp',$2,$3,'sent','BotBee',NOW(),NOW())`,
+        [`wa_otp_${Date.now()}`, cleanMobile, waMessage]
+      ).catch(() => {});
+      console.log(`[OTP-SEND] ✓ WhatsApp session message delivered`);
       res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "whatsapp" });
       return;
     }
-    console.log(`[OTP-SEND] WhatsApp template failed: ${waTemplateResult.errorMessage} → trying SMS`);
+    console.log(`[OTP-SEND] WhatsApp session failed: ${waResult?.error || "no 24h session"} → trying SMS`);
   } catch (waErr: any) {
     console.log(`[OTP-SEND] WhatsApp error: ${waErr?.message} → trying SMS`);
   }
