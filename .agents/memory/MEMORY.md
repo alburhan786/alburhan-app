@@ -90,3 +90,9 @@
 - [FCM multi-role push integration](fcm-multi-role.md) — customer_push_tokens stores user_id+user_type (not just customer_id); getTokensByFilter supports admin/staff/agent/branch/individual; sendPushForBooking injected in triggerWorkflow
 - [Inner component state reset](inner-component-state-reset.md) — components defined inside parent fn bodies get remounted on every parent re-render; never store state in them
 - [Accounting b.user_id bug](accounting-user-id-fix.md) — bookings FK is customer_id not user_id; payment_mode enum needs ::text cast for ANY() comparisons
+- [payment_date TEXT cast rule](payment-date-text-cast.md) — payment_transactions.payment_date + expenses.date are TEXT; must cast ::date before DATE_TRUNC or NOW() comparisons; string params (YYYY-MM-DD) compare fine as TEXT vs TEXT
+- [pilgrims no booking_id — join via group_id](pilgrims-no-booking-id.md) — pilgrims has NO booking_id column; join to bookings via `b.group_id = p.group_id`; workflowEngine/buses/visa all had this bug
+- [api_settings no created_at](api-settings-no-created-at.md) — api_settings table has no created_at column; only updated_at; webPush.ts + app.ts inserts must omit created_at
+- [bookings no agent_name — use agents join](bookings-no-agent-name.md) — bookings has no agent_name column; analytics agent-performance must JOIN agents ag ON ag.id=b.agent_id (both UUID); users.id is TEXT, not UUID
+- [marketing_campaigns pre-existing schema mismatch](marketing-campaigns-schema.md) — analytics module adds tenant_id/budget/spend/etc via ALTER TABLE; enterprise.ts migration must run these ALTERs for idempotency; analytics.ts ensureAnalyticsTables may fail silently if table exists
+- [feedback status enum](feedback-status-enum.md) — feedback.status enum is {open,in_review,resolved,closed} NOT in_progress; Drizzle schema must match exactly or insert/update fails

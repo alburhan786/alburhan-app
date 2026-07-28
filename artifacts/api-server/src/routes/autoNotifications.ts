@@ -52,19 +52,20 @@ router.get("/flight-reminder/stats", requireAuth as any, async (req: Authenticat
       pool.query(`SELECT MAX(created_at) AS last_sent FROM notification_logs WHERE event_type = 'departure_reminder'`),
       pool.query(`
         SELECT DISTINCT gf.departure_date, gf.departure_time, gf.flight_number,
-               gf.departure_airport, gf.arrival_airport, gf.terminal,
-               COUNT(DISTINCT p.booking_id) AS pilgrim_count
+               gf.departure_airport, gf.arrival_airport,
+               COUNT(DISTINCT p.id) AS pilgrim_count
         FROM group_flights gf
         JOIN hajj_groups hg ON hg.id = gf.group_id
         JOIN pilgrims p ON p.group_id = hg.id
-        JOIN bookings b ON b.id = p.booking_id
+        JOIN bookings b ON b.group_id = hg.id
         WHERE gf.departure_date IS NOT NULL
           AND gf.departure_date::timestamptz > NOW()
           AND gf.departure_date::timestamptz < NOW() + interval '14 days'
           AND b.status = 'approved'
+          AND (b.is_deleted IS NULL OR b.is_deleted = false)
           AND gf.flight_type = 'outbound'
         GROUP BY gf.departure_date, gf.departure_time, gf.flight_number,
-                 gf.departure_airport, gf.arrival_airport, gf.terminal
+                 gf.departure_airport, gf.arrival_airport
         ORDER BY gf.departure_date ASC
         LIMIT 10
       `),

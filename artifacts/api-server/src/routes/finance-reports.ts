@@ -77,8 +77,8 @@ router.get("/dashboard", requireAdmin as any, async (req: AuthenticatedRequest, 
 
     // Pending counts
     const [pendingVisa, pendingPassport, pendingAgreements, upcomingFlights] = await Promise.all([
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.type='visa')`),
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.type='passport')`),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='visa')`),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='passport')`),
       q1(`SELECT COUNT(*)::int AS cnt FROM agreements WHERE status='pending_signature'`).catch(() => ({ cnt: 0 })),
       q1(`SELECT COUNT(DISTINCT bf.booking_id)::int AS cnt FROM booking_flights bf WHERE bf.departure_date >= CURRENT_DATE AND bf.departure_date <= CURRENT_DATE + INTERVAL '7 days'`).catch(() => ({ cnt: 0 })),
     ]);
@@ -305,18 +305,18 @@ router.get("/monthly-trend", requireAdmin as any, async (req: AuthenticatedReque
   try {
     const months = Number(req.query.months ?? 12);
     const rows = await q(`
-      SELECT TO_CHAR(DATE_TRUNC('month', pt.payment_date), 'YYYY-MM') AS month,
+      SELECT TO_CHAR(DATE_TRUNC('month', pt.payment_date::date), 'YYYY-MM') AS month,
         COALESCE(SUM(pt.amount::numeric),0)::numeric AS revenue,
         COUNT(DISTINCT pt.booking_id)::int AS bookings
       FROM payment_transactions pt
-      WHERE pt.payment_date >= NOW() - INTERVAL '${months} months' AND pt.is_deleted=false
-      GROUP BY DATE_TRUNC('month', pt.payment_date) ORDER BY month ASC
+      WHERE pt.payment_date::date >= CURRENT_DATE - (${months} || ' months')::INTERVAL AND pt.is_deleted=false
+      GROUP BY DATE_TRUNC('month', pt.payment_date::date) ORDER BY month ASC
     `);
 
     const expRows = await q(`
       SELECT TO_CHAR(DATE_TRUNC('month', date::date), 'YYYY-MM') AS month,
         COALESCE(SUM(amount::numeric),0)::numeric AS expenses
-      FROM expenses WHERE date >= NOW() - INTERVAL '${months} months'
+      FROM expenses WHERE date::date >= CURRENT_DATE - (${months} || ' months')::INTERVAL
       GROUP BY DATE_TRUNC('month', date::date) ORDER BY month ASC
     `);
     const expMap: Record<string, number> = {};

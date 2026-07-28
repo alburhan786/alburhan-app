@@ -303,7 +303,7 @@ router.get(
     const [avgRow] = await db.select({ avg: avg(feedbackTable.ratingOverall) }).from(feedbackTable);
     const [complaintsRow] = await db.select({ total: count() }).from(feedbackTable).where(eq(feedbackTable.isComplaint, true));
     const [openRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "open")));
-    const [inProgressRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "in_progress")));
+    const [inProgressRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "in_review")));
     const [resolvedRow] = await db.select({ total: count() }).from(feedbackTable).where(eq(feedbackTable.status, "resolved"));
 
     const todayStart = new Date();
@@ -373,7 +373,7 @@ router.get(
     const { status, companyId, isComplaint, minRating, page = "1", limit = "50" } = req.query as Record<string, string>;
 
     const conditions = [];
-    if (status && ["open", "in_progress", "resolved"].includes(status)) {
+    if (status && ["open", "in_review", "resolved", "closed"].includes(status)) {
       conditions.push(eq(feedbackTable.status, status as any));
     }
     if (companyId) conditions.push(eq(feedbackTable.companyId, companyId));
@@ -439,7 +439,7 @@ router.get(
   }
 );
 
-const STATUS_ORDER: Record<string, number> = { open: 0, in_progress: 1, resolved: 2 };
+const STATUS_ORDER: Record<string, number> = { open: 0, in_review: 1, resolved: 2, closed: 3 };
 
 router.patch(
   "/admin/:id",
@@ -456,7 +456,7 @@ router.patch(
 
     const updates: Record<string, any> = { updatedAt: new Date() };
 
-    if (status && ["open", "in_progress", "resolved"].includes(status)) {
+    if (status && ["open", "in_review", "resolved", "closed"].includes(status)) {
       const currentOrder = STATUS_ORDER[current[0].status] ?? 0;
       const newOrder = STATUS_ORDER[status] ?? 0;
       if (newOrder < currentOrder) {

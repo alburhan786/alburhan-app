@@ -567,7 +567,7 @@ router.get("/payment-trash", requireAdmin as RequestHandler, async (req: Authent
     const params: unknown[] = [];
     let pi = 1;
     if (search) { params.push(`%${search}%`); conds.push(`(b.booking_number ILIKE $${pi} OR b.customer_name ILIKE $${pi} OR b.customer_mobile ILIKE $${pi} OR pt.id::text ILIKE $${pi})`); pi++; }
-    if (mode)   { params.push(mode);           conds.push(`pt.payment_mode = $${pi++}`); }
+    if (mode)   { params.push(mode);           conds.push(`pt.payment_mode::text = $${pi++}`); }
     if (from)   { params.push(from);           conds.push(`pt.payment_date >= $${pi++}`); }
     if (to)     { params.push(to);             conds.push(`pt.payment_date <= $${pi++}`); }
     const where = conds.join(" AND ");

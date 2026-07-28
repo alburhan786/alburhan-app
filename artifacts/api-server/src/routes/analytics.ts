@@ -18,26 +18,29 @@ async function ensureAnalyticsTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS marketing_campaigns (
       id            TEXT PRIMARY KEY DEFAULT 'mc_' || gen_random_uuid()::text,
-      tenant_id     TEXT NOT NULL DEFAULT 'default',
       name          TEXT NOT NULL,
       channel       TEXT NOT NULL DEFAULT 'whatsapp',
-      campaign_type TEXT NOT NULL DEFAULT 'awareness',
       status        TEXT NOT NULL DEFAULT 'draft',
-      budget        NUMERIC(12,2) DEFAULT 0,
-      spend         NUMERIC(12,2) DEFAULT 0,
-      impressions   INTEGER DEFAULT 0,
-      clicks        INTEGER DEFAULT 0,
-      leads_gen     INTEGER DEFAULT 0,
-      conversions   INTEGER DEFAULT 0,
-      revenue_attr  NUMERIC(12,2) DEFAULT 0,
-      start_date    DATE,
-      end_date      DATE,
-      notes         TEXT,
       created_by    TEXT,
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  // Add columns that may be missing if the table pre-existed with a different schema
+  const alterCols = [
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default'`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS campaign_type TEXT NOT NULL DEFAULT 'awareness'`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS budget NUMERIC(12,2) DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS spend NUMERIC(12,2) DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS impressions INTEGER DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS leads_gen INTEGER DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS conversions INTEGER DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS revenue_attr NUMERIC(12,2) DEFAULT 0`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS start_date DATE`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS end_date DATE`,
+    `ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS notes TEXT`,
+  ];
+  for (const sql of alterCols) { await pool.query(sql).catch(() => {}); }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_mc_tenant ON marketing_campaigns(tenant_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_mc_status ON marketing_campaigns(status, start_date DESC)`);
   console.log("[Analytics] Tables ensured");
@@ -111,7 +114,7 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
           COUNT(DISTINCT pt.booking_id)::int as bookings
         FROM payment_transactions pt
         WHERE pt.created_at >= NOW() - ($1 || ' months')::INTERVAL
-          AND pt.status IN ('captured','success','paid')
+          AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
         GROUP BY month_key, month ORDER BY month_key ASC
       `, [months]),
 
@@ -141,7 +144,7 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
 
       pool.query(`
         SELECT
-          COALESCE(SUM(CASE WHEN pt.status IN ('captured','success','paid') THEN pt.amount ELSE 0 END),0)::bigint as total_collected,
+          COALESCE(SUM(CASE WHEN (pt.is_deleted IS NULL OR pt.is_deleted=false) THEN pt.amount ELSE 0 END),0)::bigint as total_collected,
           COALESCE(SUM(b.final_amount - b.paid_amount),0)::bigint as total_outstanding,
           COALESCE(SUM(b.final_amount),0)::bigint as total_revenue,
           COUNT(DISTINCT b.id)::int as total_bookings,
@@ -267,17 +270,17 @@ router.get("/agent-performance", requireAdmin as any, async (req, res) => {
     const months = parseInt(String(req.query.months || "3"));
     const agents = await pool.query(`
       SELECT
-        COALESCE(u.name, b.agent_name, 'Unassigned') as agent_name,
+        COALESCE(ag.name, 'Unassigned') as agent_name,
         COUNT(DISTINCT b.id)::int as bookings,
         COUNT(DISTINCT CASE WHEN b.status IN ('confirmed','completed') THEN b.id END)::int as confirmed,
         COALESCE(SUM(b.paid_amount),0)::bigint as collected,
         COALESCE(AVG(b.final_amount),0)::bigint as avg_ticket,
         COUNT(DISTINCT CASE WHEN b.status = 'completed' THEN b.id END)::int as completed
       FROM bookings b
-      LEFT JOIN users u ON u.id = b.agent_id
+      LEFT JOIN agents ag ON ag.id = b.agent_id
       WHERE b.created_at >= NOW() - ($1 || ' months')::INTERVAL
-        AND (b.agent_name IS NOT NULL OR b.agent_id IS NOT NULL)
-      GROUP BY agent_name ORDER BY collected DESC LIMIT 20
+        AND b.agent_id IS NOT NULL
+      GROUP BY ag.name ORDER BY collected DESC LIMIT 20
     `, [months]);
 
     // Lead performance per agent
@@ -310,7 +313,7 @@ router.get("/forecast", requireAdmin as any, async (_req, res) => {
         COALESCE(SUM(amount),0)::bigint as revenue,
         COUNT(DISTINCT booking_id)::int as bookings
       FROM payment_transactions
-      WHERE status IN ('captured','success','paid')
+      WHERE (is_deleted IS NULL OR is_deleted=false)
         AND created_at >= NOW() - INTERVAL '12 months'
       GROUP BY month ORDER BY month ASC
     `);

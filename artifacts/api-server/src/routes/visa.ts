@@ -76,16 +76,24 @@ router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
     );
     res.json({ message: "Visa updated" });
     if (visaStatus === "received" || visaStatus === "approved") {
-      pool.query(`SELECT full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
-        .then(r => {
+      pool.query(
+        `SELECT p.full_name, p.mobile_india,
+          (SELECT b.id FROM bookings b WHERE b.group_id = p.group_id AND (b.is_deleted IS NULL OR b.is_deleted=false) ORDER BY b.created_at DESC LIMIT 1) AS booking_id
+         FROM pilgrims p WHERE p.id=$1`,
+        [req.params.pilgrimId]
+      ).then(r => {
           if (!r.rows[0]) return;
           const p = r.rows[0];
           fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, visaNumber: visaNumber || undefined }).catch(() => {});
           triggerWorkflow("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, visaStatus: "approved" }).catch(() => {});
         }).catch(() => {});
     } else if (visaStatus === "rejected") {
-      pool.query(`SELECT full_name, mobile_india, booking_id FROM pilgrims WHERE id=$1`, [req.params.pilgrimId])
-        .then(r => {
+      pool.query(
+        `SELECT p.full_name, p.mobile_india,
+          (SELECT b.id FROM bookings b WHERE b.group_id = p.group_id AND (b.is_deleted IS NULL OR b.is_deleted=false) ORDER BY b.created_at DESC LIMIT 1) AS booking_id
+         FROM pilgrims p WHERE p.id=$1`,
+        [req.params.pilgrimId]
+      ).then(r => {
           if (!r.rows[0]) return;
           const p = r.rows[0];
           fireNotificationEvent("visa_rejected", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {});
@@ -113,8 +121,12 @@ router.post("/bulk-update", requireAdmin as any, async (req, res) => {
     );
     res.json({ message: `Updated ${pilgrimIds.length} pilgrims`, count: pilgrimIds.length });
     if (visaStatus === "received" || visaStatus === "approved") {
-      pool.query(`SELECT id, full_name, mobile_india, booking_id FROM pilgrims WHERE id=ANY($1)`, [pilgrimIds])
-        .then(r => {
+      pool.query(
+        `SELECT p.id, p.full_name, p.mobile_india,
+          (SELECT b.id FROM bookings b WHERE b.group_id = p.group_id AND (b.is_deleted IS NULL OR b.is_deleted=false) ORDER BY b.created_at DESC LIMIT 1) AS booking_id
+         FROM pilgrims p WHERE p.id=ANY($1)`,
+        [pilgrimIds]
+      ).then(r => {
           for (const p of r.rows) {
             fireNotificationEvent("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india }).catch(() => {});
             triggerWorkflow("visa_approved", { customerName: p.full_name, customerMobile: p.mobile_india, pilgramName: p.full_name, bookingId: p.booking_id, visaStatus: "approved" }).catch(() => {});

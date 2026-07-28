@@ -483,9 +483,9 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
       pool.query(`
         SELECT
           COUNT(*)::int AS total_reviews,
-          ROUND(AVG(rating), 1)::float AS avg_rating
+          ROUND(AVG(rating_overall), 1)::float AS avg_rating
         FROM feedback
-        WHERE rating IS NOT NULL
+        WHERE rating_overall IS NOT NULL
       `).catch(() => ({ rows: [{ total_reviews: 0, avg_rating: null }] })),
       // Flights
       pool.query(`
@@ -502,7 +502,7 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
           COUNT(DISTINCT b.id)::int AS total_bookings,
           COALESCE(SUM(GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0), 0)),0)::float AS outstanding,
           COALESCE(SUM(CASE WHEN b.created_at >= date_trunc('month',NOW()) THEN b.paid_amount::numeric ELSE 0 END),0)::float AS this_month_revenue,
-          COUNT(DISTINCT b.user_id)::int AS total_customers
+          COUNT(DISTINCT b.customer_id)::int AS total_customers
         FROM bookings b
         LEFT JOIN payment_transactions pt ON pt.booking_id=b.id AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
         WHERE (b.deleted_at IS NULL) AND b.final_amount IS NOT NULL
@@ -904,8 +904,8 @@ router.get("/bi", requireAdmin as any, async (req: AuthenticatedRequest, res) =>
 
       // 15. Average satisfaction rating
       pool.query(`
-        SELECT ROUND(AVG(rating),1)::float AS avg_rating, COUNT(*)::int AS total_reviews
-        FROM feedback WHERE rating IS NOT NULL
+        SELECT ROUND(AVG(rating_overall),1)::float AS avg_rating, COUNT(*)::int AS total_reviews
+        FROM feedback WHERE rating_overall IS NOT NULL
       `).catch(() => ({ rows: [{ avg_rating: null, total_reviews: 0 }] })),
 
       // 16. Agreement completion

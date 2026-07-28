@@ -22,8 +22,8 @@ async function getVapidKeys(): Promise<{ publicKey: string; privateKey: string }
     // Generate and persist
     const keys = webPush.generateVAPIDKeys();
     await pool.query(
-      `INSERT INTO api_settings (key, value, created_at, updated_at)
-       VALUES ('vapid_keys', $1, NOW(), NOW())
+      `INSERT INTO api_settings (key, value, updated_at)
+       VALUES ('vapid_keys', $1, NOW())
        ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
       [JSON.stringify(keys)]
     );

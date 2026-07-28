@@ -111,8 +111,12 @@ router.post("/:busId/assign", requireAdmin as any, async (req, res) => {
       await pool.query(`UPDATE pilgrims SET bus_number=$1, seat_number=$2 WHERE id=$3`, [bus.rows[0].bus_number, seatNumber||null, pilgrimId]);
     }
     res.json({ message: "Assigned" });
-    pool.query(`SELECT p.id, p.full_name, p.mobile_india, p.booking_id, b.bus_number FROM pilgrims p, buses b WHERE p.id=$1 AND b.id=$2`, [pilgrimId, req.params.busId])
-      .then(r => {
+    pool.query(
+      `SELECT p.id, p.full_name, p.mobile_india, p.group_id, buses.bus_number,
+        (SELECT b.id FROM bookings b WHERE b.group_id = p.group_id AND (b.is_deleted IS NULL OR b.is_deleted=false) ORDER BY b.created_at DESC LIMIT 1) AS booking_id
+       FROM pilgrims p, buses WHERE p.id=$1 AND buses.id=$2`,
+      [pilgrimId, req.params.busId]
+    ).then(r => {
         if (!r.rows[0]) return;
         const row = r.rows[0];
         fireNotificationEvent("bus_assigned", { customerName: row.full_name, customerMobile: row.mobile_india, busNumber: row.bus_number, seatNumber: seatNumber || undefined }).catch(() => {});

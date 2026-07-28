@@ -50,7 +50,7 @@ router.get("/dashboard", requireAdmin as any, async (_req, res) => {
       // Cash flow (last 7 days)
       q(`SELECT payment_date::date AS date, COALESCE(SUM(amount::numeric),0)::numeric AS collected FROM payment_transactions WHERE payment_date::date >= CURRENT_DATE - INTERVAL '7 days' AND is_deleted=false GROUP BY payment_date::date ORDER BY date`),
       // Monthly growth (last 6 months)
-      q(`SELECT TO_CHAR(DATE_TRUNC('month', payment_date),'YYYY-MM') AS month, COALESCE(SUM(amount::numeric),0)::numeric AS revenue, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE payment_date >= NOW() - INTERVAL '6 months' AND is_deleted=false GROUP BY DATE_TRUNC('month',payment_date) ORDER BY month`),
+      q(`SELECT TO_CHAR(DATE_TRUNC('month', payment_date::date),'YYYY-MM') AS month, COALESCE(SUM(amount::numeric),0)::numeric AS revenue, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE payment_date::date >= CURRENT_DATE - INTERVAL '6 months' AND is_deleted=false GROUP BY DATE_TRUNC('month',payment_date::date) ORDER BY month`),
       // Expenses last 30 days
       q1(`SELECT COALESCE(SUM(amount::numeric),0)::numeric AS total FROM expenses WHERE date >= CURRENT_DATE - INTERVAL '30 days'`).catch(() => ({ total: 0 })),
     ]);

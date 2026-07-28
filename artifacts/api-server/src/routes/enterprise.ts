@@ -8,6 +8,18 @@ const router = Router();
 
 // ── Lead Intelligence Migration ───────────────────────────────────────────────
 async function ensureLeadIntelligenceTables() {
+  // Analytics module columns (added by ensureAnalyticsTables in analytics.ts; duplicated here for reliability)
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default'`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS campaign_type TEXT NOT NULL DEFAULT 'awareness'`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS budget NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS spend NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS impressions INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS leads_gen INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS conversions INTEGER DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS revenue_attr NUMERIC(12,2) DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS start_date DATE`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS end_date DATE`).catch(() => {});
+  await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS notes TEXT`).catch(() => {});
   // Campaign ROI columns
   await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS interested_count INT DEFAULT 0`);
   await pool.query(`ALTER TABLE marketing_campaigns ADD COLUMN IF NOT EXISTS bookings_generated INT DEFAULT 0`);

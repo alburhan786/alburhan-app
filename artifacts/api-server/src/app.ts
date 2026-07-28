@@ -2089,8 +2089,8 @@ app.post("/api/migrate/activate-new-templates", async (req, res) => {
 
   // Persist merged overrides to DB
   await p.query(
-    `INSERT INTO api_settings (key, value, is_encrypted, is_enabled, created_at, updated_at)
-     VALUES ('botbee_template_overrides', $1, false, true, NOW(), NOW())
+    `INSERT INTO api_settings (key, value, is_encrypted, is_enabled, updated_at)
+     VALUES ('botbee_template_overrides', $1, false, true, NOW())
      ON CONFLICT (key) DO UPDATE SET value=$1, updated_at=NOW()`,
     [JSON.stringify(merged)]
   );

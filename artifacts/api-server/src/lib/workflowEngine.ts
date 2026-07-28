@@ -695,10 +695,9 @@ export function startDocumentReminderCron() {
                b.id as booking_id, b.booking_number, b.customer_name, b.customer_mobile,
                p.passport_number, p.photo_url, p.visa_number
         FROM pilgrims p
-        JOIN bookings b ON b.id = (
-          SELECT bk.id FROM bookings bk WHERE bk.id = p.booking_id LIMIT 1
-        )
+        JOIN bookings b ON b.group_id = p.group_id
         WHERE b.status IN ('approved','partially_paid')
+          AND (b.is_deleted IS NULL OR b.is_deleted = false)
           AND (p.passport_number IS NULL OR p.passport_number = ''
                OR p.photo_url IS NULL OR p.photo_url = '')
         LIMIT 100
@@ -748,9 +747,8 @@ export function startZiyaratReminderCron() {
         LEFT JOIN buses b ON z.bus_id = b.id
         LEFT JOIN ziyarat_attendance za ON za.schedule_id = z.id
         LEFT JOIN pilgrims p ON za.pilgrim_id = p.id
-        LEFT JOIN bookings bk ON bk.id = (
-          SELECT bk2.id FROM bookings bk2 WHERE bk2.id = p.booking_id LIMIT 1
-        )
+        LEFT JOIN bookings bk ON bk.group_id = p.group_id
+          AND (bk.is_deleted IS NULL OR bk.is_deleted = false)
         WHERE z.schedule_date = $1
           AND z.status = 'scheduled'
           AND p.mobile_india IS NOT NULL

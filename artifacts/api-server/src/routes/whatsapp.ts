@@ -83,7 +83,7 @@ router.post("/test-abt-template", requireAdmin as any, async (req: Authenticated
         `SELECT b.*, u.name AS customer_name, u.mobile AS customer_mobile,
                 p.name AS package_name, p.price AS package_price
          FROM bookings b
-         LEFT JOIN users u ON u.id = b.user_id
+         LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN packages p ON p.id = b.package_id
          WHERE b.id=$1 LIMIT 1`,
         [bookingId]

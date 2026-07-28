@@ -74,7 +74,7 @@ router.get("/branch", requireAuth as any, async (req: any, res) => {
                 pk.name AS package_name, b.created_at
          FROM bookings b JOIN agents a ON a.id = b.agent_id
          JOIN branches br ON br.id = a.branch_id
-         LEFT JOIN users u ON u.id = b.user_id
+         LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN packages pk ON pk.id = b.package_id
          WHERE br.manager_mobile=$1 AND b.deleted_at IS NULL
          ORDER BY b.created_at DESC LIMIT 20`,

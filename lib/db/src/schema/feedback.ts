@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, integer, pgEnum } from "drizzle-orm/pg-core";
 
-export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_progress", "resolved"]);
+export const feedbackStatusEnum = pgEnum("feedback_status", ["open", "in_review", "resolved", "closed"]);
 
 export const feedbackTable = pgTable("feedback", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
