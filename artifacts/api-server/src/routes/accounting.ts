@@ -372,10 +372,10 @@ router.get("/payment-entries", requireAdmin as any, async (req: AuthenticatedReq
         pt.amount::numeric AS amount, pt.is_reconciled, pt.created_at
       FROM payment_transactions pt
         JOIN bookings b ON b.id=pt.booking_id
-        JOIN users u ON u.id=b.user_id
+        JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE pt.is_deleted=false AND pt.payment_date::text BETWEEN $1 AND $2
-        ${mode && mode !== "all" ? "AND pt.payment_mode=$3" : ""}
+        ${mode && mode !== "all" ? "AND pt.payment_mode::text=$3" : ""}
       ORDER BY pt.payment_date DESC, pt.created_at DESC
     `, mode && mode !== "all" ? [dateFrom, dateTo, mode] : [dateFrom, dateTo]);
     res.json({ rows, total: rows.reduce((s, r) => s + Number(r.amount || 0), 0) });
@@ -394,7 +394,7 @@ router.get("/outstanding", requireAdmin as any, async (req: AuthenticatedRequest
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS outstanding,
         b.status, b.created_at
       FROM bookings b
-        JOIN users u ON u.id=b.user_id
+        JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         AND b.final_amount::numeric > COALESCE(b.paid_amount::numeric,0)
@@ -417,7 +417,7 @@ router.get("/ledger", requireAdmin as any, async (req: AuthenticatedRequest, res
         GREATEST(b.final_amount::numeric - COALESCE(b.paid_amount::numeric,0),0) AS balance,
         b.status, b.created_at
       FROM bookings b
-        JOIN users u ON u.id=b.user_id
+        JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
       WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         ${search ? `AND (u.name ILIKE '%'||$1||'%' OR u.mobile ILIKE '%'||$1||'%' OR b.booking_number ILIKE '%'||$1||'%')` : ""}
@@ -639,9 +639,9 @@ router.get("/bank-reconciliation", requireAdmin as any, async (req: Authenticate
         pt.is_reconciled, pt.reconciled_date, pt.reconciled_by,
         b.booking_number, COALESCE(u.name,u.mobile) AS customer_name
       FROM payment_transactions pt
-      JOIN bookings b ON b.id=pt.booking_id JOIN users u ON u.id=b.user_id
+      JOIN bookings b ON b.id=pt.booking_id JOIN users u ON u.id=b.customer_id
       WHERE pt.is_deleted=false
-        AND pt.payment_mode = ANY($1)
+        AND pt.payment_mode::text = ANY($1)
         AND pt.payment_date::text BETWEEN $2 AND $3
         ${status === "reconciled" ? "AND pt.is_reconciled=true" : status === "unreconciled" ? "AND pt.is_reconciled=false" : ""}
       ORDER BY pt.payment_date DESC
