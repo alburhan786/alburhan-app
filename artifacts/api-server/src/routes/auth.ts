@@ -145,9 +145,9 @@ router.post("/send-otp", async (req, res) => {
   // failure and "Parameter at index 0 exceeds length limit 15" from BotBee's pre-validation.
   // Using a session message bypasses template variable handling entirely.
   try {
-    const { sendBotBeeWhatsApp } = await import("../lib/botbee.js");
+    const { sendText } = await import("../lib/botbee.js");
     const waMessage = `Your Al Burhan Tours & Travels OTP is *${otp}*. Valid for 5 minutes. Do not share with anyone.`;
-    const waResult = await sendBotBeeWhatsApp(cleanMobile, waMessage);
+    const waResult = await sendText(cleanMobile, waMessage);
     if (waResult?.ok) {
       // Log to notification_logs for audit trail
       await pool.query(
