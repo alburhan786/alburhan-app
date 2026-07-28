@@ -2838,6 +2838,9 @@ async function start() {
       "not in window",
       "user not opted in",
       "blocked by user",
+      "parameter at index",           // BotBee template variable format error — unrecoverable
+      "exceeds the parameter",        // parameter length limit exceeded — unrecoverable
+      "parameter length limit",       // variant of the same
     ];
     const isWAPermanentError = (msg: string): boolean =>
       WA_PERMANENT_ERRORS.some(e => msg?.toLowerCase().includes(e));
@@ -2849,7 +2852,10 @@ async function start() {
          AND (retry_count >= 5
               OR provider_response::text ILIKE '%24 hour%'
               OR provider_response::text ILIKE '%outside 24 hour%'
-              OR provider_response::text ILIKE '%24h window%')`
+              OR provider_response::text ILIKE '%24h window%'
+              OR provider_response::text ILIKE '%parameter at index%'
+              OR provider_response::text ILIKE '%exceeds the parameter%'
+              OR provider_response::text ILIKE '%parameter length limit%')`
     ).catch(() => {});
 
     const runRetryEngine = async () => {

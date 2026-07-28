@@ -118,16 +118,10 @@ export async function resolveVariables(
     // Core booking + customer
     const bRow = await pool.query(`
       SELECT b.booking_number, b.customer_name, b.customer_mobile, b.package_name,
-             b.final_amount, b.paid_amount, b.preferred_departure_date, b.return_date,
-             COALESCE(u.phone,'') AS support_phone
+             b.final_amount, b.paid_amount, b.preferred_departure_date,
+             b.invoice_number AS booking_invoice_number
       FROM bookings b
-      LEFT JOIN users u ON u.role='super_admin' LIMIT 1
       WHERE b.id=$1 LIMIT 1`, [bookingId]
-    ).catch(() => ({ rows: [] }));
-
-    // Separate query for support phone (staff/admin)
-    const spRow = await pool.query(
-      `SELECT customer_mobile FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]
     ).catch(() => ({ rows: [] }));
 
     if (bRow.rows.length) {
@@ -149,6 +143,8 @@ export async function resolveVariables(
       if (!vars.payment_status) vars.payment_status = pa >= fa ? "Paid" : pa > 0 ? "Partial" : "Pending";
       if (!vars.dashboard_url)  vars.dashboard_url  = "https://alburhantravels.online/my-bookings";
       if (!vars.support_phone)  vars.support_phone  = "7045009898";
+      // Use invoice_number from bookings row as fallback before hitting invoices table
+      if (!vars.invoice_number && b.booking_invoice_number) vars.invoice_number = b.booking_invoice_number;
     }
 
     // Latest payment receipt
@@ -167,34 +163,37 @@ export async function resolveVariables(
     // Latest invoice
     if (event === "invoice_ready" || !vars.invoice_number) {
       const invRow = await pool.query(
-        `SELECT invoice_number, total_amount FROM invoices WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+        `SELECT invoice_number, total FROM invoices WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
         [bookingId]
       ).catch(() => ({ rows: [] }));
       if (invRow.rows.length) {
         const inv = invRow.rows[0];
         if (!vars.invoice_number) vars.invoice_number = inv.invoice_number || "";
-        if (!vars.amount) vars.amount = String(Math.round(Number(inv.total_amount) || 0));
+        if (!vars.amount) vars.amount = String(Math.round(Number(inv.total) || 0));
       }
     }
 
     // Agreement
     if (event === "agreement_ready" || !vars.agreement_number) {
       const agrRow = await pool.query(
-        `SELECT id, agreement_number, document_url FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
         [bookingId]
       ).catch(() => ({ rows: [] }));
       if (agrRow.rows.length) {
         const agr = agrRow.rows[0];
         if (!vars.agreement_number) vars.agreement_number = agr.agreement_number || agr.id?.slice(0,8).toUpperCase() || "";
-        if (!vars.document_url)     vars.document_url     = agr.document_url || `https://alburhantravels.online/admin/agreements`;
+        // agreements table has no document_url column — use the public signing link
+        if (!vars.document_url) vars.document_url = `https://alburhantravels.online/sign-agreement/${agr.id}`;
       }
     }
 
-    // Pilgrim flight / visa / hotel
+    // Pilgrim flight / visa / hotel  (use actual DB columns — hajj_groups owns flight/hotel)
     if (["flight_ticket","visa_ready","hotel_voucher","departure_reminder"].includes(event)) {
       const pilRow = await pool.query(
-        `SELECT p.ticket_number, p.airline, p.flight_number, p.visa_number, p.hotel_name,
-                hj.departure_date AS flight_date
+        `SELECT p.visa_number, p.passport_number,
+                hj.flight_number,
+                hj.departure_date AS flight_date,
+                hj.hotels->0->>'name' AS hotel_name
          FROM pilgrims p
          JOIN bookings b ON b.group_id = p.group_id
          LEFT JOIN hajj_groups hj ON hj.id = p.group_id
@@ -203,9 +202,9 @@ export async function resolveVariables(
       ).catch(() => ({ rows: [] }));
       if (pilRow.rows.length) {
         const p = pilRow.rows[0];
-        if (!vars.flight_number) vars.flight_number = p.flight_number || p.ticket_number || "";
-        if (!vars.airline_name)  vars.airline_name  = p.airline || "";
+        if (!vars.flight_number) vars.flight_number = p.flight_number || "";
         if (!vars.hotel_name)    vars.hotel_name    = p.hotel_name || "";
+        if (!vars.visa_number)   vars.visa_number   = p.visa_number || "";
         if (!vars.departure_date && p.flight_date) {
           vars.departure_date = new Date(p.flight_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
         }
@@ -214,6 +213,37 @@ export async function resolveVariables(
   } catch (err: any) {
     console.warn("[rcs] resolveVariables error:", err.message);
   }
+
+  // ── Lemin API key aliases ─────────────────────────────────────────────────────
+  // Different Lemin templates use different variable key formats (plain/{{...}}/#!...!#).
+  // Populate all variants here so sendRCSForEvent can filter by variables_required keys.
+  const cn  = vars.customer_name || "";
+  const bid = vars.booking_id    || "";
+
+  // Type A — plain "name" (templates 3651/3652/3654/3655)
+  if (!vars["name"]) vars["name"] = cn;
+
+  // Type B — double-brace format (templates 3657/3659/3660)
+  if (!vars["{{customer_name}}"]) vars["{{customer_name}}"] = cn;
+  if (!vars["{{booking_id}}"])    vars["{{booking_id}}"]    = bid;
+  if (!vars["{{invoice_number}}"]) vars["{{invoice_number}}"] = vars.invoice_number || "";
+  if (!vars["{{amount}}"])         vars["{{amount}}"]         = vars.amount         || "";
+  if (!vars["{{visa_number}}"])    vars["{{visa_number}}"]    = vars.visa_number    || "";
+  if (!vars["{{package_name}}"])   vars["{{package_name}}"]   = vars.package_name   || "";
+  if (!vars["{{ticket_number}}"]) vars["{{ticket_number}}"]  = vars.flight_number  || "";  // flight_number doubles as ticket
+  if (!vars["{{flight_number}}"]) vars["{{flight_number}}"]  = vars.flight_number  || "";
+
+  // Composite departure key for template 3659 — "15 Nov 2026 at 06:00"
+  const depDate = vars.departure_date || "";
+  const depTime = (vars as any)["departure_time"] || "06:00";
+  const compositeKey = "{{departure_date}} at {{departure_time}}";
+  if (!vars[compositeKey]) vars[compositeKey] = depDate ? `${depDate} at ${depTime}` : "";
+
+  // Type C — hash-bang format (template 3661)
+  if (!vars["#!name!#"])        vars["#!name!#"]        = cn;
+  if (!vars[": #!agreement!#"]) vars[": #!agreement!#"] = vars.agreement_number || "";
+  if (!vars["🔗 #!download!#"]) vars["🔗 #!download!#"] = vars.document_url    || "https://alburhantravels.online/my-bookings";
+  if (!vars["#!bookingid!#"])   vars["#!bookingid!#"]   = bid;
 
   return vars;
 }
@@ -322,10 +352,19 @@ export async function pollMessageStatus(messageId: string): Promise<RCSDeliveryS
       const r = await axios.get(statusUrl, {
         params: { message_id: messageId, user_id: apiKey }, // user_id to Lemin only
         timeout: 8000,
+        maxRedirects: 0,   // Lemin status endpoint requires session auth; redirect = unavailable
+        validateStatus: (s) => s < 400,
       });
-      const st = (r.data?.status || r.data?.delivery_status || "unknown").toLowerCase() as RCSDeliveryStatus;
-      if (finalStates.has(st) || st === "sent") return st;
-    } catch { /* continue polling */ }
+      // If redirected to sign-in page, status polling is not available — return unknown
+      const isHtml = typeof r.data === "string" && r.data.includes("sign-in");
+      if (isHtml || r.status === 302 || r.status === 301) return "unknown";
+      const st = (r.data?.status || r.data?.delivery_status || "").toLowerCase() as RCSDeliveryStatus;
+      if (st && (finalStates.has(st) || st === "sent")) return st;
+    } catch (e: any) {
+      // Redirect or network error — stop retrying
+      if (e?.response?.status === 302 || e?.response?.status === 301) return "unknown";
+      /* continue polling on other errors */
+    }
   }
   return "unknown";
 }
@@ -428,10 +467,18 @@ export async function sendRCSForEvent(
     };
   }
 
-  // 6. Build safe + Lemin payloads (user_id only goes to Lemin, never logged)
+  // 6. Build Lemin payload — filter to ONLY the keys the template requires.
+  //    This ensures we send exactly {"name":"..."} for simple templates and
+  //    {"{{customer_name}}":"..."} etc for double-brace templates.
+  const requiredKeys = (mapping.variables_required as string[]) || [];
+  const templateVars: Record<string, string> = {};
+  for (const key of requiredKeys) {
+    templateVars[key] = String(resolved[key] || "");
+  }
+
   const safePayload: Record<string, unknown> = {
     type: "single", dial_code: dialCode, template: templateId, phone,
-    variables: resolved,
+    variables: templateVars,
   };
   const leminPayload = { ...safePayload, user_id: leminKey };
 
@@ -453,7 +500,7 @@ export async function sendRCSForEvent(
       const bodyFailed  = body.success === false || body.status === false || authFailed || tplNotFound;
       const ok = resp.status >= 200 && resp.status < 300 && !bodyFailed;
 
-      const messageId = body.message_id || body.id || body.msg_id || undefined;
+      const messageId = body.data?.id || body.data?.message_id || body.message_id || body.id || body.msg_id || undefined;
       lastResult = {
         ok, provider: "LeminAI", endpoint,
         httpStatus: resp.status,
@@ -564,7 +611,7 @@ export async function sendCustomRCS(opts: {
     const tplNotFound = errTxt.includes("template not found");
     const bodyFailed  = body.success === false || body.status === false || authFailed || tplNotFound;
     const ok = resp.status >= 200 && resp.status < 300 && !bodyFailed;
-    const messageId = body.message_id || body.id || undefined;
+    const messageId = body.data?.id || body.data?.message_id || body.message_id || body.id || undefined;
 
     await logRCSNotification({
       event: opts.eventLabel || "rcs_custom",
