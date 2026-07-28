@@ -82,6 +82,7 @@ import crmRouter from "./crm.js";
 import { leadEngineRouter } from "./lead-engine.js";
 import inboxRouter from "./inbox.js";
 import customer360Router from "./customer360.js";
+import rcsRouter from "./rcs.js";
 
 const router: IRouter = Router();
 
@@ -376,6 +377,7 @@ router.use("/portal", portalRouter);
 router.use("/sms-settings", smsSettingsRouter);
 router.use("/social-media", socialMediaRouter);
 router.use("/push", pushRouter);
+router.use("/rcs", rcsRouter);
 router.use("/itinerary", itineraryRouter);
 router.use("/admin/e2e", e2eRouter);
 router.use("/admin/error-logs", errorLogsRouter);

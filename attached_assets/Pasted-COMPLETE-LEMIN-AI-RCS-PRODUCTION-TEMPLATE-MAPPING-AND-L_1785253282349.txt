@@ -1,0 +1,376 @@
+COMPLETE LEMIN AI RCS PRODUCTION TEMPLATE MAPPING AND LIVE DELIVERY VALIDATION
+
+Lemin AI RCS authentication is already working in production.
+
+Current Replit Secrets:
+
+LEMIN_API_KEY
+LEMIN_BASE_URL
+LEMIN_DIAL_CODE
+LEMIN_AGENT
+
+The API key is valid and Lemin responds successfully.
+
+IMPORTANT:
+- Do not use the sample template ID 1473 anywhere.
+- Do not mark RCS delivery as successful only because authentication passes.
+- A real approved template must be sent and its delivery status must be verified.
+
+==================================================
+1. CREATE RCS TEMPLATE MAPPING ADMIN PAGE
+==================================================
+
+Create this admin page:
+
+Communication Center → RCS Template Mapping
+
+Add editable template-mapping fields for:
+
+- booking_submitted
+- booking_confirmed
+- booking_approved
+- invoice_ready
+- payment_received
+- pending_payment_reminder
+- agreement_ready
+- visa_ready
+- flight_ticket
+- hotel_voucher
+- departure_reminder
+
+The page must show:
+
+- ERP event name
+- Lemin template name
+- Lemin template ID
+- Carrier
+- Template type
+- Enabled/disabled status
+- Last successful send
+- Last failure
+- Test button
+- Edit button
+
+Store all mappings in the production database.
+
+Do not hardcode template IDs inside multiple services. Use one central RCS template-mapping table or configuration service.
+
+==================================================
+2. USE THESE APPROVED LEMIN TEMPLATE IDS
+==================================================
+
+Map the following approved Jio RCS templates:
+
+Booking_Submitted = 3651
+Booking_Approved = 3652
+Payment_Received = 3654
+Pending_Payment_Reminder = 3655
+Payment_Received_Alternative = 3656
+Invoice_Generated = 3657
+Ticket_Issued = 3659
+Visa_Issued = 3660
+Agreement_Ready = 3661
+
+Recommended ERP mapping:
+
+booking_submitted → 3651
+booking_confirmed → 3652
+booking_approved → 3652
+payment_received → 3654
+pending_payment_reminder → 3655
+invoice_ready → 3657
+flight_ticket → 3659
+visa_ready → 3660
+agreement_ready → 3661
+
+For hotel_voucher and departure_reminder:
+
+- Do not use an unrelated template.
+- Leave the event clearly marked as “Template not mapped” until the correct approved Lemin template ID is added.
+- The admin must be able to add the approved ID later through the mapping page.
+
+For the duplicate Payment_Received templates:
+
+- Use template 3654 as the default.
+- Keep template 3656 available as an alternative.
+- Clearly document the difference after inspecting the approved template content.
+
+==================================================
+3. VARIABLE MAPPING
+==================================================
+
+For templates with variables, support and map these standard ERP variables:
+
+- customer_name
+- booking_id
+- agreement_number
+- invoice_number
+- receipt_number
+- package_name
+- amount
+- paid_amount
+- balance_amount
+- payment_status
+- document_url
+- dashboard_url
+- departure_date
+- return_date
+- flight_number
+- airline_name
+- hotel_name
+- support_phone
+
+Create one central variable resolver that reads real booking, customer, payment, invoice, agreement, flight and hotel data.
+
+Do not send:
+
+- empty values
+- undefined
+- null
+- unreplaced placeholders
+- test placeholder values
+- the text {{customer_name}} or similar raw tokens
+
+Before sending, validate that every variable required by the selected Lemin template has a real value.
+
+When a required value is missing:
+
+- do not send the RCS request
+- mark the notification as validation_failed
+- show the missing variable names in Notification Logs
+
+==================================================
+4. LEMIN SEND REQUEST
+==================================================
+
+Use the Lemin endpoint:
+
+POST /api/send/template
+
+For templates with dynamic values, use the correct Lemin “Send Template with Variables” request format from the official documentation.
+
+The request must use:
+
+- type = single
+- dial_code from LEMIN_DIAL_CODE
+- template = mapped approved template ID
+- phone = recipient mobile number without spaces or symbols
+- user_id = LEMIN_API_KEY
+- variables = resolved variable object when required
+
+Use:
+
+LEMIN_BASE_URL
+LEMIN_API_KEY
+LEMIN_DIAL_CODE
+LEMIN_AGENT
+
+Never expose LEMIN_API_KEY or user_id in:
+
+- frontend code
+- browser responses
+- admin logs
+- notification logs
+- error messages
+- analytics
+- exported files
+
+Mask sensitive request fields before saving or returning any data.
+
+==================================================
+5. REAL PRODUCTION TEST PAGE
+==================================================
+
+Add a production test section inside:
+
+Communication Center → RCS Template Mapping
+
+Allow the admin to select:
+
+- event
+- approved template
+- test booking
+- test recipient mobile number
+
+Show a preview containing:
+
+- template ID
+- recipient
+- resolved variables
+- final message preview where available
+
+Require confirmation before sending a live production RCS message.
+
+Run a real production RCS send to one test mobile number for every mapped template.
+
+Do not use fake or simulated success responses.
+
+==================================================
+6. MESSAGE ID AND DELIVERY STATUS
+==================================================
+
+After each successful send request:
+
+1. Save the returned message_id.
+2. Save the provider response.
+3. Call:
+
+GET /api/messages/status
+
+4. Pass:
+   - message_id
+   - user_id securely from LEMIN_API_KEY
+5. Update the notification status as:
+   - queued
+   - sent
+   - delivered
+   - read
+   - failed
+   - expired
+   - unknown
+
+Poll the status safely until a final state is received, using reasonable retry limits and delays.
+
+Do not create an infinite polling loop.
+
+==================================================
+7. NOTIFICATION LOGS
+==================================================
+
+Display real RCS details in:
+
+Communication Center → Notification Logs
+
+For every RCS notification, show:
+
+- ERP event
+- customer name
+- booking ID
+- recipient
+- template name
+- template ID
+- message_id
+- request time
+- provider HTTP status
+- provider response
+- current delivery status
+- sent time
+- delivered time
+- read time
+- failure reason
+- retry count
+- last status check
+- View Details button
+
+Never display the Lemin API key or user_id.
+
+==================================================
+8. ERROR HANDLING
+==================================================
+
+Handle these separately:
+
+- invalid API key
+- unauthorized
+- HTTP 401
+- HTTP 403
+- template not found
+- template not approved
+- missing variable
+- invalid phone number
+- unsupported carrier
+- insufficient balance
+- provider timeout
+- rate limit
+- provider server error
+- message failed
+- status lookup failed
+
+“Template not found” must not be treated as delivery success.
+
+It may prove that authentication is valid, but the notification itself must remain failed until a valid approved template is sent successfully.
+
+==================================================
+9. AUTOMATIC ERP EVENT INTEGRATION
+==================================================
+
+Connect the mapped RCS templates to these real ERP events:
+
+- booking submitted
+- booking approved
+- invoice generated
+- payment received
+- pending payment reminder
+- agreement ready
+- visa issued
+- flight ticket issued
+- hotel voucher ready
+- departure reminder
+
+Each event must:
+
+- load the correct template mapping
+- resolve real variables
+- send to the correct customer number
+- save the message_id
+- track delivery status
+- appear in Notification Logs
+
+Do not allow duplicate RCS notifications for the same event unless an authorised retry is being performed.
+
+Use an idempotency key based on:
+
+booking_id + event + template_id + document/version identifier
+
+==================================================
+10. FINAL PRODUCTION VALIDATION
+==================================================
+
+Run live tests using the approved templates:
+
+3651 Booking_Submitted
+3652 Booking_Approved
+3654 Payment_Received
+3655 Pending_Payment_Reminder
+3657 Invoice_Generated
+3659 Ticket_Issued
+3660 Visa_Issued
+3661 Agreement_Ready
+
+For each test, report:
+
+- template ID
+- recipient
+- API request accepted or rejected
+- message_id
+- latest provider status
+- sent/delivered/read/failed
+- failure reason
+- variables used
+- notification log record created
+
+Final success criteria:
+
+- Authentication passes
+- Correct approved template is used
+- No sample ID 1473 remains
+- Required variables are populated
+- Real message_id is returned
+- Status API works
+- Notification log is created
+- At least one live RCS message reaches sent or delivered status
+- No secret is exposed
+
+Do not report “RCS fully operational” based only on the Connected health check.
+
+Report separately:
+
+1. Authentication: PASS/FAIL
+2. Template mapping: PASS/FAIL
+3. Send API acceptance: PASS/FAIL
+4. Message ID received: PASS/FAIL
+5. Delivery status confirmed: PASS/FAIL
+6. Variable mapping: PASS/FAIL
+7. Secret protection: PASS/FAIL
+
+Build, deploy and test this on the production VPS without breaking WhatsApp, SMS, Email, Firebase Push, booking automation or existing notification logs.

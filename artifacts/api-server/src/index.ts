@@ -2614,6 +2614,59 @@ async function start() {
     console.log("[Migration] v30.0 notification_templates sender_id ABURHA→ALBURH updated");
   } catch (err: any) { console.warn("[Migration] v30.0 sender_id update:", err.message); }
 
+  // ── v31.0 — RCS Template Mappings + notification_logs RCS columns ───────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rcs_template_mappings (
+        erp_event          TEXT PRIMARY KEY,
+        template_name      TEXT NOT NULL DEFAULT '',
+        template_id        TEXT,
+        alt_template_id    TEXT,
+        carrier            TEXT DEFAULT 'jio',
+        template_type      TEXT DEFAULT 'transactional',
+        variables_required TEXT[] DEFAULT '{}',
+        enabled            BOOLEAN DEFAULT true,
+        last_success_at    TIMESTAMPTZ,
+        last_failure_at    TIMESTAMPTZ,
+        last_failure_reason TEXT,
+        notes              TEXT,
+        created_at         TIMESTAMPTZ DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    // Seed approved Jio RCS templates (ON CONFLICT = skip if already exists)
+    await pool.query(`
+      INSERT INTO rcs_template_mappings (erp_event, template_name, template_id, variables_required, notes) VALUES
+        ('booking_submitted',        'Booking_Submitted',          '3651', ARRAY['customer_name','booking_id','package_name'],                     NULL),
+        ('booking_confirmed',        'Booking_Approved',           '3652', ARRAY['customer_name','booking_id','package_name','amount'],            NULL),
+        ('booking_approved',         'Booking_Approved',           '3652', ARRAY['customer_name','booking_id','package_name','amount'],            NULL),
+        ('payment_received',         'Payment_Received',           '3654', ARRAY['customer_name','booking_id','amount','receipt_number'],          '3656 also available as alternative'),
+        ('pending_payment_reminder', 'Pending_Payment_Reminder',   '3655', ARRAY['customer_name','booking_id','balance_amount'],                   NULL),
+        ('invoice_ready',            'Invoice_Generated',          '3657', ARRAY['customer_name','booking_id','invoice_number','amount'],          NULL),
+        ('flight_ticket',            'Ticket_Issued',              '3659', ARRAY['customer_name','booking_id','flight_number','airline_name','departure_date'], NULL),
+        ('visa_ready',               'Visa_Issued',                '3660', ARRAY['customer_name','booking_id'],                                    NULL),
+        ('agreement_ready',          'Agreement_Ready',            '3661', ARRAY['customer_name','booking_id','agreement_number','document_url'],  NULL),
+        ('hotel_voucher',            'Hotel_Voucher',              NULL,   ARRAY['customer_name','booking_id','hotel_name'],                       'Template not mapped — add approved Lemin template ID'),
+        ('departure_reminder',       'Departure_Reminder',         NULL,   ARRAY['customer_name','booking_id','departure_date'],                   'Template not mapped — add approved Lemin template ID')
+      ON CONFLICT (erp_event) DO NOTHING
+    `);
+    console.log("[Migration] v31.0 rcs_template_mappings seeded");
+  } catch (err: any) { console.warn("[Migration] v31.0 rcs_template_mappings:", err.message); }
+
+  // v31.0 — notification_logs: add RCS tracking columns
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS message_id        TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS delivery_status   TEXT DEFAULT 'unknown'`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS last_status_check TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS read_at           TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS template_id       TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS template_name     TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS idempotency_key   TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_nl_message_id ON notification_logs(message_id) WHERE message_id IS NOT NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_nl_idempotency ON notification_logs(idempotency_key) WHERE idempotency_key IS NOT NULL`);
+    console.log("[Migration] v31.0 notification_logs RCS columns ensured");
+  } catch (err: any) { console.warn("[Migration] v31.0 notification_logs cols:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
