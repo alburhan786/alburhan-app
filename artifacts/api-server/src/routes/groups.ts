@@ -587,6 +587,102 @@ router.post(
   }
 );
 
+// ── POST /api/groups/:groupId/pilgrims/bulk-family ────────────────────────────
+// Bulk-update familyId / familyHead / familyRelation for existing pilgrims.
+// Matches rows by serialNumber; rejects unknowns; returns a preview + result.
+router.post("/:groupId/pilgrims/bulk-family", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const groupId = String(req.params.groupId);
+  const rows: any[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+
+  if (rows.length === 0) {
+    return void res.status(400).json({ message: "rows array is required and must not be empty" });
+  }
+
+  // Load all pilgrims in the group, keyed by serialNumber
+  const allPilgrims = await pool.query(
+    `SELECT id, serial_number, full_name, family_id FROM pilgrims WHERE group_id=$1`,
+    [groupId]
+  );
+  if (allPilgrims.rows.length === 0) {
+    return void res.status(404).json({ message: "Group not found or has no pilgrims" });
+  }
+
+  const bySerial = new Map<number, { id: string; fullName: string; currentFamilyId: string | null }>();
+  for (const p of allPilgrims.rows) {
+    bySerial.set(Number(p.serial_number), {
+      id: p.id,
+      fullName: p.full_name,
+      currentFamilyId: p.family_id || null,
+    });
+  }
+
+  const toUpdate: { id: string; oldFamilyId: string | null; familyId: string | null; familyHead: boolean; familyRelation: string | null }[] = [];
+  const skippedRows: { serialNumber: any; reason: string }[] = [];
+
+  for (const row of rows) {
+    const sn = Number(row.serialNumber);
+    if (!sn || isNaN(sn)) {
+      skippedRows.push({ serialNumber: row.serialNumber, reason: "Invalid serial number" });
+      continue;
+    }
+    const pilgrim = bySerial.get(sn);
+    if (!pilgrim) {
+      skippedRows.push({ serialNumber: sn, reason: "Serial number not found in group" });
+      continue;
+    }
+    toUpdate.push({
+      id: pilgrim.id,
+      oldFamilyId: pilgrim.currentFamilyId,
+      familyId: row.familyId ? String(row.familyId).trim() || null : null,
+      familyHead: String(row.familyHead ?? "").trim().toLowerCase() === "yes",
+      familyRelation: row.familyRelation ? String(row.familyRelation).trim() || null : null,
+    });
+  }
+
+  if (toUpdate.length === 0) {
+    return void res.json({ updated: 0, skipped: skippedRows.length, skippedRows });
+  }
+
+  // Apply updates one-by-one (small batches in practice)
+  let updated = 0;
+  // Track both destination AND source family IDs — old families may need a new head after members leave
+  const affectedFamilies = new Set<string>();
+
+  for (const u of toUpdate) {
+    try {
+      // If setting as head, clear the flag from others in the destination family first
+      if (u.familyHead && u.familyId) {
+        await pool.query(
+          `UPDATE pilgrims SET family_head=false, updated_at=NOW() WHERE group_id=$1 AND family_id=$2 AND id<>$3`,
+          [groupId, u.familyId, u.id]
+        );
+      }
+      await pool.query(
+        `UPDATE pilgrims SET family_id=$1, family_head=$2, family_relation=$3, updated_at=NOW() WHERE id=$4`,
+        [u.familyId, u.familyHead, u.familyRelation, u.id]
+      );
+      // Record both old and new family IDs so ensureFamilyHead runs on both sides
+      if (u.familyId) affectedFamilies.add(u.familyId);
+      if (u.oldFamilyId && u.oldFamilyId !== u.familyId) affectedFamilies.add(u.oldFamilyId);
+      updated++;
+    } catch (err: any) {
+      skippedRows.push({ serialNumber: "?", reason: err?.message || "DB error" });
+    }
+  }
+
+  // Auto-promote family head where none exists (covers both destination and orphaned source families)
+  for (const fid of affectedFamilies) {
+    await ensureFamilyHead(groupId, fid).catch(() => {});
+  }
+
+  auditLog({
+    req, action: "bulk_family_update", entityTable: "pilgrims", entityId: groupId,
+    newValue: { updated, skipped: skippedRows.length, familiesAffected: affectedFamilies.size },
+  }).catch(() => {});
+
+  res.json({ updated, skipped: skippedRows.length, skippedRows });
+});
+
 router.get("/:groupId/haji-list/pdf", requireAdmin as any, async (req, res) => {
   try {
     const groupId = String(req.params.groupId);
