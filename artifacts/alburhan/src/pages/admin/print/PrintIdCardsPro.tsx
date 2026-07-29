@@ -42,6 +42,30 @@ const DARK = "#0d5040";
 const GOLD = "#C9A23F";
 const SHORT_ADDRESS = "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur";
 
+// ── Group colour accents ──────────────────────────────────────────────────────
+const GROUP_COLOR_MAP: Record<string, string> = {
+  VIP: "#c0000c", // red
+  A:   "#16a34a", // green
+  B:   "#2563eb", // blue
+  C:   "#9333ea", // purple
+  D:   "#d97706", // amber
+  E:   "#0891b2", // cyan
+  F:   "#db2777", // pink
+  G:   "#65a30d", // lime
+  H:   "#7c3aed", // violet
+  I:   "#0d9488", // teal
+  J:   "#ea580c", // orange
+};
+
+/** Returns the accent colour for a group based on its name. */
+function getGroupColor(groupName: string): string {
+  const name = (groupName || "").trim().toUpperCase();
+  if (name.includes("VIP")) return GROUP_COLOR_MAP["VIP"];
+  // match last capital letter of the group name word
+  const lastLetter = name.replace(/[^A-Z]/g, "").slice(-1);
+  return GROUP_COLOR_MAP[lastLetter] || DARK;
+}
+
 function buildVerifyUrl(id: string): string {
   return `${window.location.origin}${import.meta.env.BASE_URL}verify/${id}`;
 }
@@ -60,9 +84,10 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
     .replace(/[^A-Za-z0-9\-. ]/g, "")
     .trim();
   const barcodeFormat = "CODE128";
+  const groupColor = getGroupColor(group.groupName);
 
   return (
-    <div className="pro-card">
+    <div className="pro-card" style={{ borderLeft: `3mm solid ${groupColor}` }}>
 
       {/* ── Header ── */}
       <div style={{
@@ -249,9 +274,10 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
 
 function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) {
   const saudiPhones = (company.phoneSaudi || "").split(/[|,]/).map(s => s.trim()).filter(Boolean);
+  const groupColor = getGroupColor(group.groupName);
 
   return (
-    <div className="pro-card">
+    <div className="pro-card" style={{ borderLeft: `3mm solid ${groupColor}` }}>
 
       {/* ── Header ── */}
       <div style={{
@@ -401,9 +427,10 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
     .replace(/[^\x00-\x7F]/g, "")
     .replace(/[^A-Za-z0-9\-. ]/g, "")
     .trim();
+  const groupColor = getGroupColor(group.groupName);
 
   return (
-    <div className="pro-card-portrait">
+    <div className="pro-card-portrait" style={{ borderLeft: `3mm solid ${groupColor}` }}>
 
       {/* ── Header ── */}
       <div style={{
