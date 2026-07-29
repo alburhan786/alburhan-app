@@ -1,11 +1,15 @@
 // @ts-nocheck
 import { Router } from "express";
+import fs from "fs";
+import path from "path";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import { sendOtpSMS, sendEmail } from "../lib/notifications.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateAgreementPdfBuffer, HAJJ_AGREEMENT_CLAUSES, CONSENT_CATEGORIES, AgreementPdfOptions } from "../lib/agreementPdf.js";
+import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
+import { objectStorageClient } from "../lib/objectStorage.js";
 import { createHash } from "crypto";
 import { spawn } from "child_process";
 import { sendPDFDocument } from "../lib/botbee.js";
@@ -91,7 +95,7 @@ const RICH_SELECT = `
          cp.nationality, cp.father_name, cp.city, cp.state, cp.country,
          cp.passport_issue_date, cp.passport_expiry,
          cp.nominee, cp.nominee_relation, cp.whatsapp_number,
-         cp.photo_url, cp.aadhar_image_url, cp.pan_image_url, cp.passport_image_url
+         cp.address, cp.photo_url, cp.aadhar_image_url, cp.pan_image_url, cp.passport_image_url
   FROM agreements a
   LEFT JOIN bookings b  ON b.id  = a.booking_id
   LEFT JOIN hajj_groups hg ON hg.id = b.group_id
@@ -127,7 +131,7 @@ function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfO
     customerGender:         ag.gender || null,
     customerNationality:    ag.nationality || null,
     customerBloodGroup:     ag.blood_group || null,
-    customerAddress:        ag.customer_address || null,
+    customerAddress:        ag.address || null,
     customerCity:           ag.city || null,
     customerState:          ag.state || null,
     customerCountry:        ag.country || null,
@@ -219,6 +223,45 @@ function getSiteBase(): string {
   return process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : (process.env.SITE_URL || "https://alburhantravels.online");
+}
+
+// ── Fetch an image from storage/disk/URL into a Buffer (for PDF embedding) ───
+async function fetchImageBuffer(url: string | null | undefined): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    if (url.startsWith("/api/storage/objects/")) {
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) return null;
+      const tail = url.replace("/api/storage/objects/", "");
+      const [file] = await (objectStorageClient as any).bucket(bucketId).file(`objects/${tail}`).download();
+      return file as Buffer;
+    }
+    if (url.startsWith("/api/documents/files/")) {
+      const filename = path.basename(url);
+      const uploadsDir = process.env.UPLOADS_DIR || path.resolve(process.cwd(), "../../uploads");
+      const filePath = path.join(uploadsDir, filename);
+      if (!fs.existsSync(filePath)) return null;
+      return fs.readFileSync(filePath);
+    }
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!resp.ok) return null;
+      return Buffer.from(await resp.arrayBuffer());
+    }
+    return null;
+  } catch (e: any) {
+    console.warn("[fetchImageBuffer] Could not fetch", url?.substring(0, 60), e?.message);
+    return null;
+  }
+}
+
+// ── Build PDF opts enriched with fetched photo buffers (async) ───────────────
+async function buildEnrichedPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfOptions> = {}): Promise<AgreementPdfOptions> {
+  const [customerPhotoBuffer, passportPhotoBuffer] = await Promise.all([
+    fetchImageBuffer(ag.photo_url).catch(() => null),
+    fetchImageBuffer(ag.passport_image_url).catch(() => null),
+  ]);
+  return buildPdfOpts(ag, siteBase, { customerPhotoBuffer: customerPhotoBuffer || null, passportPhotoBuffer: passportPhotoBuffer || null, ...override });
 }
 
 // ── Auto-generate (called after payment confirmed) ────────────────────────────
@@ -563,7 +606,10 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
     const ag = agRes.rows[0];
     console.log(`[Agreement/Sign] agreement=${ag.agreement_number} booking=${ag.booking_number} booking_id=${ag.booking_id} status=${ag.status} mobile=${ag.customer_mobile} token=${ag.verification_token?.slice(0, 8)}…`);
 
-    if (ag.status === "signed") return res.status(400).json({ error: "Already signed" });
+    if (ag.status === "signed") {
+      const pdfUrl = `${getSiteBase()}/api/agreements/my/${id}/pdf`;
+      return res.status(200).json({ ok: true, alreadySigned: true, pdfUrl, agreementNumber: ag.agreement_number, message: "Agreement already signed. You can download your signed copy." });
+    }
     if (!ag.signing_otp || ag.signing_otp !== String(otp)) return res.status(400).json({ error: "Invalid OTP" });
     if (!ag.signing_otp_expires_at || new Date() > new Date(ag.signing_otp_expires_at)) {
       return res.status(400).json({ error: "OTP has expired. Please request a new one." });
@@ -622,83 +668,108 @@ router.post("/my/:id/sign", requireAuth, async (req: any, res) => {
       }).catch(e => console.error("[Agreement] signed-notify failed:", e));
     }
 
+    // ── Fetch customer/passport photo buffers for PDF (parallel, best-effort) ──
+    console.log(`[Agreement/Sign] 🖼 Fetching photos — profile=${!!ag.photo_url} passport=${!!ag.passport_image_url}`);
+    const [customerPhotoBuffer, passportPhotoBuffer] = await Promise.all([
+      fetchImageBuffer(ag.photo_url).catch(() => null),
+      fetchImageBuffer(ag.passport_image_url).catch(() => null),
+    ]);
+    console.log(`[Agreement/Sign] 🖼 Photos — profile=${!!customerPhotoBuffer} passport=${!!passportPhotoBuffer}`);
+
     // Generate PDF
     console.log(`[Agreement/Sign] 📄 Generating PDF — agreement=${ag.agreement_number} booking=${ag.booking_number}`);
     let pdfBuffer: Buffer | null = null;
+    let savedDocId: string | null = null;
+    let savedFileUrl: string | null = null;
     try {
       pdfBuffer = await generateAgreementPdfBuffer(buildPdfOpts(ag, siteBase, {
         signatureData,
-        signedAt:       now,
-        signedIp:       ip,
+        signedAt:             now,
+        signedIp:             ip,
         userAgent,
-        otpVerified:    true,
-        otpVerifiedAt:  now,
+        otpVerified:          true,
+        otpVerifiedAt:        now,
         verificationUrl,
         termsAccepted,
-        status: "signed",
+        status:               "signed",
+        customerPhotoBuffer:  customerPhotoBuffer || null,
+        passportPhotoBuffer:  passportPhotoBuffer || null,
       }));
       await pool.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [id]);
       await logAgreementAudit(id, "pdf_generated", { size: pdfBuffer.length }, ip, userAgent);
       console.log(`[Agreement/Sign] ✅ PDF generated — ${Math.round(pdfBuffer.length / 1024)} KB`);
 
-      // ── Step 9: Save signed PDF to documents table so it's attached to the booking ──
+      // ── Save signed PDF to documents table ──
       try {
         const pdfFilename = `Agreement-${ag.agreement_number}.pdf`;
-        const fileUrl = await uploadToGCS(pdfBuffer, pdfFilename, "application/pdf", "agreements");
-        const docId = crypto.randomUUID();
+        savedFileUrl = await uploadToGCS(pdfBuffer, pdfFilename, "application/pdf", "agreements");
+        savedDocId = crypto.randomUUID();
         await pool.query(
           `INSERT INTO documents
              (id, booking_id, document_type, file_name, file_key, file_url, uploaded_by,
               customer_id, is_visible_to_customer, notification_sent,
               file_size, mime_type, original_filename, created_at)
-           VALUES ($1,$2,'model_contract',$3,$4,$5,'admin',$6,true,true,$7,'application/pdf',$3,NOW())
+           VALUES ($1,$2,'model_contract',$3,$4,$5,'admin',$6,true,false,$7,'application/pdf',$3,NOW())
            ON CONFLICT DO NOTHING`,
-          [docId, ag.booking_id, pdfFilename, fileUrl, fileUrl, customerId, pdfBuffer.length]
+          [savedDocId, ag.booking_id, pdfFilename, savedFileUrl, savedFileUrl, customerId, pdfBuffer.length]
         );
-        console.log(`[Agreement/Sign] ✅ PDF saved to documents table — id=${docId} url=${fileUrl}`);
-        await logAgreementAudit(id, "pdf_stored", { doc_id: docId, url: fileUrl, size: pdfBuffer.length }, ip, userAgent);
+        console.log(`[Agreement/Sign] ✅ PDF saved to documents — id=${savedDocId} url=${savedFileUrl}`);
+        await logAgreementAudit(id, "pdf_stored", { doc_id: savedDocId, url: savedFileUrl, size: pdfBuffer.length }, ip, userAgent);
       } catch (docErr: any) {
-        console.warn(`[Agreement/Sign] ⚠ documents table insert skipped: ${docErr?.message}`);
+        console.warn(`[Agreement/Sign] ⚠ documents insert skipped: ${docErr?.message}`);
       }
     } catch (pdfErr: any) {
       console.error("[Agreement/Sign] ❌ PDF generation failed:", pdfErr?.message, pdfErr?.stack?.slice(0, 300));
     }
 
-    // Email
-    const emailAddr = ag.customer_email || ag.user_email;
-    console.log(`[Agreement/Sign] 📧 Email step — to=${emailAddr || "MISSING"} pdf=${!!pdfBuffer}`);
-    if (emailAddr && pdfBuffer) {
+    // ── Deliver signed PDF via WhatsApp + Email (sendDocumentToCustomer for proper logging) ──
+    if (pdfBuffer && savedDocId && savedFileUrl) {
       try {
-        const htmlBody = `<p>As-salamu Alaykum <strong>${ag.customer_name || "Valued Customer"}</strong>,</p><p>Alhumdulillah! Your Hajj Agreement has been signed successfully.</p><p><strong>Agreement ID:</strong> ${ag.agreement_number}<br/><strong>Booking ID:</strong> ${ag.booking_number}</p><p>Please find your signed agreement attached. Verify at: <a href="${verificationUrl}">${verificationUrl}</a></p><p>May Allah accept your Hajj. Ameen.<br/>— Al Burhan Tours & Travels</p>`;
-        await sendEmail(emailAddr, `Your Hajj Agreement — ${ag.agreement_number}`,
-          `Your Hajj Agreement ${ag.agreement_number} has been signed. Verify: ${verificationUrl}`, htmlBody,
-          [{ filename: `Agreement-${ag.agreement_number}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
-        );
-        await logAgreementAudit(id, "email_sent", { to: emailAddr });
-        console.log(`[Agreement/Sign] ✅ Email sent to ${emailAddr}`);
-      } catch (e: any) {
-        console.error("[Agreement/Sign] ❌ Email send failed:", e?.message);
+        await sendDocumentToCustomer({
+          docId:           savedDocId,
+          bookingId:       ag.booking_id,
+          bookingNumber:   ag.booking_number,
+          customerId:      ag.customer_id,
+          customerName:    ag.customer_name || ag.user_name || "Valued Customer",
+          customerMobile:  ag.customer_mobile || "",
+          customerEmail:   ag.customer_email  || ag.user_email || "",
+          documentType:    "model_contract",
+          fileName:        `Agreement-${ag.agreement_number}.pdf`,
+          fileUrl:         savedFileUrl,
+          mimeType:        "application/pdf",
+          packageName:     ag.package_name || "Hajj Package",
+        });
+        await logAgreementAudit(id, "pdf_delivered", { doc_id: savedDocId }, ip, userAgent);
+        console.log(`[Agreement/Sign] ✅ PDF delivered via document delivery`);
+      } catch (deliveryErr: any) {
+        console.error("[Agreement/Sign] ❌ PDF delivery failed:", deliveryErr?.message);
+        // Fallback: direct WhatsApp send
+        try {
+          if (ag.customer_mobile && pdfBuffer) {
+            await sendPDFDocument(ag.customer_mobile, pdfBuffer, `Agreement-${ag.agreement_number}.pdf`,
+              `As-salamu Alaykum ${ag.customer_name}! Your Hajj Agreement (${ag.agreement_number}) has been signed. Booking: ${ag.booking_number}. Verify: ${verificationUrl}`
+            );
+            console.log(`[Agreement/Sign] ✅ WhatsApp fallback sent to ***${ag.customer_mobile.slice(-4)}`);
+          }
+        } catch (fbErr: any) {
+          console.error("[Agreement/Sign] ❌ WhatsApp fallback also failed:", fbErr?.message);
+        }
       }
-    }
-
-    // WhatsApp
-    console.log(`[Agreement/Sign] 📱 WhatsApp step — mobile=${ag.customer_mobile || "MISSING"} pdf=${!!pdfBuffer}`);
-    try {
-      if (ag.customer_mobile) {
+    } else if (pdfBuffer && ag.customer_mobile) {
+      // No saved doc (GCS upload failed) — still attempt direct WhatsApp
+      try {
         await sendPDFDocument(ag.customer_mobile, pdfBuffer, `Agreement-${ag.agreement_number}.pdf`,
           `As-salamu Alaykum ${ag.customer_name}! Your Hajj Agreement (${ag.agreement_number}) has been signed. Booking: ${ag.booking_number}. Verify: ${verificationUrl}`
         );
-        await logAgreementAudit(id, "whatsapp_sent", { mobile: ag.customer_mobile.slice(-4).padStart(ag.customer_mobile.length, "*") });
-        console.log(`[Agreement/Sign] ✅ WhatsApp PDF sent to ***${ag.customer_mobile.slice(-4)}`);
+        console.log(`[Agreement/Sign] ✅ WhatsApp direct sent (no saved doc) to ***${ag.customer_mobile.slice(-4)}`);
+      } catch (e: any) {
+        console.error("[Agreement/Sign] ❌ WhatsApp direct send failed:", e?.message);
       }
-    } catch (e: any) {
-      console.error("[Agreement/Sign] ❌ WhatsApp send failed:", e?.message);
     }
 
+    const pdfUrl = `${siteBase}/api/agreements/my/${id}/pdf`;
     console.log(`[Agreement/Sign] ✅ COMPLETE — agreement=${ag.agreement_number} booking=${ag.booking_number} pdf=${!!pdfBuffer}`);
-    const payload: any = { ok: true, agreementNumber: ag.agreement_number, message: "Agreement signed successfully." };
-    if (pdfBuffer) payload.pdfBase64 = pdfBuffer.toString("base64");
-    res.json(payload);
+    res.json({ ok: true, agreementNumber: ag.agreement_number, pdfUrl, message: "Agreement signed successfully." });
   } catch (err: any) {
     console.error("[Agreement/Sign] ❌ Fatal error:", err?.message, err?.stack?.slice(0, 400));
     res.status(500).json({ error: "Failed to sign agreement" });
@@ -715,7 +786,7 @@ router.get("/my/:id/pdf", requireAuth, async (req: any, res) => {
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
 
-    const buf = await generateAgreementPdfBuffer(buildPdfOpts(ag, getSiteBase()));
+    const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
     await logAgreementAudit(id, "pdf_downloaded_customer", {}, getClientIp(req), req.headers["user-agent"]);
     const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
@@ -871,7 +942,7 @@ router.get("/:id/pdf", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [id]);
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
-    const buf = await generateAgreementPdfBuffer(buildPdfOpts(ag, getSiteBase()));
+    const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
     await logAgreementAudit(id, "pdf_downloaded_admin", { adminId: req.user?.id }, getClientIp(req));
     const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
@@ -893,7 +964,7 @@ router.get("/:id/image", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [id]);
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
-    const pdfBuf = await generateAgreementPdfBuffer(buildPdfOpts(ag, getSiteBase()));
+    const pdfBuf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
 
     // Attempt GhostScript conversion (gs must be available on VPS)
     const ext = format === "jpg" ? "jpeg" : format;
@@ -933,7 +1004,7 @@ router.get("/:id/image", requireAdmin, async (req: any, res) => {
     try {
       const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [req.params.id]);
       if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
-      const buf = await generateAgreementPdfBuffer(buildPdfOpts(agRes.rows[0], getSiteBase()));
+      const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(agRes.rows[0], getSiteBase()));
       const safeName = agRes.rows[0].agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="Agreement-${safeName}.pdf"`);
@@ -1008,7 +1079,7 @@ router.post("/:id/resend-email", requireAdmin, async (req: any, res) => {
     if (!emailTo) return res.status(400).json({ error: "No email on record" });
 
     const siteBase = getSiteBase();
-    const buf = await generateAgreementPdfBuffer(buildPdfOpts(ag, siteBase));
+    const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, siteBase));
     const verificationUrl = `${siteBase}/verify-agreement/${ag.verification_token}`;
     await sendEmail(emailTo, `Your Hajj Agreement — ${ag.agreement_number}`,
       `Your Hajj Agreement ${ag.agreement_number} is attached. Verify at: ${verificationUrl}`,
@@ -1034,7 +1105,7 @@ router.post("/:id/resend-whatsapp", requireAdmin, async (req: any, res) => {
     if (!mobile) return res.status(400).json({ error: "No mobile number" });
 
     const siteBase = getSiteBase();
-    const buf = await generateAgreementPdfBuffer(buildPdfOpts(ag, siteBase));
+    const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, siteBase));
     const verificationUrl = `${siteBase}/verify-agreement/${ag.verification_token}`;
     await sendPDFDocument(mobile, buf, `Agreement-${ag.agreement_number}.pdf`,
       `As-salamu Alaykum ${ag.customer_name || ""}! Your Hajj Agreement (${ag.agreement_number}) from Al Burhan Tours & Travels. Booking: ${ag.booking_number}. Verify: ${verificationUrl}`

@@ -227,6 +227,9 @@ export interface AgreementPdfOptions {
   nomineeRelation?: string | null;
   emergencyContactName?: string | null;
   emergencyContactMobile?: string | null;
+  // Photos (pre-fetched buffers — fetched by caller before PDF generation)
+  customerPhotoBuffer?: Buffer | null;
+  passportPhotoBuffer?: Buffer | null;
   // Package
   packageName?: string | null;
   packageType?: string | null;
@@ -331,9 +334,18 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
 
   const photoW = 62;
   const photoH = 82;
-  // Photo placeholder
+  // Customer profile photo (or placeholder)
   doc.rect(M, y, photoW, photoH).fill("#E8E8E8").stroke("#C0C0C0");
-  doc.fill("#BBB").font("Helvetica").fontSize(6).text("PASSPORT\nPHOTO", M, y + 32, { width: photoW, align: "center" });
+  if (o.customerPhotoBuffer) {
+    try {
+      doc.image(o.customerPhotoBuffer, M + 1, y + 1, { width: photoW - 2, height: photoH - 16, fit: [photoW - 2, photoH - 16] });
+    } catch {}
+  } else {
+    doc.fill("#BBB").font("Helvetica").fontSize(6).text("PHOTO\nUPLOAD\nPENDING", M, y + 24, { width: photoW, align: "center" });
+  }
+  // Label bar at bottom of photo box
+  doc.rect(M, y + photoH - 14, photoW, 14).fill(DG);
+  doc.fill("white").font("Helvetica").fontSize(5).text("CUSTOMER PHOTO", M, y + photoH - 10, { width: photoW, align: "center" });
   doc.fill("black");
 
   const infoX = M + photoW + 5;
@@ -394,6 +406,31 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
     .text(`  ${fmt(o.nominee, "Not specified")}  |  Relationship: ${fmt(o.nomineeRelation)}`, { continued: false });
   doc.fill("black");
   y += 26;
+
+  // ── Passport Photo ────────────────────────────────────────────────────────
+  const ppW = 62;
+  const ppH = 72;
+  doc.rect(M, y, ppW, ppH).fill("#E8E8E8").stroke("#C0C0C0");
+  if (o.passportPhotoBuffer) {
+    try {
+      doc.image(o.passportPhotoBuffer, M + 1, y + 1, { width: ppW - 2, height: ppH - 16, fit: [ppW - 2, ppH - 16] });
+    } catch {}
+  } else {
+    doc.fill("#BBB").font("Helvetica").fontSize(6).text("NO PASSPORT\nPHOTO\nUPLOADED", M, y + 20, { width: ppW, align: "center" });
+  }
+  doc.rect(M, y + ppH - 14, ppW, 14).fill(o.passportPhotoBuffer ? DG : "#999");
+  doc.fill("white").font("Helvetica").fontSize(5).text("PASSPORT PHOTO", M, y + ppH - 10, { width: ppW, align: "center" });
+  doc.fill("black");
+  // Passport details alongside photo
+  const ppInfoX = M + ppW + 5;
+  const ppInfoW = CW - ppW - 5;
+  const ppCellH = (ppH - g) / 2;
+  const ppC2 = (ppInfoW - g) / 2;
+  infoCell(doc, ppInfoX,        y,              ppC2, ppCellH, "PASSPORT NO.", fmt(o.customerPassport));
+  infoCell(doc, ppInfoX+ppC2+g, y,              ppC2, ppCellH, "NATIONALITY",  fmt(o.customerNationality));
+  infoCell(doc, ppInfoX,        y+ppCellH+g,    ppC2, ppCellH, "ISSUE DATE",   fmtDate(o.passportIssueDate));
+  infoCell(doc, ppInfoX+ppC2+g, y+ppCellH+g,    ppC2, ppCellH, "EXPIRY DATE",  fmtDate(o.passportExpiry));
+  y += ppH + 4;
 
   // ── Package Details ───────────────────────────────────────────────────────
   y = secBar(doc, y, "PACKAGE INFORMATION");
