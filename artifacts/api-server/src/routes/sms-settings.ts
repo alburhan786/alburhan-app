@@ -503,6 +503,17 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
   const smtpConf = getCachedConfig("smtp");
   const emailEnabled = !!(smtpConf?.enabled && (smtpConf?.host || process.env.SMTP_HOST));
 
+  // Check RCS config (Lemin)
+  const [rcsMappingsRow, rcsStatsRow] = await Promise.all([
+    pool.query(`SELECT COUNT(*) FILTER (WHERE enabled=true) AS enabled_count, COUNT(*) AS total_count, MAX(last_success_at) AS last_success FROM rcs_template_mappings`).catch(() => ({ rows: [{}] })),
+    pool.query(`SELECT COUNT(*) FILTER (WHERE status='sent') AS rcs_sent, COUNT(*) FILTER (WHERE status='failed') AS rcs_failed FROM notification_logs WHERE channel='rcs'`).catch(() => ({ rows: [{}] })),
+  ]);
+  const rcsMappings = rcsMappingsRow.rows[0] || {};
+  const rcsStats = rcsStatsRow.rows[0] || {};
+  const rcsEnabledCount = Number(rcsMappings.enabled_count || 0);
+  const rcsTotalCount = Number(rcsMappings.total_count || 0);
+  const leminKeyConfigured = !!(process.env.LEMIN_API_KEY);
+
   // Recent notification stats (last 24h)
   const statsRow = await pool.query(`
     SELECT
@@ -510,6 +521,8 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
       COUNT(*) FILTER (WHERE channel='sms' AND status='failed' AND sent_at > NOW()-INTERVAL '24h') AS sms_failed,
       COUNT(*) FILTER (WHERE channel='whatsapp' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS wa_sent,
       COUNT(*) FILTER (WHERE channel='email' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS email_sent,
+      COUNT(*) FILTER (WHERE channel='rcs' AND status='sent' AND sent_at > NOW()-INTERVAL '24h') AS rcs_sent_24h,
+      COUNT(*) FILTER (WHERE channel='rcs' AND status='failed' AND sent_at > NOW()-INTERVAL '24h') AS rcs_failed_24h,
       COUNT(*) FILTER (WHERE provider_response::text ILIKE '%quick_route_emergency%' AND sent_at > NOW()-INTERVAL '24h') AS emergency_sms_count
     FROM notification_logs
   `).catch(() => ({ rows: [{}] }));
@@ -523,6 +536,8 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
     { id: "sms_templates",     label: `DLT Templates Configured (${smsConfigured}/${SMS_EVENTS.length})`, pass: smsConfigured === SMS_EVENTS.length, detail: smsConfigured === SMS_EVENTS.length ? "All events have template IDs" : `${SMS_EVENTS.length - smsConfigured} events missing template IDs` },
     { id: "whatsapp",          label: "WhatsApp Channel (BotBee)",             pass: waEnabled,       detail: waEnabled ? "API key configured" : "BotBee API key not set" },
     { id: "email",             label: "Email Channel (SMTP)",                  pass: emailEnabled,    detail: emailEnabled ? `Host: ${smtpConf?.host || process.env.SMTP_HOST}` : "SMTP not configured" },
+    { id: "rcs_key",           label: "RCS Channel (Lemin) — API Key",         pass: leminKeyConfigured, detail: leminKeyConfigured ? "LEMIN_API_KEY configured" : "LEMIN_API_KEY not set — RCS will not send" },
+    { id: "rcs_mappings",      label: `RCS Templates Mapped (${rcsEnabledCount}/${rcsTotalCount})`, pass: rcsEnabledCount > 0, detail: rcsTotalCount === 0 ? "No RCS template mappings seeded" : `${rcsEnabledCount} of ${rcsTotalCount} event templates enabled` },
     { id: "no_emergency_usage",label: "No Emergency SMS in Last 24h",          pass: Number(stats.emergency_sms_count || 0) === 0, detail: Number(stats.emergency_sms_count || 0) === 0 ? "All SMS sent via DLT route" : `⚠ ${stats.emergency_sms_count} emergency SMS sent` },
   ];
 
@@ -564,6 +579,7 @@ router.get("/production-report", async (_req: AuthenticatedRequest, res) => {
       sms: { enabled: !!apiKey && f2s.enabled !== false, route: "dlt", last24h: { sent: Number(stats.sms_sent || 0), failed: Number(stats.sms_failed || 0), emergency: Number(stats.emergency_sms_count || 0) } },
       whatsapp: { enabled: waEnabled, provider: "BotBee", last24h: { sent: Number(stats.wa_sent || 0) } },
       email: { enabled: emailEnabled, provider: "SMTP", last24h: { sent: Number(stats.email_sent || 0) } },
+      rcs: { enabled: leminKeyConfigured && rcsEnabledCount > 0, provider: "LeminAI", apiKeyConfigured: leminKeyConfigured, enabledMappings: rcsEnabledCount, totalMappings: rcsTotalCount, lastSuccess: rcsMappings.last_success || null, allTime: { sent: Number(rcsStats.rcs_sent || 0), failed: Number(rcsStats.rcs_failed || 0) }, last24h: { sent: Number(stats.rcs_sent_24h || 0), failed: Number(stats.rcs_failed_24h || 0) } },
     },
     checks,
   });

@@ -2,11 +2,30 @@ import { pool } from "@workspace/db";
 import {
   sendWhatsApp,
   sendDLTSMS,
-  sendRCS,
   sendEmail,
 } from "./notifications.js";
 import { sendTemplate as sendBotBeeTemplate, is24hWindowError } from "./botbee.js";
 import { sendMetaEventTemplate, isMetaWapiConfigured, META_EVENT_TEMPLATE_MAP } from "./metaWapi.js";
+
+// Shared mapping: ERP EventType → rcs_template_mappings.erp_event key.
+// Used by sendOnChannelWithType (live dispatch) and retryNotification (replay).
+const RCS_EVENT_MAP: Readonly<Partial<Record<string, string>>> = {
+  new_booking:        "booking_submitted",
+  booking_approved:   "booking_approved",
+  payment_received:   "payment_received",
+  partial_payment:    "pending_payment_reminder",
+  payment_due:        "pending_payment_reminder",
+  invoice_generated:  "invoice_ready",
+  invoice_ready:      "invoice_ready",
+  ticket_issued:      "flight_ticket",
+  flight_assigned:    "flight_ticket",
+  visa_ready:         "visa_ready",
+  visa_approved:      "visa_ready",
+  visa_issued:        "visa_ready",
+  agreement_ready:    "agreement_ready",
+  hotel_assigned:     "hotel_voucher",
+  departure_reminder: "departure_reminder",
+} as const;
 
 export type EventType =
   // Account & Auth
@@ -468,8 +487,16 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
         return { status: "failed", providerResponse: { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message } };
       }
     } else if (channel === "rcs") {
-      const result = await sendRCS(ctx.customerMobile, ctx.customerName, message);
-      return { status: result.ok ? "sent" : "failed", providerResponse: result };
+      try {
+        const { sendRCSForEvent } = await import("./rcs.js");
+        const result = await sendRCSForEvent("custom", ctx.customerMobile, ctx.bookingId, {
+          customer_name: ctx.customerName || "",
+          booking_id: ctx.bookingNumber || ctx.bookingId || "",
+        }, { customerId: ctx.customerId, bookingNumber: ctx.bookingNumber, customerName: ctx.customerName });
+        return { status: result.ok ? "sent" : "failed", providerResponse: result };
+      } catch (rcsErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "LeminAI", errorMessage: rcsErr.message } };
+      }
     } else if (channel === "email") {
       if (!ctx.customerEmail) return { status: "failed", providerResponse: { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email address" } };
       const subject = buildEmailSubject(ctx as unknown as EventType extends string ? any : never, ctx);
@@ -995,8 +1022,35 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
         return { status: "failed", providerResponse: { ok: false, provider: "Fast2SMS", endpoint: "https://www.fast2sms.com/dev/bulkV2", errorMessage: smsErr?.message } };
       }
     } else if (channel === "rcs") {
-      const result = await sendRCS(ctx.customerMobile, ctx.customerName, message);
-      return { status: result.ok ? "sent" : "failed", providerResponse: result };
+      // Use shared module-level RCS_EVENT_MAP so live dispatch and retry share the same mapping.
+      // No SMS fallback here: fireNotificationEvent dispatches all enabled channels in parallel,
+      // so if SMS is also enabled it already fires independently — a fallback would duplicate sends.
+      const rcsEvent = RCS_EVENT_MAP[eventType] ?? eventType;
+      const rcsVars: Record<string, string> = {};
+      if (ctx.customerName)                   rcsVars.customer_name    = ctx.customerName;
+      if (ctx.bookingNumber || ctx.bookingId) rcsVars.booking_id       = ctx.bookingNumber || ctx.bookingId || "";
+      if (ctx.amount != null)                 rcsVars.amount           = String(Math.round(Number(ctx.amount)));
+      if (ctx.packageName)                    rcsVars.package_name     = String(ctx.packageName);
+      if ((ctx as any).receiptNumber)         rcsVars.receipt_number   = String((ctx as any).receiptNumber);
+      if (ctx.invoiceNumber)                  rcsVars.invoice_number   = String(ctx.invoiceNumber);
+      if ((ctx as any).flightNumber)          rcsVars.flight_number    = String((ctx as any).flightNumber);
+      if ((ctx as any).airlineName)           rcsVars.airline_name     = String((ctx as any).airlineName);
+      if (ctx.departureDate)                  rcsVars.departure_date   = String(ctx.departureDate);
+      if ((ctx as any).agreementNumber)       rcsVars.agreement_number = String((ctx as any).agreementNumber);
+      if ((ctx as any).agreementUrl)          rcsVars.document_url     = String((ctx as any).agreementUrl);
+      if (ctx.hotelName)                      rcsVars.hotel_name       = String(ctx.hotelName);
+      if ((ctx as any).balanceAmount)         rcsVars.balance_amount   = String((ctx as any).balanceAmount);
+      try {
+        const { sendRCSForEvent } = await import("./rcs.js");
+        const rcsResult = await sendRCSForEvent(rcsEvent, ctx.customerMobile, ctx.bookingId, rcsVars, {
+          customerId: ctx.customerId,
+          bookingNumber: ctx.bookingNumber,
+          customerName: ctx.customerName,
+        });
+        return { status: rcsResult.ok ? "sent" : "failed", providerResponse: rcsResult };
+      } catch (rcsErr: any) {
+        return { status: "failed", providerResponse: { ok: false, provider: "LeminAI", endpoint: "", errorMessage: rcsErr.message } };
+      }
     } else if (channel === "email") {
       if (!ctx.customerEmail) return { status: "failed", providerResponse: { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No email address" } };
       const attachments = ctx.attachments as import("./notifications.js").EmailAttachment[] | undefined;
@@ -1062,8 +1116,6 @@ export async function fireNotificationEvent(
     if (!enabled.includes(c)) return false;
     // Skip email when customer has no email address (prevents "failed" noise in logs)
     if (c === "email" && !ctx.customerEmail) return false;
-    // Skip RCS globally — provider is non-functional (0% success); disabled in notification_settings
-    if (c === "rcs") return false;
     return true;
   });
   console.log(`[notifEngine] ${eventType}: enabled channels = [${orderedChannels.join(", ")}] (of [${enabled.join(", ")}])`);
@@ -1281,8 +1333,19 @@ export async function retryNotification(logId: string): Promise<{ success: boole
       status = smsResult.ok ? "sent" : "failed";
       providerResponse = smsResult;
     } else if (channel === "rcs") {
-      const result = await sendRCS(log.recipient, log.recipient, message);
-      status = result.ok ? "sent" : "failed"; providerResponse = result;
+      try {
+        const { sendRCSForEvent } = await import("./rcs.js");
+        // Use the same EventType→erp_event mapping as live dispatch
+        const rcsRetryEvent = RCS_EVENT_MAP[log.event_type || ""] ?? (log.event_type || "custom");
+        const rcsResult = await sendRCSForEvent(
+          rcsRetryEvent, log.recipient, log.booking_id || undefined,
+          { customer_name: log.customer_name || "", booking_id: log.booking_number || log.booking_id || "" },
+          { customerId: log.customer_id || undefined, bookingNumber: log.booking_number || undefined, customerName: log.customer_name || undefined }
+        );
+        status = rcsResult.ok ? "sent" : "failed"; providerResponse = rcsResult;
+      } catch (rcsErr: any) {
+        status = "failed"; providerResponse = { ok: false, provider: "LeminAI", errorMessage: rcsErr.message };
+      }
     } else if (channel === "email") {
       const result = await sendEmail(log.recipient, "Notification from Al Burhan Tours", message.replace(/\n/g, "<br>"));
       status = result.ok ? "sent" : "failed"; providerResponse = result;
