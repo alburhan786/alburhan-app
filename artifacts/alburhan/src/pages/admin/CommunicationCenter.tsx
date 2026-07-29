@@ -59,6 +59,50 @@ const EVENT_LABELS: Record<string, string> = {
 const ALL_EVENTS = Object.values(EVENT_GROUPS).flat();
 const CHANNELS = ["whatsapp","sms","rcs","email","push"];
 
+// Human-readable labels for structured error codes written by sendDLT() and other providers
+const ERROR_CODE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  invalid_template_id:     { label: "Template ID invalid",     color: "#991b1b", bg: "#fef2f2" },
+  dlt_rejected:            { label: "DLT rejected",            color: "#92400e", bg: "#fef3c7" },
+  dlt_template_missing:    { label: "Template not configured", color: "#92400e", bg: "#fef3c7" },
+  invalid_sender_id:       { label: "Sender ID invalid",       color: "#991b1b", bg: "#fef2f2" },
+  fast2sms_error:          { label: "Fast2SMS error",          color: "#991b1b", bg: "#fef2f2" },
+  rate_limit:              { label: "Rate limited",            color: "#92400e", bg: "#fef3c7" },
+  network_error:           { label: "Network error",           color: "#1e40af", bg: "#eff6ff" },
+  insufficient_balance:    { label: "Insufficient balance",    color: "#991b1b", bg: "#fef2f2" },
+  template_not_found:      { label: "Template not found",      color: "#92400e", bg: "#fef3c7" },
+  permanently_failed:      { label: "Permanently failed",      color: "#6b21a8", bg: "#faf5ff" },
+  meta_error:              { label: "Meta API error",          color: "#991b1b", bg: "#fef2f2" },
+  botbee_error:            { label: "WhatsApp provider error", color: "#991b1b", bg: "#fef2f2" },
+  rcs_error:               { label: "RCS provider error",      color: "#1e40af", bg: "#eff6ff" },
+  smtp_error:              { label: "Email delivery error",    color: "#6b21a8", bg: "#faf5ff" },
+  push_error:              { label: "Push delivery error",     color: "#991b1b", bg: "#fef2f2" },
+};
+
+// Ordered list for the filter dropdown (most actionable first)
+const ERROR_CODE_OPTIONS = [
+  "invalid_template_id", "dlt_template_missing", "dlt_rejected",
+  "invalid_sender_id", "fast2sms_error", "rate_limit",
+  "network_error", "insufficient_balance", "template_not_found",
+  "permanently_failed", "meta_error", "botbee_error", "rcs_error", "smtp_error", "push_error",
+];
+
+function ErrorCodeBadge({ code }: { code: string }) {
+  const meta = ERROR_CODE_LABELS[code];
+  const label  = meta?.label  ?? code.replace(/_/g, " ");
+  const color  = meta?.color  ?? "#6b7280";
+  const bg     = meta?.bg     ?? "#f3f4f6";
+  return (
+    <span title={code} style={{
+      background: bg, color, border: `1px solid ${color}33`,
+      borderRadius: 4, padding: "2px 7px", fontSize: 10, fontWeight: 700,
+      whiteSpace: "nowrap", display: "inline-block", maxWidth: 160,
+      overflow: "hidden", textOverflow: "ellipsis",
+    }}>
+      {label}
+    </span>
+  );
+}
+
 function useApi<T>(url: string, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -248,7 +292,7 @@ function ErrorDetailPanel({ log, onClose }: { log: any; onClose: () => void }) {
 
   return (
     <tr>
-      <td colSpan={9} style={{ padding: 0, background: "#fafafa", borderBottom: "2px solid #e5e7eb" }}>
+      <td colSpan={10} style={{ padding: 0, background: "#fafafa", borderBottom: "2px solid #e5e7eb" }}>
         <div style={{ padding: "16px 20px", borderLeft: "4px solid #ef4444" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -310,6 +354,7 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
   const [status, setStatus] = useState(filterStatus || "");
   const [channel, setChannel] = useState("");
   const [eventType, setEventType] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const LIMIT = 30;
@@ -318,6 +363,7 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
     limit: String(LIMIT), offset: String(page * LIMIT),
     ...(status && { status }), ...(channel && { channel }),
     ...(eventType && { event_type: eventType }), ...(search && { search }),
+    ...(errorCode && { error_code: errorCode }),
   }).toString();
 
   const { data, loading, reload } = useApi<any>(`/api/notification-center/logs?${qs}`, [qs]);
@@ -363,6 +409,13 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
           <option value="">All Events</option>
           {ALL_EVENTS.map(e => <option key={e} value={e}>{EVENT_LABELS[e] || e}</option>)}
         </select>
+        <select value={errorCode} onChange={e => { setErrorCode(e.target.value); setPage(0); }}
+          style={{ border: `1px solid ${errorCode ? "#ef444488" : "#d1d5db"}`, borderRadius: 6, padding: "7px 10px", fontSize: 13, color: errorCode ? "#991b1b" : undefined, background: errorCode ? "#fef2f2" : undefined }}>
+          <option value="">All Error Codes</option>
+          {ERROR_CODE_OPTIONS.map(c => (
+            <option key={c} value={c}>{ERROR_CODE_LABELS[c]?.label ?? c.replace(/_/g," ")}</option>
+          ))}
+        </select>
         {filterStatus === "failed" && (
           <button onClick={retryAll} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
             ⟳ Retry All
@@ -380,7 +433,7 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Time","Recipient","Channel","Provider","Event","Status","Retries","Action"].map(h => (
+                  {["Time","Recipient","Channel","Provider","Event","Status","Reason","Retries","Action"].map(h => (
                     <th key={h} style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                   <th style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "1px solid #e5e7eb" }}></th>
@@ -415,6 +468,11 @@ function DeliveryLogs({ filterStatus }: { filterStatus?: string }) {
                         </td>
                         <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{EVENT_LABELS[log.event_type] || log.event_type}</td>
                         <td style={{ padding: "8px 10px" }}><StatusBadge status={log.status} /></td>
+                        <td style={{ padding: "8px 10px", maxWidth: 170 }}>
+                          {log.error_code
+                            ? <ErrorCodeBadge code={log.error_code} />
+                            : <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>}
+                        </td>
                         <td style={{ padding: "8px 10px", textAlign: "center" }}>{log.retry_count || 0}<span style={{ color: "#9ca3af" }}>/3</span></td>
                         <td style={{ padding: "8px 10px" }}>
                           {log.status === "failed" && (log.retry_count || 0) < 3 && (

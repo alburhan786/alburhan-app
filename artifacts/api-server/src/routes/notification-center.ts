@@ -133,7 +133,7 @@ router.get("/retry-queue-count", requireAdmin as any, async (_req: Authenticated
 
 router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const { status, channel, event_type, search, booking_number, date } = req.query as any;
+    const { status, channel, event_type, search, booking_number, date, error_code } = req.query as any;
     const pageParam  = Number(req.query.page  || 1);
     const limitParam = Number(req.query.limit || req.query.limit || 30);
     const offsetParam = Number(req.query.offset || (pageParam - 1) * limitParam);
@@ -156,6 +156,10 @@ router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) 
     if (booking_number) {
       conditions.push(`nl.booking_id IN (SELECT id FROM bookings WHERE booking_number ILIKE $${idx++})`);
       params.push(`%${booking_number}%`);
+    }
+    if (error_code) {
+      conditions.push(`nl.error_code = $${idx++}`);
+      params.push(error_code);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
