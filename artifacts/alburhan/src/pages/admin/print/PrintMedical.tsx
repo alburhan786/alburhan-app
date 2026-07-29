@@ -3,6 +3,7 @@ import { useRoute } from "wouter";
 import { downloadAsPdf } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
 import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
+import { PrintHeader } from "./PrintHeader";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -27,7 +28,7 @@ function calcAge(dob?: string): string {
 const CARD_W = "88.9mm";
 const CARD_H = "76.2mm";
 
-function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
+function MedCard({ p, group, company }: { p: Pilgrim; group: Group; company: CompanyInfo }) {
   return (
     <div style={{
       width: CARD_W, height: CARD_H,
@@ -64,8 +65,8 @@ function MedCard({ p, group }: { p: Pilgrim; group: Group }) {
           <div><b>EMERGENCY CONTACT DETAILS</b></div>
           <div><b>(NAME &amp; NUMBER):</b></div>
           <div><b>NAME:</b> {p.fullName.toUpperCase()}</div>
-          <div><b>SAUDI MOBILE:</b> {p.mobileSaudi || "0547090786"}</div>
-          <div><b>INDIAN MOBILE:</b> {p.mobileIndia ? `+91${p.mobileIndia}` : "+91 9893989786"}</div>
+          <div><b>SAUDI MOBILE:</b> {p.mobileSaudi || company.phoneSaudi}</div>
+          <div><b>INDIAN MOBILE:</b> {p.mobileIndia ? `+91${p.mobileIndia}` : company.mobile}</div>
         </div>
       </div>
 
@@ -154,11 +155,14 @@ export default function PrintMedical() {
       </div>
 
       <div ref={contentRef}>
+        <div style={{ padding: "4mm 4mm 0 4mm" }}>
+          <PrintHeader company={company} title="MEDICAL INFORMATION CARDS" subtitle={group.groupName} />
+        </div>
         {pairs.map((pair, pi) => (
           <div key={pi} className={pi < pairs.length - 1 ? "med-page-break" : ""} style={{ display: "flex", flexDirection: "column", gap: "6mm", padding: "4mm" }}>
             {pair.map(p => (
               <div key={p.id} className="med-row">
-                <MedCard p={p} group={group} />
+                <MedCard p={p} group={group} company={company} />
               </div>
             ))}
           </div>
