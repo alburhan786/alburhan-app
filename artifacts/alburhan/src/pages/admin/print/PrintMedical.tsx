@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
 import { downloadAsPdf } from "@/lib/downloadUtils";
 import { Barcode } from "@/components/print/Barcode";
+import { COMPANIES, getCompanyById, type CompanyInfo } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -11,7 +12,7 @@ interface Pilgrim {
   mobileIndia?: string; mobileSaudi?: string; address?: string; city?: string; state?: string;
   coverNumber?: string; medicalCondition?: string; relation?: string;
 }
-interface Group { id: string; groupName: string; year: number; startingSerialNumber?: number; hotels?: { groupLeader?: string }; }
+interface Group { id: string; groupName: string; year: number; startingSerialNumber?: number; companyId?: string; hotels?: { groupLeader?: string }; }
 
 function calcAge(dob?: string): string {
   if (!dob) return "—";
@@ -109,6 +110,8 @@ export default function PrintMedical() {
   const groupId = params?.groupId || "";
   const [group, setGroup] = useState<Group | null>(null);
   const [pilgrims, setPilgrims] = useState<Pilgrim[]>([]);
+  const [companyId, setCompanyId] = useState("alburhan");
+  const company = getCompanyById(companyId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [dlState, setDlState] = useState<string | null>(null);
 
@@ -117,7 +120,7 @@ export default function PrintMedical() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
+    ]).then(([g, p]) => { setGroup(g); if (g.companyId) setCompanyId(g.companyId); setPilgrims(p); });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;
@@ -139,6 +142,9 @@ export default function PrintMedical() {
       `}</style>
 
       <div className="no-print" style={{ padding: "16px", background: "#fef3c7", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+        <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
+          {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.id === "alburhan" ? "Al Burhan Tours & Travels" : c.name}</option>)}
+        </select>
         <button onClick={() => window.print()} style={{ padding: "10px 24px", background: "#c0392b", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>🖨 Print</button>
         <button onClick={async () => { if (!contentRef.current) return; setDlState("pdf"); try { await downloadAsPdf(contentRef.current, `medical-${group?.groupName || "group"}`); } finally { setDlState(null); } }}
           disabled={!!dlState} style={{ padding: "10px 20px", background: dlState ? "#6b7280" : "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>

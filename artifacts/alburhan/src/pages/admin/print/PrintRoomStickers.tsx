@@ -34,6 +34,7 @@ interface Group {
   id: string;
   groupName: string;
   year: number;
+  companyId?: string;
   hotels?: {
     groupLeader?: string;
     makkah?: HotelInfo;
@@ -222,6 +223,7 @@ export default function PrintRoomStickers() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(([g, p]) => {
       setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
       setPilgrims(Array.isArray(p) ? p : []);
       setLoading(false);
     }).catch(() => setLoading(false));

@@ -12,6 +12,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; departureDate?: string; returnDate?: string;
+  companyId?: string;
   hotels?: { makkah?: { name?: string }; madinah?: { name?: string }; aziziah?: { name?: string } };
 }
 
@@ -30,7 +31,7 @@ export default function PrintContract() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(([g, p]) => { setGroup(g); setPilgrims(p); });
+    ]).then(([g, p]) => { setGroup(g); if (g.companyId) setCompanyId(g.companyId); setPilgrims(p); });
   }, [groupId]);
 
   if (!group) return <div style={{ padding: "40px", textAlign: "center", fontFamily: "Arial" }}>Loading...</div>;

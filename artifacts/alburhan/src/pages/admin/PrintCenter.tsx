@@ -3,8 +3,10 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { Link } from "wouter";
 import {
   Printer, CreditCard, Luggage, Stethoscope, Plane, Hotel, Bus,
-  FileText, Star, Users, Hash, AlertCircle, DoorOpen, ScrollText, BadgeCheck
+  FileText, Star, Users, Hash, AlertCircle, DoorOpen, ScrollText, BadgeCheck,
+  Building2
 } from "lucide-react";
+import { COMPANIES } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BASE = import.meta.env.BASE_URL || "/";
@@ -12,12 +14,15 @@ const BASE = import.meta.env.BASE_URL || "/";
 interface HajjGroup {
   id: string;
   name: string;
+  groupName?: string;
   season?: string;
   year?: number;
   departureDate?: string;
   returnDate?: string;
   status?: string;
+  companyId?: string;
   _count?: { pilgrims: number };
+  pilgrimCount?: number;
 }
 
 const PRINT_OPTIONS = [
@@ -48,16 +53,23 @@ export default function PrintCenter() {
   const [groups, setGroups] = useState<HajjGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
 
   useEffect(() => {
     fetch(`${API}/api/groups`, { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
       .then(data => {
-        setGroups(Array.isArray(data) ? data : (data.groups || []));
+        const raw: any[] = Array.isArray(data) ? data : (data.groups || []);
+        // Normalise: API returns groupName, UI interface uses name
+        setGroups(raw.map(g => ({ ...g, name: g.name || g.groupName })));
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const filteredGroups = selectedCompanyId === "all"
+    ? groups
+    : groups.filter(g => (g.companyId || "alburhan") === selectedCompanyId);
 
   return (
     <AdminLayout>
@@ -67,6 +79,36 @@ export default function PrintCenter() {
           <h1 className="text-3xl font-serif font-bold text-foreground">Print Center</h1>
         </div>
         <p className="text-muted-foreground">All print options for every Hajj Group — ID cards, luggage labels, medical cards, lists and more.</p>
+      </div>
+
+      {/* Company Filter */}
+      <div className="bg-white rounded-2xl shadow-sm border border-border/50 p-4 mb-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-semibold text-muted-foreground">Filter by Company:</span>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedCompanyId("all")}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold border transition ${selectedCompanyId === "all" ? "bg-[#0B3D2E] text-white border-[#0B3D2E]" : "bg-white text-[#0B3D2E] border-[#0B3D2E]/40 hover:bg-[#0B3D2E]/5"}`}
+            >
+              All Companies
+            </button>
+            {COMPANIES.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCompanyId(c.id)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold border transition ${selectedCompanyId === c.id ? "bg-[#0B3D2E] text-white border-[#0B3D2E]" : "bg-white text-[#0B3D2E] border-[#0B3D2E]/40 hover:bg-[#0B3D2E]/5"}`}
+              >
+                {c.nameShort}
+              </button>
+            ))}
+          </div>
+          {selectedCompanyId !== "all" && (
+            <span className="text-xs text-muted-foreground ml-auto">
+              Showing {filteredGroups.length} of {groups.length} group{groups.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Print Options Legend */}
@@ -157,21 +199,25 @@ export default function PrintCenter() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-gray-100 rounded-2xl animate-pulse" />)}
         </div>
-      ) : groups.length === 0 ? (
+      ) : filteredGroups.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-border/50 p-16 text-center">
           <AlertCircle className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <h3 className="font-bold text-gray-400 text-lg mb-2">No Hajj Groups Found</h3>
-          <p className="text-sm text-gray-300 mb-6">Create a Hajj Group first to access print options.</p>
-          <Link href="/admin/groups">
-            <button className="px-6 py-2.5 bg-[#0B3D2E] text-white rounded-xl text-sm font-semibold hover:bg-[#0d5038] transition">
-              Go to Hajj Groups →
-            </button>
-          </Link>
+          <h3 className="font-bold text-gray-400 text-lg mb-2">{groups.length === 0 ? "No Hajj Groups Found" : "No Groups for Selected Company"}</h3>
+          <p className="text-sm text-gray-300 mb-6">{groups.length === 0 ? "Create a Hajj Group first to access print options." : "Try selecting a different company filter."}</p>
+          {groups.length === 0 && (
+            <Link href="/admin/groups">
+              <button className="px-6 py-2.5 bg-[#0B3D2E] text-white rounded-xl text-sm font-semibold hover:bg-[#0d5038] transition">
+                Go to Hajj Groups →
+              </button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map(group => {
+          {filteredGroups.map(group => {
             const isOpen = expanded === group.id;
+            const pilgrimCount = group._count?.pilgrims ?? group.pilgrimCount;
+            const companyLabel = COMPANIES.find(c => c.id === (group.companyId || "alburhan"))?.nameShort;
             return (
               <div key={group.id} className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden">
                 {/* Group Header */}
@@ -189,7 +235,10 @@ export default function PrintCenter() {
                         {group.season && <span className="text-xs text-muted-foreground">{group.season}</span>}
                         {group.year && <span className="text-xs text-muted-foreground">{group.year}</span>}
                         {group.departureDate && <span className="text-xs text-muted-foreground">Departs: {group.departureDate}</span>}
-                        {group._count && <span className="text-xs font-semibold text-[#0B3D2E]">{group._count.pilgrims} Pilgrims</span>}
+                        {pilgrimCount != null && <span className="text-xs font-semibold text-[#0B3D2E]">{pilgrimCount} Pilgrims</span>}
+                        {companyLabel && selectedCompanyId === "all" && (
+                          <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">{companyLabel}</span>
+                        )}
                       </div>
                     </div>
                   </div>

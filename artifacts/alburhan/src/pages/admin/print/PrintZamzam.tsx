@@ -29,6 +29,7 @@ interface Group {
   startingSerialNumber?: number;
   flightNumber?: string;
   returnDate?: string;
+  companyId?: string;
 }
 
 function buildVerifyUrl(id: string): string {
@@ -54,6 +55,7 @@ export default function PrintZamzam() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(async ([g, p]) => {
       setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
       const list: Pilgrim[] = Array.isArray(p) ? p : [];
       setPilgrims(list);
       const entries = await Promise.all(

@@ -16,7 +16,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  startingSerialNumber?: number;
+  startingSerialNumber?: number; companyId?: string;
   hotels?: { makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string }; aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string } };
 }
 
@@ -260,6 +260,7 @@ export default function PrintIdCards() {
       fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" }).then(r => r.ok ? r.json() : {}),
     ]).then(async ([g, p, bm]) => {
       setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
       setPilgrims(p);
       setBookingMap(bm || {});
       const entries = await Promise.all(

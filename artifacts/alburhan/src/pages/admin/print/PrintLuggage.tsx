@@ -14,7 +14,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  startingSerialNumber?: number;
+  startingSerialNumber?: number; companyId?: string;
   hotels?: {
     groupLeader?: string;
     makkah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
@@ -87,6 +87,7 @@ export default function PrintLuggage() {
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
     ]).then(async ([g, p]) => {
       setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
       const list: Pilgrim[] = Array.isArray(p) ? p : p;
       setPilgrims(list);
       const entries = await Promise.all(

@@ -12,8 +12,6 @@ const PROD_DOMAIN = "https://alburhantravels.online";
 const MASHARIQ_EN = "Mashariq Al-Masiyah Company";
 const MASHARIQ_AR = "شركة مشارق الماسية";
 
-// Company India phones (shown big on front)
-const INDIA_PHONES = ["9893989786", "9893225590"];
 // Emergency Saudi contacts (name + number)
 const SAUDI_EMERGENCY = ["0547090786", "0568780786"];
 const EMERGENCY_CONTACTS = [
@@ -29,7 +27,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  startingSerialNumber?: number;
+  startingSerialNumber?: number; companyId?: string;
   hotels?: {
     groupLeader?: string;
     makkah?:  { name?: string; address?: string; nameAr?: string; addressAr?: string };
@@ -40,7 +38,6 @@ interface Group {
 
 const DARK = "#0d5040";
 const GOLD = "#C9A23F";
-const SHORT_ADDRESS = "Shop No. 8, Khanka Masjid Complex, Shanwara Road, Burhanpur";
 
 // ── Group colour accents ──────────────────────────────────────────────────────
 const GROUP_COLOR_MAP: Record<string, string> = {
@@ -100,7 +97,7 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
         {/* Company + year */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "8pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>
-            AL BURHAN TOURS AND TRAVELS
+            {company.name}
           </div>
           <div style={{ fontSize: "6.5pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 1.2 }}>
             HAJJ {group.year}
@@ -122,7 +119,7 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
             width: "10mm", height: "10mm", borderRadius: "50%",
             background: GOLD, display: "flex", alignItems: "center",
             justifyContent: "center", color: DARK, fontWeight: 900, fontSize: "6pt", flexShrink: 0,
-          }}>AB</div>
+          }}>{company.nameShort.slice(0, 2)}</div>
         )}
       </div>
 
@@ -216,7 +213,7 @@ function FrontCard({ p, group, company, photoDataUrls }: CardProps) {
           <div style={{ borderTop: `1px solid ${GOLD}40`, paddingTop: "0.5mm" }}>
             <div style={{ fontSize: "2.5pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Company (India)</div>
             <div style={{ fontSize: "5pt", fontWeight: 900, color: DARK, lineHeight: 1.3 }}>
-              {INDIA_PHONES[0]} &nbsp;|&nbsp; {INDIA_PHONES[1]}
+              {company.phone}
             </div>
           </div>
         </div>
@@ -286,7 +283,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
       }}>
         <div>
           <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px", lineHeight: 1.1 }}>
-            AL BURHAN TOURS AND TRAVELS
+            {company.name}
           </div>
           <div style={{ fontSize: "5.5pt", fontWeight: 900, color: GOLD, letterSpacing: "0.5px", lineHeight: 1.2 }}>
             HAJJ {group.year}
@@ -377,7 +374,7 @@ function BackCard({ p, group, company, showFeedbackQr, bookingMap }: CardProps) 
               {p.fullName}
             </div>
             <div style={{ fontSize: "5.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
-              {SHORT_ADDRESS}
+              {company.address}
             </div>
           </div>
           {/* Right: emergency Saudi */}
@@ -440,7 +437,7 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
         <div style={{ fontSize: "18pt", lineHeight: 1, flexShrink: 0 }}>🇮🇳</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "7pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.4px", lineHeight: 1.15 }}>
-            AL BURHAN TOURS AND TRAVELS
+            {company.name}
           </div>
           <div style={{ fontSize: "6pt", fontWeight: 900, color: GOLD, letterSpacing: "1px", lineHeight: 1.2 }}>
             HAJJ {group.year}
@@ -460,7 +457,7 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
             width: "10mm", height: "10mm", borderRadius: "50%", background: GOLD,
             display: "flex", alignItems: "center", justifyContent: "center",
             color: DARK, fontWeight: 900, fontSize: "6pt", flexShrink: 0,
-          }}>AB</div>
+          }}>{company.nameShort.slice(0, 2)}</div>
         )}
       </div>
 
@@ -559,7 +556,7 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
           <div style={{ marginTop: "auto", borderTop: `1px solid ${GOLD}40`, paddingTop: "0.8mm" }}>
             <div style={{ fontSize: "3pt", color: "#999", textTransform: "uppercase", lineHeight: 1 }}>Company (India)</div>
             <div style={{ fontSize: "6pt", fontWeight: 900, color: DARK, lineHeight: 1.4 }}>
-              {INDIA_PHONES[0]} &nbsp;|&nbsp; {INDIA_PHONES[1]}
+              {company.phone}
             </div>
           </div>
         </div>
@@ -593,7 +590,7 @@ function FrontCardPortrait({ p, group, company, photoDataUrls }: CardProps) {
               {p.salutation ? `${p.salutation} ` : ""}{p.fullName}
             </div>
             <div style={{ fontSize: "4.5pt", fontWeight: 900, color: "#fff", lineHeight: 1.35, letterSpacing: "0.2px" }}>
-              {SHORT_ADDRESS}
+              {company.address}
             </div>
           </div>
         </div>
@@ -891,6 +888,7 @@ export default function PrintIdCardsPro() {
       fetch(`${API}/api/feedback/admin/group-bookings/${groupId}`, { credentials: "include" }).then(r => r.ok ? r.json() : {}),
     ]).then(async ([g, p, bm]) => {
       setGroup(g);
+      if (g.companyId) setCompanyId(g.companyId);
       const list: Pilgrim[] = Array.isArray(p) ? p : [];
       setPilgrims(list);
       setBookingMap(bm || {});
