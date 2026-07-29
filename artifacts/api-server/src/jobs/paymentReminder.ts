@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
 const PROD_DOMAIN = "https://alburhantravels.online";
+const SETTINGS_KEY = "payment_reminders_enabled";
 
 let remindersEnabled: boolean = process.env.PAYMENT_REMINDERS_ENABLED !== "false";
 
@@ -10,9 +11,44 @@ export function isRemindersEnabled(): boolean {
   return remindersEnabled;
 }
 
+/** Persist the enabled flag to api_settings so it survives server restarts. */
+async function persistRemindersEnabled(enabled: boolean): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO api_settings (key, value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      [SETTINGS_KEY, enabled ? "true" : "false"]
+    );
+  } catch (err: any) {
+    console.error("[PaymentReminder] Failed to persist reminders state:", err?.message);
+  }
+}
+
+/** Read persisted enabled state from api_settings; falls back to env var default. */
+export async function loadRemindersEnabledFromDB(): Promise<void> {
+  try {
+    const res = await pool.query(
+      `SELECT value FROM api_settings WHERE key = $1 LIMIT 1`,
+      [SETTINGS_KEY]
+    );
+    if (res.rows[0]?.value !== undefined) {
+      remindersEnabled = res.rows[0].value !== "false";
+      console.log(`[PaymentReminder] Loaded persisted state: reminders ${remindersEnabled ? "ENABLED" : "DISABLED"}`);
+    } else {
+      // No persisted value yet — use current default and persist it
+      await persistRemindersEnabled(remindersEnabled);
+      console.log(`[PaymentReminder] No persisted state found; defaulting to ${remindersEnabled ? "ENABLED" : "DISABLED"}`);
+    }
+  } catch (err: any) {
+    console.error("[PaymentReminder] Failed to load persisted reminders state:", err?.message);
+  }
+}
+
 export function setRemindersEnabled(enabled: boolean): void {
   remindersEnabled = enabled;
   console.log(`[PaymentReminder] Reminders ${enabled ? "ENABLED" : "DISABLED"} by admin`);
+  void persistRemindersEnabled(enabled);
 }
 
 const ELIGIBLE_STATUSES = ["pending", "approved", "partially_paid"];
@@ -219,6 +255,9 @@ export async function runDailyReminders(): Promise<void> {
 
 // ── Cron: 9:00 AM IST = 03:30 UTC ─────────────────────────────────────────
 export function startPaymentReminderCron(): void {
+  // Load persisted enabled/disabled state from DB before the first cron tick
+  void loadRemindersEnabledFromDB();
+
   cron.schedule("30 3 * * *", () => {
     void runDailyReminders();
   }, { timezone: "UTC" });
