@@ -14,7 +14,7 @@ import {
   RefreshCw, MessageSquare, Mail, Phone, Bell, Radio, CheckCircle, XCircle,
   Clock, TrendingUp, AlertTriangle, Activity, Send, Users, Smartphone, Zap,
   Check, X, ShieldCheck, Power, Play, BellRing, BellOff, Loader2,
-  ChevronDown, ChevronUp, ClipboardList
+  ChevronDown, ChevronUp, ClipboardList, ShieldAlert
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -118,6 +118,224 @@ function PushRegistrationWidget() {
       {isLoading ? "Registering…" : "Register Push for This Device"}
       {error && <span className="text-red-500 ml-1">{error.slice(0,40)}</span>}
     </button>
+  );
+}
+
+// ── RCS Fallback / Health Panel ───────────────────────────────────────────────
+const RCS_EVENT_LABELS: Record<string, string> = {
+  booking_submitted:        "Booking Submitted",
+  booking_approved:         "Booking Approved",
+  payment_received:         "Payment Received",
+  pending_payment_reminder: "Pending Payment Reminder",
+  invoice_ready:            "Invoice Ready",
+  flight_ticket:            "Flight Ticket",
+  visa_ready:               "Visa Ready",
+  agreement_ready:          "Agreement Ready",
+  hotel_voucher:            "Hotel Voucher",
+  departure_reminder:       "Departure Reminder",
+};
+
+function RCSFallbackPanel() {
+  const [stats, setStats]       = useState<any>(null);
+  const [loading, setLoading]   = useState(false);
+  const [expanded, setExpanded] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/api/rcs/fallback-stats`, { credentials: "include" });
+      if (r.ok) setStats(await r.json());
+    } catch {
+      // non-fatal — panel shows empty state
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const s7 = stats?.summary7d || {};
+  const s24 = stats?.summary24h || {};
+  const events: any[] = stats?.events || [];
+  const hasAlert = stats?.alert === true;
+  const rate7 = s7.rate ?? null;
+  const rateColor = rate7 === null ? "text-gray-400" : rate7 >= 80 ? "text-emerald-600" : rate7 >= 50 ? "text-amber-600" : "text-red-600";
+  const barColor  = rate7 === null ? "bg-gray-300"   : rate7 >= 80 ? "bg-emerald-500"  : rate7 >= 50 ? "bg-amber-500"  : "bg-red-500";
+
+  return (
+    <div className="bg-white rounded-xl border-2 border-purple-200 shadow-sm overflow-hidden">
+      {/* header */}
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 bg-purple-50 border-b border-purple-100 hover:bg-purple-100/60 transition-colors"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <Radio size={16} className="text-purple-700" />
+          </div>
+          <div className="text-left">
+            <p className="font-bold text-purple-900 text-sm">RCS Channel Health (Lemin AI)</p>
+            <p className="text-xs text-purple-600/70">7-day delivery rate · SMS coverage when RCS fails · alert if &gt;50% failure in 24h</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasAlert && (
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 animate-pulse">
+              <ShieldAlert size={10} /> HIGH FAILURE RATE
+            </span>
+          )}
+          {!loading && stats && rate7 !== null && (
+            <span className={`text-sm font-bold font-mono ${rateColor}`}>{rate7}%</span>
+          )}
+          {loading && <Loader2 size={14} className="animate-spin text-purple-400" />}
+          <button onClick={e => { e.stopPropagation(); load(); }} className="text-purple-400 hover:text-purple-700 transition-colors p-1 rounded">
+            <RefreshCw size={13} />
+          </button>
+          {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="p-4 space-y-4">
+          {/* ── Alert banner ─────────────────────────────────────────────── */}
+          {hasAlert && (
+            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800">
+              <ShieldAlert size={14} className="shrink-0 mt-0.5 text-red-600" />
+              <div>
+                <span className="font-bold">RCS failure rate exceeded 50% in the last 24 hours</span>
+                <span className="block text-red-700 mt-0.5">
+                  {s24.failed} of {s24.total} messages failed ({s24.failureRate}%).
+                  Check the Lemin API key in Settings → RCS Templates, or review per-event template IDs below.
+                  Parallel SMS channel continues to deliver to customers.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Summary KPIs ─────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* 7d rate */}
+            <div className="p-3 rounded-xl border bg-gray-50 text-center">
+              <div className={`text-2xl font-mono font-bold ${rateColor}`}>
+                {rate7 !== null ? `${rate7}%` : "—"}
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mt-0.5">7-day Success</div>
+              {rate7 !== null && (
+                <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+                  <div className={`h-full ${barColor} transition-all`} style={{ width: `${rate7}%` }} />
+                </div>
+              )}
+            </div>
+
+            {/* 7d counts */}
+            <div className="p-3 rounded-xl border bg-gray-50">
+              <div className="flex justify-between text-xs font-bold text-gray-700 mb-2">
+                <span className="text-gray-500">7-day</span>
+                <span className="font-mono text-gray-800">{(s7.total || 0).toLocaleString()} total</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded p-1.5 text-center">
+                  <div className="font-mono font-bold text-emerald-700 text-sm">{(s7.sent || 0).toLocaleString()}</div>
+                  <div className="text-[9px] text-emerald-600 uppercase">Sent</div>
+                </div>
+                <div className="flex-1 bg-red-50 border border-red-100 rounded p-1.5 text-center">
+                  <div className="font-mono font-bold text-red-600 text-sm">{(s7.failed || 0).toLocaleString()}</div>
+                  <div className="text-[9px] text-red-500 uppercase">Failed</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 24h */}
+            <div className="p-3 rounded-xl border bg-gray-50">
+              <div className="flex justify-between text-xs font-bold text-gray-700 mb-2">
+                <span className="text-gray-500">Last 24h</span>
+                <span className={`font-mono text-xs font-bold ${(s24.failureRate||0) >= 50 ? "text-red-600" : "text-gray-700"}`}>
+                  {s24.total > 0 ? `${s24.failureRate}% fail` : "—"}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded p-1.5 text-center">
+                  <div className="font-mono font-bold text-emerald-700 text-sm">{s24.sent || 0}</div>
+                  <div className="text-[9px] text-emerald-600 uppercase">Sent</div>
+                </div>
+                <div className={`flex-1 border rounded p-1.5 text-center ${(s24.failed||0) > 0 ? "bg-red-50 border-red-100" : "bg-gray-50 border-gray-100"}`}>
+                  <div className={`font-mono font-bold text-sm ${(s24.failed||0) > 0 ? "text-red-600" : "text-gray-400"}`}>{s24.failed || 0}</div>
+                  <div className="text-[9px] uppercase text-gray-500">Failed</div>
+                </div>
+              </div>
+            </div>
+
+            {/* SMS coverage */}
+            <div className="p-3 rounded-xl border bg-purple-50/50">
+              <div className="text-[10px] uppercase tracking-wider text-purple-700 font-bold mb-1">SMS Coverage (7d)</div>
+              <div className="text-2xl font-mono font-bold text-purple-700">{(s7.smsCoveredTotal || 0).toLocaleString()}</div>
+              <div className="text-[10px] text-purple-600/70 mt-1 leading-tight">
+                RCS failures where parallel SMS delivered to customer
+              </div>
+            </div>
+          </div>
+
+          {/* ── Per-event breakdown ───────────────────────────────────────── */}
+          {events.length > 0 ? (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-[#0A3D2A] px-4 py-2 flex justify-between items-center">
+                <span className="text-white text-xs font-bold uppercase tracking-wider">Per-Event RCS Breakdown (7d)</span>
+                <span className="text-[#C9A84C] text-xs font-mono">{events.length} events</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 border-b text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left font-semibold uppercase tracking-wider">Event</th>
+                      <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wider">Total</th>
+                      <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wider">Sent</th>
+                      <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wider">Failed</th>
+                      <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wider">Rate</th>
+                      <th className="px-3 py-2.5 text-right font-semibold uppercase tracking-wider">SMS Covered</th>
+                      <th className="px-3 py-2.5 text-left font-semibold uppercase tracking-wider">Top Error</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {events.map((ev: any) => {
+                      const r = ev.rate;
+                      const rc = r === null ? "text-gray-400" : r >= 80 ? "text-emerald-600" : r >= 50 ? "text-amber-600" : "text-red-600";
+                      return (
+                        <tr key={ev.event} className="hover:bg-gray-50">
+                          <td className="px-3 py-2.5 font-mono font-bold text-[#0A3D2A]">
+                            {RCS_EVENT_LABELS[ev.event] || ev.event}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono text-gray-600">{ev.total}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-emerald-700 font-bold">{ev.sent}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-600 font-bold">{ev.failed}</td>
+                          <td className={`px-3 py-2.5 text-right font-mono font-bold ${rc}`}>
+                            {r !== null ? `${r}%` : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            {ev.smsCovered > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                <Check size={9} />{ev.smsCovered}
+                              </span>
+                            ) : <span className="text-gray-400">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-500 truncate max-w-[180px]" title={ev.topError || ""}>
+                            {ev.topError
+                              ? <span className="text-[10px] font-mono text-red-500 truncate block max-w-[180px]">{ev.topError}</span>
+                              : <span className="text-gray-300">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : !loading ? (
+            <div className="p-6 text-center text-gray-400 text-sm border border-dashed rounded-xl bg-gray-50">
+              No RCS traffic in the last 7 days.
+              {" "}Enable RCS in Settings → RCS Templates to start sending.
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -596,6 +814,9 @@ export default function NotificationHealth() {
             })}
           </div>
         </div>
+
+        {/* ── RCS Fallback Health ────────────────────────────────────────── */}
+        <RCSFallbackPanel />
 
         {/* ── Production Validation ──────────────────────────────────────── */}
         <ProductionValidationPanel />

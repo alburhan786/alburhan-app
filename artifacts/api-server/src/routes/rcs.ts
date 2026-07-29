@@ -164,6 +164,134 @@ router.get("/status/:messageId", requireAdmin as any, async (req, res) => {
   } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
+// ── GET /api/rcs/fallback-stats ──────────────────────────────────────────────
+// Returns RCS delivery health + "SMS coverage" metric for the Notification Health panel.
+// "SMS coverage" = RCS failed AND the same booking+event had SMS sent within 5 minutes.
+router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
+  try {
+    const [stats7d, stats24h, perEvent, smsCoverage] = await Promise.all([
+      // ── 7-day totals ────────────────────────────────────────────────────────
+      pool.query(`
+        SELECT
+          COUNT(*)                                        AS total,
+          COUNT(*) FILTER (WHERE status='sent')           AS sent,
+          COUNT(*) FILTER (WHERE status='failed')         AS failed,
+          MAX(CASE WHEN status='sent'   THEN sent_at END) AS last_success,
+          MAX(CASE WHEN status='failed' THEN sent_at END) AS last_failure
+        FROM notification_logs
+        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '7 days'
+      `),
+
+      // ── Last 24h totals (for alert threshold) ───────────────────────────────
+      pool.query(`
+        SELECT
+          COUNT(*)                                        AS total,
+          COUNT(*) FILTER (WHERE status='sent')           AS sent,
+          COUNT(*) FILTER (WHERE status='failed')         AS failed
+        FROM notification_logs
+        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '24 hours'
+      `),
+
+      // ── Per-event breakdown (7d) ─────────────────────────────────────────────
+      pool.query(`
+        SELECT
+          event_type,
+          COUNT(*)                                        AS total,
+          COUNT(*) FILTER (WHERE status='sent')           AS sent,
+          COUNT(*) FILTER (WHERE status='failed')         AS failed,
+          MAX(CASE WHEN status='sent'   THEN sent_at END) AS last_success,
+          MAX(CASE WHEN status='failed' THEN sent_at END) AS last_failure,
+          -- Most common failure reason from provider_response
+          MODE() WITHIN GROUP (ORDER BY
+            COALESCE(
+              provider_response::json->>'errorMessage',
+              provider_response::json->'providerResponse'->>'errorMessage',
+              'unknown'
+            )
+          ) FILTER (WHERE status='failed') AS top_error
+        FROM notification_logs
+        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '7 days'
+        GROUP BY event_type
+        ORDER BY total DESC
+      `),
+
+      // ── SMS coverage: RCS failed but SMS succeeded for same booking+event ────
+      // within 5-minute window → shows parallel SMS channel covered the customer
+      pool.query(`
+        SELECT
+          rcs.event_type,
+          COUNT(*) AS sms_covered_count
+        FROM notification_logs rcs
+        WHERE rcs.channel = 'rcs'
+          AND rcs.status  = 'failed'
+          AND rcs.booking_id IS NOT NULL
+          AND rcs.sent_at > NOW() - INTERVAL '7 days'
+          AND EXISTS (
+            SELECT 1
+            FROM notification_logs sms
+            WHERE sms.channel     = 'sms'
+              AND sms.status      = 'sent'
+              AND sms.booking_id  = rcs.booking_id
+              AND sms.event_type  = rcs.event_type
+              AND ABS(EXTRACT(EPOCH FROM (sms.sent_at - rcs.sent_at))) < 300
+          )
+        GROUP BY rcs.event_type
+      `),
+    ]);
+
+    const s7 = stats7d.rows[0] || {};
+    const s24 = stats24h.rows[0] || {};
+    const total7d   = Number(s7.total   || 0);
+    const sent7d    = Number(s7.sent    || 0);
+    const failed7d  = Number(s7.failed  || 0);
+    const total24h  = Number(s24.total  || 0);
+    const sent24h   = Number(s24.sent   || 0);
+    const failed24h = Number(s24.failed || 0);
+
+    const rate7d  = total7d  > 0 ? Math.round((sent7d  / total7d)  * 100) : null;
+    const rate24h = total24h > 0 ? Math.round((sent24h / total24h) * 100) : null;
+    const failureRate24h = total24h > 0 ? Math.round((failed24h / total24h) * 100) : 0;
+
+    // Build SMS coverage index
+    const smsCoverageMap: Record<string, number> = {};
+    for (const r of smsCoverage.rows) {
+      smsCoverageMap[r.event_type] = Number(r.sms_covered_count);
+    }
+    const totalSmsCovered = Object.values(smsCoverageMap).reduce((a, b) => a + b, 0);
+
+    const events = perEvent.rows.map((r: any) => ({
+      event:         r.event_type,
+      total:         Number(r.total),
+      sent:          Number(r.sent),
+      failed:        Number(r.failed),
+      rate:          Number(r.total) > 0 ? Math.round((Number(r.sent) / Number(r.total)) * 100) : null,
+      lastSuccess:   r.last_success || null,
+      lastFailure:   r.last_failure || null,
+      topError:      r.top_error || null,
+      smsCovered:    smsCoverageMap[r.event_type] || 0,
+    }));
+
+    res.json({
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      alert: failureRate24h >= 50 && total24h > 0,
+      alertThreshold: 50,
+      summary7d: {
+        total: total7d, sent: sent7d, failed: failed7d,
+        rate: rate7d,
+        lastSuccess: s7.last_success || null,
+        lastFailure: s7.last_failure || null,
+        smsCoveredTotal: totalSmsCovered,
+      },
+      summary24h: {
+        total: total24h, sent: sent24h, failed: failed24h,
+        rate: rate24h, failureRate: failureRate24h,
+      },
+      events,
+    });
+  } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
 // ── GET /api/rcs/logs ─────────────────────────────────────────────────────────
 router.get("/logs", requireAdmin as any, async (req, res) => {
   const limit  = Math.min(Number(req.query.limit) || 50, 200);
