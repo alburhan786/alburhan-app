@@ -60,6 +60,38 @@ function SnowflakeSVG({ size = 120, color = GREEN, opacity = 0.07 }: { size?: nu
   );
 }
 
+/* ── Mosque + Crescent SVG (back sticker corner motif) ── */
+function MosqueCrescentSVG({ size = 80, color = DARK, goldColor = GOLD, opacity = 0.09 }: { size?: number; color?: string; goldColor?: string; opacity?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: "block" }}>
+      {/* Left minaret */}
+      <rect x="8" y="46" width="9" height="44" rx="1.5" fill={color} opacity={opacity} />
+      <path d="M8,46 Q12.5,37 17,46Z" fill={color} opacity={opacity} />
+      <rect x="9.5" y="40" width="6" height="6" rx="1" fill={color} opacity={opacity} />
+      {/* Right minaret */}
+      <rect x="83" y="46" width="9" height="44" rx="1.5" fill={color} opacity={opacity} />
+      <path d="M83,46 Q87.5,37 92,46Z" fill={color} opacity={opacity} />
+      <rect x="84.5" y="40" width="6" height="6" rx="1" fill={color} opacity={opacity} />
+      {/* Main building */}
+      <rect x="21" y="62" width="58" height="28" rx="2" fill={color} opacity={opacity} />
+      {/* Side domes */}
+      <ellipse cx="31" cy="62" rx="10" ry="8" fill={color} opacity={opacity} />
+      <ellipse cx="69" cy="62" rx="10" ry="8" fill={color} opacity={opacity} />
+      {/* Main dome */}
+      <ellipse cx="50" cy="51" rx="19" ry="15" fill={color} opacity={opacity} />
+      {/* Door arch (lighter cutout illusion) */}
+      <path d="M44,90 L44,74 Q50,66 56,74 L56,90Z" fill="#fff" opacity={opacity * 0.7} />
+      {/* Windows */}
+      <ellipse cx="32" cy="73" rx="4" ry="5" fill="#fff" opacity={opacity * 0.6} />
+      <ellipse cx="68" cy="73" rx="4" ry="5" fill="#fff" opacity={opacity * 0.6} />
+      {/* Crescent moon on top of dome */}
+      <path d="M50,32 Q61,23 50,14 Q42,23 50,32Z" fill={goldColor} opacity={opacity * 1.4} />
+      {/* Star next to crescent */}
+      <circle cx="55" cy="19" r="2.5" fill={goldColor} opacity={opacity * 1.4} />
+    </svg>
+  );
+}
+
 /* ════════════════════════════════════════════════════
    FRONT STICKER — two sizes
    compact = true  → 96 × 68 mm  (for "both" mode, 4 per page)
@@ -285,6 +317,9 @@ function BackSticker({ p, group, company, compact, serviceLabel }: {
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}>
               <SnowflakeSVG size={100} />
             </div>
+            <div style={{ position: "absolute", top: "-4mm", right: "-4mm", pointerEvents: "none", zIndex: 0 }}>
+              <MosqueCrescentSVG size={60} opacity={0.11} />
+            </div>
             <div style={{ position: "relative", zIndex: 1, padding: "1mm 2.5mm" }}>
               <div style={{ textAlign: "right", marginBottom: "0.5mm" }}>
                 <div style={{ fontFamily: "Arial", direction: "rtl", fontSize: "8.5pt", fontWeight: 900, color: "#111" }}>مركز تقديم الخدمة</div>
@@ -369,6 +404,9 @@ function BackSticker({ p, group, company, compact, serviceLabel }: {
         </div>
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}><SnowflakeSVG size={160} /></div>
+          <div style={{ position: "absolute", top: "-5mm", right: "-5mm", pointerEvents: "none", zIndex: 0 }}>
+            <MosqueCrescentSVG size={92} opacity={0.11} />
+          </div>
           <div style={{ position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "1.5mm 3mm 0.5mm", textAlign: "right" }}>
               <div style={{ fontFamily: "Arial", direction: "rtl", fontSize: "11pt", fontWeight: 900, color: "#111" }}>مركز تقديم الخدمة</div>
