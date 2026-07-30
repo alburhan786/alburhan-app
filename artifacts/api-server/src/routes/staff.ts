@@ -272,7 +272,7 @@ router.post(
         return "";
       };
 
-      const VALID_ROLES = ["airport_staff", "catering_staff", "office_staff", "group_guide", "driver", "medical_staff", "group_leader"];
+      const VALID_ROLES = ["airport_staff", "catering_staff", "office_staff", "group_guide", "driver", "medical_staff", "group_leader", "tour_leader", "cook"];
       const VALID_BLOOD = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
       const VALID_STATUSES = ["active", "inactive"];
 
@@ -305,6 +305,10 @@ router.post(
           medicalstaff: "medical_staff",
           groupleader: "group_leader",
           leader: "group_leader",
+          tourleader: "tour_leader",
+          tour: "tour_leader",
+          cook: "cook",
+          chef: "cook",
         };
         const role = rawRole
           ? (VALID_ROLES.includes(rawRole)

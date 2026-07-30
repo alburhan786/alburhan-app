@@ -83,6 +83,8 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
   driver:         "Driver",
   medical_staff:  "Medical Staff",
   group_leader:   "Group Leader",
+  tour_leader:    "Tour Leader",
+  cook:           "Cook",
 };
 
 const ALL_ADMIN_ROLES: AdminRole[] = [
@@ -113,7 +115,7 @@ export default function StaffManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [photoUploading, setPhotoUploading] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff" | "office_staff" | "group_guide" | "driver" | "medical_staff" | "group_leader">("all");
+  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff" | "office_staff" | "group_guide" | "driver" | "medical_staff" | "group_leader" | "tour_leader" | "cook">("all");
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
@@ -408,7 +410,7 @@ export default function StaffManager() {
       {activeTab === "staff" && (
         <>
           <div className="flex flex-wrap gap-2 mb-6 items-center">
-            {(["all", "airport_staff", "catering_staff", "office_staff", "group_guide", "driver", "medical_staff", "group_leader"] as const).map(r => (
+            {(["all", "airport_staff", "catering_staff", "office_staff", "group_guide", "driver", "medical_staff", "group_leader", "tour_leader", "cook"] as const).map(r => (
               <button
                 key={r}
                 onClick={() => setFilter(r)}
@@ -724,6 +726,8 @@ export default function StaffManager() {
                     <option value="driver">Driver</option>
                     <option value="medical_staff">Medical Staff</option>
                     <option value="group_leader">Group Leader</option>
+                    <option value="tour_leader">Tour Leader</option>
+                    <option value="cook">Cook</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -841,7 +845,7 @@ export default function StaffManager() {
                 <ol className="list-decimal list-inside space-y-1 text-blue-700">
                   <li>Download the CSV template below and fill in your staff data.</li>
                   <li>Required column: <span className="font-mono font-bold">fullName</span></li>
-                  <li>Role values: <span className="font-mono">airport_staff</span>, <span className="font-mono">catering_staff</span>, <span className="font-mono">office_staff</span></li>
+                  <li>Role values: <span className="font-mono">airport_staff</span>, <span className="font-mono">catering_staff</span>, <span className="font-mono">office_staff</span>, <span className="font-mono">group_guide</span>, <span className="font-mono">driver</span>, <span className="font-mono">medical_staff</span>, <span className="font-mono">group_leader</span>, <span className="font-mono">tour_leader</span>, <span className="font-mono">cook</span></li>
                   <li>Maximum 500 rows per import.</li>
                   <li>Upload the completed file (CSV or Excel) and click Import.</li>
                 </ol>

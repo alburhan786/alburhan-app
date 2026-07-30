@@ -48,6 +48,8 @@ const ROLE_LABELS: Record<string, string> = {
   driver:         "DRIVER",
   medical_staff:  "MEDICAL STAFF",
   group_leader:   "GROUP LEADER",
+  tour_leader:    "TOUR LEADER",
+  cook:           "COOK",
 };
 
 /* ── Premium Kaaba Icon — solid cube with kiswa & gold accents ── */
@@ -635,6 +637,12 @@ export default function PrintStaffCards() {
           <option value="airport_staff">Airport Staff</option>
           <option value="catering_staff">Catering Staff</option>
           <option value="office_staff">Office Staff</option>
+          <option value="group_guide">Group Guide</option>
+          <option value="driver">Driver</option>
+          <option value="medical_staff">Medical Staff</option>
+          <option value="group_leader">Group Leader</option>
+          <option value="tour_leader">Tour Leader</option>
+          <option value="cook">Cook</option>
         </select>
 
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}

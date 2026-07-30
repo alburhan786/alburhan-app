@@ -15,8 +15,15 @@ interface StaffInfo {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  airport_staff: "Airport Staff",
+  airport_staff:  "Airport Staff",
   catering_staff: "Catering Staff",
+  office_staff:   "Office Staff",
+  group_guide:    "Group Guide",
+  driver:         "Driver",
+  medical_staff:  "Medical Staff",
+  group_leader:   "Group Leader",
+  tour_leader:    "Tour Leader",
+  cook:           "Cook",
 };
 
 export default function StaffVerify() {
