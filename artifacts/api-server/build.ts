@@ -107,7 +107,19 @@ async function buildAll() {
     // After key rotation: rebuild + manual bootstrap (see DEPLOYMENT-REPORT.md), then
     // hotdeploy resumes working because the new bundle carries the new key.
     "MIGRATION_KEY",
+    // Replit dev-server base URL — baked in so hotdeploy/self-update always know where to
+    // pull the latest bundle from, without needing DEPLOY_SOURCE_URL in the VPS ecosystem.
+    // Computed below from REPLIT_DEV_DOMAIN if not already set explicitly.
+    "DEPLOY_SOURCE_URL",
   ];
+
+  // Derive DEPLOY_SOURCE_URL from the Replit-provided domain if not set explicitly.
+  // This means every bundle carries the correct source URL at build time.
+  if (!process.env.DEPLOY_SOURCE_URL && process.env.REPLIT_DEV_DOMAIN) {
+    process.env.DEPLOY_SOURCE_URL = `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    console.log(`  ℹ️  Computed DEPLOY_SOURCE_URL=${process.env.DEPLOY_SOURCE_URL}`);
+  }
+
   for (const key of injectKeys) {
     const val = process.env[key];
     if (val && val !== "your_actual_key_here" && val !== "your_key_here") {

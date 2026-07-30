@@ -179,6 +179,19 @@ function requireLocalhost(req: any, res: any, next: any): void {
   next();
 }
 
+/** Returns the Replit dev-server base URL used by all VPS→Replit download endpoints.
+ *  Priority:
+ *   1. DEPLOY_SOURCE_URL env var — set once in VPS ecosystem.config.js, survives domain changes.
+ *   2. https://REPLIT_DEV_DOMAIN — auto-injected by Replit at runtime AND baked into the
+ *      bundle via build.ts injectKeys, so every fresh bundle already carries the correct domain.
+ *  Returns "" when neither is available — callers must return 503. */
+function getDeploySourceUrl(): string {
+  return (
+    process.env.DEPLOY_SOURCE_URL ||
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "")
+  );
+}
+
 // GET /api/migrate/hotdeploy — full deploy: backend bundle + frontend assets.
 // Single GET call deploys both so CDN-blocked POST paths are never needed.
 // Use ?frontend=0 to skip frontend, ?backend=0 to skip backend.
@@ -191,7 +204,8 @@ app.get("/api/migrate/hotdeploy", requireLocalhost, async (req, res) => {
   }
   void _auditMigrate("hotdeploy_started", req.path, "127.0.0.1", true);
 
-  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL = getDeploySourceUrl();
+  if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js env, then run: pm2 reload ecosystem.config.js --update-env" });
   const skipBackend  = req.query.backend  === "0";
   const skipFrontend = req.query.frontend === "0";
 
@@ -275,7 +289,8 @@ app.post("/api/migrate/self-update", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
-  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL = getDeploySourceUrl();
+  if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js env, then run: pm2 reload ecosystem.config.js --update-env" });
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
     `${DEV_URL}/api/migrate/server.cjs?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
 
@@ -380,7 +395,8 @@ app.post("/api/migrate/deploy-frontend", requireLocalhost, async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
-  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL = getDeploySourceUrl();
+  if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js env, then run: pm2 reload ecosystem.config.js --update-env" });
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
     `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
   const asyncMode = (req.query.async || req.body?.async) === true
@@ -1061,7 +1077,8 @@ app.get("/api/migrate/setup-db.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEV_URL    = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL    = getDeploySourceUrl();
+  if (!DEV_URL) return void res.status(503).send("# DEPLOY_SOURCE_URL not configured on this server\nexit 1");
 
   const script = `#!/bin/bash
 # Al Burhan Tours — Production PostgreSQL setup + DATABASE_URL fix
@@ -3874,7 +3891,8 @@ app.get("/api/migrate/deploy.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL_HERE = getDeploySourceUrl();
+  if (!DEV_URL_HERE) return void res.status(503).send("# DEPLOY_SOURCE_URL not configured on this server\nexit 1");
 
   const script = `#!/bin/bash
 set -e
@@ -3970,7 +3988,8 @@ app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL_HERE = getDeploySourceUrl();
+  if (!DEV_URL_HERE) return void res.status(503).send("# DEPLOY_SOURCE_URL not configured on this server\nexit 1");
 
   const script = `#!/bin/bash
 # Al Burhan Tours — VPS Fix Deploy v24 (port-aware, self-healing)
