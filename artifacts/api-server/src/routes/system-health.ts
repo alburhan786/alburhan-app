@@ -436,9 +436,9 @@ router.post("/test-sms", requireAdmin as any, async (req, res) => {
     return;
   }
   const testOtp = String(Math.floor(100000 + Math.random() * 900000));
-  console.log(`[TEST-SMS] Admin triggered test SMS to ${phone}, OTP=${testOtp}`);
+  console.log(`[TEST-SMS] Admin triggered test SMS to ${phone}`);
   const diag = await testSmsDiagnostics(phone, testOtp);
-  res.json({ testOtp, diagnostics: diag });
+  res.json({ diagnostics: diag });
 });
 
 // ── GET /api/admin/performance — Real performance metrics ─────────────────

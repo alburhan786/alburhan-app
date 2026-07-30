@@ -202,7 +202,7 @@ export default function OTPDebug() {
         || data?.diagnostics?.dlt?.body?.return === true
         || data?.diagnostics?.quick?.body?.return === true;
       toast({
-        title: anyOk ? `Test OTP sent: ${data.testOtp}` : "All routes failed",
+        title: anyOk ? "Test OTP sent successfully" : "All routes failed",
         description: anyOk ? `Delivered to +91 ${clean}` : "See route details below",
         variant: anyOk ? "default" : "destructive",
       });
@@ -293,8 +293,7 @@ export default function OTPDebug() {
         {testResult && (
           <div className="mt-4 space-y-3">
             <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground font-semibold">Test OTP:</span>
-              <span className="font-mono text-2xl font-bold text-blue-800 tracking-widest">{testResult.testOtp}</span>
+              <span className="text-xs text-muted-foreground font-semibold">Test OTP sent to device</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(["otp_route", "dlt", "quick"] as const).map(k => {

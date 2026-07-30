@@ -90,7 +90,6 @@ export default function Login({ portalType = "customer" }: { portalType?: Portal
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [debugOtp, setDebugOtp] = useState<string | null>(null);
   const [smsSent, setSmsSent] = useState<boolean | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
   const [whatsappSent, setWhatsappSent] = useState<boolean>(false);
@@ -186,7 +185,6 @@ export default function Login({ portalType = "customer" }: { portalType?: Portal
       setWhatsappSent(result?.whatsappSent === true);
       if (result?.smsError) setSmsError(result.smsError);
       if (result?.smsFailReason) setSmsFailReason(result.smsFailReason);
-      if (result?.debugOtp) setDebugOtp(result.debugOtp);
       startCooldown();
       return true;
     } catch (err: any) {
@@ -364,7 +362,7 @@ export default function Login({ portalType = "customer" }: { portalType?: Portal
                   )}
 
                   {/* SMS failed — WhatsApp delivered */}
-                  {smsSent === false && whatsappSent && !debugOtp && (
+                  {smsSent === false && whatsappSent && (
                     <div className="mt-3 space-y-2">
                       <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-start gap-2">
                         <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
@@ -383,7 +381,7 @@ export default function Login({ portalType = "customer" }: { portalType?: Portal
                   )}
 
                   {/* SMS failed — no WhatsApp either */}
-                  {smsSent === false && !whatsappSent && !debugOtp && (
+                  {smsSent === false && !whatsappSent && (
                     <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl space-y-2">
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
@@ -401,14 +399,7 @@ export default function Login({ portalType = "customer" }: { portalType?: Portal
                     </div>
                   )}
 
-                  {/* Admin debug OTP */}
-                  {debugOtp && (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                      <p className="text-xs text-amber-700 font-medium mb-1">⚠️ Admin debug — your OTP:</p>
-                      <p className="text-2xl font-mono font-bold text-amber-800 tracking-widest">{debugOtp}</p>
-                      {smsError && <p className="text-xs text-red-600 mt-1 font-mono break-all">SMS: {smsError}</p>}
-                    </div>
-                  )}
+
                 </div>
 
                 <form onSubmit={handleVerifyOtp} className="space-y-5">

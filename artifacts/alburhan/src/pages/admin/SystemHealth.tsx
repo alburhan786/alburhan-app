@@ -95,7 +95,7 @@ export default function SystemHealth() {
       const ok = data?.diagnostics?.dlt?.body?.return === true || data?.diagnostics?.quick?.body?.return === true;
       toast({
         title:       ok ? "Test SMS Sent!" : "Test SMS Failed",
-        description: ok ? `OTP ${data.testOtp} sent to ${clean}` : "Check diagnostics below",
+        description: ok ? `Test OTP sent to +91 ${clean}` : "Check diagnostics below",
         variant:     ok ? "default" : "destructive",
       });
     } catch (err: any) {
@@ -285,8 +285,7 @@ export default function SystemHealth() {
             {testResult && (
               <div className="mt-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground">Test OTP:</span>
-                  <span className="font-mono font-bold text-lg text-blue-800 tracking-widest">{testResult.testOtp}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">Test OTP sent to device</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {["dlt", "quick", "otp"].map(route => {
