@@ -92,31 +92,33 @@ export interface EmailResult {
 // ── Retry wrapper ──────────────────────────────────────────────────────────────
 async function sendWithRetry(
   mailOptions: nodemailer.SendMailOptions,
-  maxRetries = 3
+  _maxRetries = 1 // single attempt — outer retry queue handles backoff
 ): Promise<EmailResult> {
+  // ── Circuit breaker: honour the global email suspension flag ─────────────
+  try {
+    const { isEmailEnabled } = await import("../lib/apiSettingsProvider.js");
+    if (!(await isEmailEnabled())) {
+      console.warn(`[EmailService] SUSPENDED — skipping send to ${mailOptions.to}`);
+      return { ok: false, error: "Email sending is currently suspended. Re-enable via System Health." };
+    }
+  } catch { /* non-fatal — proceed */ }
+
   const transport = getTransport();
   if (!transport) {
     return { ok: false, error: "SMTP not configured — check SMTP env vars" };
   }
-  let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const info = await transport.sendMail(mailOptions);
-      console.log(
-        `[EmailService] ✅ Delivered to ${mailOptions.to}` +
-        ` | Subject: "${mailOptions.subject}"` +
-        ` | ID: ${info.messageId}` +
-        (attempt > 1 ? ` (attempt ${attempt})` : "")
-      );
-      return { ok: true, messageId: info.messageId };
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[EmailService] ⚠️  Attempt ${attempt}/${maxRetries} failed for ${mailOptions.to}: ${err?.message}`);
-      if (attempt < maxRetries) await new Promise(r => setTimeout(r, attempt * 2000));
-    }
+  try {
+    const info = await transport.sendMail(mailOptions);
+    console.log(
+      `[EmailService] ✅ Delivered to ${mailOptions.to}` +
+      ` | Subject: "${mailOptions.subject}"` +
+      ` | ID: ${info.messageId}`
+    );
+    return { ok: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.error(`[EmailService] ❌ Failed for ${mailOptions.to}: ${err?.message}`);
+    return { ok: false, error: err?.message || "Email delivery failed" };
   }
-  console.error(`[EmailService] ❌ All ${maxRetries} attempts failed for ${mailOptions.to}: ${lastError?.message}`);
-  return { ok: false, error: lastError?.message || "Email delivery failed after retries" };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { testSmsDiagnostics, getSmsAttemptLog } from "../lib/notifications.js";
-import { getCachedConfig, forceResyncFast2SmsKey } from "../lib/apiSettingsProvider.js";
+import { getCachedConfig, forceResyncFast2SmsKey, isEmailEnabled, bustEmailEnabledCache } from "../lib/apiSettingsProvider.js";
 import { isPlaceholderKey } from "../lib/keyValidation.js";
 
 const router = Router();
@@ -541,6 +541,96 @@ router.post("/resync-fast2sms", requireAdmin as any, async (_req, res) => {
     });
   } catch (e: any) {
     res.status(500).json({ ok: false, reason: e.message });
+  }
+});
+
+// ── GET  /api/admin/email-circuit — current state ─────────────────────────
+router.get("/email-circuit", requireAdmin as any, async (_req, res) => {
+  try {
+    const enabled = await isEmailEnabled();
+    const row = await pool.query(
+      `SELECT value, updated_at FROM api_settings WHERE key='email_circuit_breaker' LIMIT 1`
+    );
+    res.json({
+      emailEnabled: enabled,
+      value: row.rows[0]?.value ?? "not set (defaults to enabled)",
+      updatedAt: row.rows[0]?.updated_at ?? null,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /api/admin/email-circuit — toggle email on/off ──────────────────
+router.post("/email-circuit", requireAdmin as any, async (req, res) => {
+  try {
+    const { enabled } = req.body as { enabled: boolean };
+    const value = enabled ? "enabled" : "suspended";
+    await pool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at, updated_by)
+       VALUES ('email_circuit_breaker', $1, 'email_circuit_breaker', $2, NOW(), 'admin-ui')
+       ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = NOW(), updated_by = 'admin-ui'`,
+      [value, enabled]
+    );
+    bustEmailEnabledCache();
+    console.log(`[EmailCircuit] Email sending ${enabled ? "RE-ENABLED" : "SUSPENDED"} via admin UI`);
+
+    // When re-enabling, reset stuck email retries so they can try again
+    if (enabled) {
+      const reset = await pool.query(
+        `UPDATE notification_retry_queue
+         SET status='pending', next_retry_at=NOW() + interval '2 minutes',
+             last_error='Reset after email re-enabled'
+         WHERE channel='email'
+           AND status='failed'
+           AND last_error LIKE '%suspended%'`
+      );
+      console.log(`[EmailCircuit] Reset ${reset.rowCount} suspended email retry items`);
+    }
+
+    res.json({ ok: true, emailEnabled: enabled });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── GET /api/admin/email-audit — last-24h email activity report ──────────
+router.get("/email-audit", requireAdmin as any, async (_req, res) => {
+  try {
+    const [sent, failed, dupes, queue] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS count FROM notification_logs
+         WHERE channel='email' AND status='sent' AND sent_at > NOW() - interval '24 hours'`
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS count FROM notification_logs
+         WHERE channel='email' AND status='failed' AND sent_at > NOW() - interval '24 hours'`
+      ),
+      pool.query(
+        `SELECT event_type, booking_id, COUNT(*) AS sends
+         FROM notification_logs
+         WHERE channel='email' AND sent_at > NOW() - interval '24 hours'
+         GROUP BY event_type, booking_id
+         HAVING COUNT(*) > 1
+         ORDER BY sends DESC LIMIT 20`
+      ),
+      pool.query(
+        `SELECT channel, status, COUNT(*) AS count
+         FROM notification_retry_queue
+         WHERE channel='email'
+         GROUP BY channel, status`
+      ),
+    ]);
+    res.json({
+      window: "last 24 hours",
+      sent: Number(sent.rows[0]?.count ?? 0),
+      failed: Number(failed.rows[0]?.count ?? 0),
+      duplicates: dupes.rows,
+      retryQueue: queue.rows,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 

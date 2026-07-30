@@ -9,7 +9,7 @@ import {
   CheckCircle, XCircle, AlertTriangle, RefreshCw, Send,
   Loader2, Activity, MessageCircle, Database, Shield,
   Clock, Mail, Radio, Bell, ListChecks, Cpu, HardDrive,
-  MemoryStick, Wifi, RotateCcw, Server, FileText,
+  MemoryStick, Wifi, RotateCcw, Server, FileText, PowerOff, Power,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -68,6 +68,43 @@ export default function SystemHealth() {
   const [testing,     setTesting]   = useState(false);
   const [testResult,  setTestResult]= useState<any>(null);
   const [resyncing,   setResyncing] = useState(false);
+  const [emailEnabled,    setEmailEnabled]    = useState<boolean | null>(null);
+  const [emailTogglingOn, setEmailTogglingOn] = useState(false);
+  const [emailAudit,      setEmailAudit]      = useState<any>(null);
+  const [auditLoading,    setAuditLoading]    = useState(false);
+
+  const fetchEmailCircuit = async () => {
+    try {
+      const r = await fetch(`${API}/api/admin/email-circuit`, { credentials: "include" });
+      if (r.ok) { const d = await r.json(); setEmailEnabled(d.emailEnabled); }
+    } catch {}
+  };
+
+  const toggleEmail = async (enable: boolean) => {
+    setEmailTogglingOn(true);
+    try {
+      const r = await fetch(`${API}/api/admin/email-circuit`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: enable }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        setEmailEnabled(d.emailEnabled);
+        toast({ title: enable ? "✅ Email Re-enabled" : "⛔ Email Suspended", description: enable ? "Outgoing email is now active. Monitor logs." : "All outgoing email is blocked. WhatsApp/SMS remain active." });
+      }
+    } catch (err: any) { toast({ title: "Toggle failed", description: err.message, variant: "destructive" }); }
+    finally { setEmailTogglingOn(false); }
+  };
+
+  const fetchEmailAudit = async () => {
+    setAuditLoading(true);
+    try {
+      const r = await fetch(`${API}/api/admin/email-audit`, { credentials: "include" });
+      if (r.ok) setEmailAudit(await r.json());
+    } catch {}
+    finally { setAuditLoading(false); }
+  };
 
   const fetchHealth = async () => {
     setLoading(true);
@@ -119,7 +156,7 @@ export default function SystemHealth() {
     } finally { setResyncing(false); }
   };
 
-  useEffect(() => { fetchHealth(); }, []);
+  useEffect(() => { fetchHealth(); fetchEmailCircuit(); }, []);
 
   const c         = health?.checks;
   const recentOtps: any[] = c?.recent_otps?.detail || [];
@@ -238,6 +275,89 @@ export default function SystemHealth() {
               <CheckCard label="Disk (/)"  icon={HardDrive}   check={c?.disk} />
             </div>
           </div>
+
+          {/* ── Email Circuit Breaker ── */}
+          <Card className={`p-5 border-2 ${emailEnabled === false ? "border-red-400 bg-red-50" : "border-green-400 bg-green-50/40"}`}>
+            <div className="flex items-start gap-3">
+              {emailEnabled === false
+                ? <PowerOff size={20} className="text-red-600 mt-0.5 shrink-0" />
+                : <Power size={20} className="text-green-600 mt-0.5 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`font-bold text-sm ${emailEnabled === false ? "text-red-800" : "text-green-800"}`}>
+                    Email Circuit Breaker
+                  </span>
+                  <Badge className={emailEnabled === false ? "bg-red-100 text-red-800 border-0" : "bg-green-100 text-green-800 border-0"}>
+                    {emailEnabled === null ? "Loading…" : emailEnabled ? "✅ ENABLED" : "⛔ SUSPENDED"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {emailEnabled === false
+                    ? "All outgoing email is blocked. WhatsApp and SMS remain fully active. Re-enable only after Hostinger SMTP is restored."
+                    : "Outgoing email is active. Suspend immediately if Hostinger reports suspicious activity."}
+                </p>
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  {emailEnabled !== false && (
+                    <Button size="sm" variant="destructive" onClick={() => toggleEmail(false)} disabled={emailTogglingOn} className="gap-1.5">
+                      {emailTogglingOn ? <Loader2 size={12} className="animate-spin" /> : <PowerOff size={12} />}
+                      Suspend Email Now
+                    </Button>
+                  )}
+                  {emailEnabled === false && (
+                    <Button size="sm" onClick={() => toggleEmail(true)} disabled={emailTogglingOn}
+                      className="bg-green-700 hover:bg-green-800 text-white gap-1.5">
+                      {emailTogglingOn ? <Loader2 size={12} className="animate-spin" /> : <Power size={12} />}
+                      Re-enable Email
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={fetchEmailAudit} disabled={auditLoading} className="gap-1.5">
+                    {auditLoading ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                    24h Email Audit
+                  </Button>
+                </div>
+                {emailAudit && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border text-xs space-y-1.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="text-center p-2 bg-green-50 rounded">
+                        <div className="font-bold text-lg text-green-700">{emailAudit.sent}</div>
+                        <div className="text-muted-foreground">Sent</div>
+                      </div>
+                      <div className="text-center p-2 bg-red-50 rounded">
+                        <div className="font-bold text-lg text-red-700">{emailAudit.failed}</div>
+                        <div className="text-muted-foreground">Failed</div>
+                      </div>
+                      <div className="text-center p-2 bg-amber-50 rounded">
+                        <div className="font-bold text-lg text-amber-700">{emailAudit.duplicates?.length ?? 0}</div>
+                        <div className="text-muted-foreground">Dupes</div>
+                      </div>
+                    </div>
+                    {emailAudit.duplicates?.length > 0 && (
+                      <details className="mt-1">
+                        <summary className="text-[10px] text-muted-foreground cursor-pointer">Duplicate sends ({emailAudit.duplicates.length})</summary>
+                        <div className="mt-1 space-y-1">
+                          {emailAudit.duplicates.map((d: any, i: number) => (
+                            <div key={i} className="font-mono text-[10px] bg-amber-50 rounded p-1.5">
+                              {d.event_type} · booking {d.booking_id?.slice(-8)} · {d.sends}× sent
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    {emailAudit.retryQueue?.length > 0 && (
+                      <details>
+                        <summary className="text-[10px] text-muted-foreground cursor-pointer">Retry queue</summary>
+                        <div className="mt-1 space-y-1">
+                          {emailAudit.retryQueue.map((q: any, i: number) => (
+                            <div key={i} className="font-mono text-[10px] bg-muted rounded p-1.5">{q.status}: {q.count}</div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
 
           {/* ── Manual resync card ── */}
           <Card className="p-5 border-2 border-dashed border-[#0B3D2E]/20 bg-[#f0f7f3]">

@@ -606,6 +606,15 @@ export interface EmailAttachment {
 
 export async function sendEmail(to: string, subject: string, body: string, htmlBody?: string, attachments?: EmailAttachment[]): Promise<SendResult> {
   if (!to) return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "No recipient email" };
+
+  // ── Circuit breaker: bail immediately if email is suspended ─────────────────
+  // Avoids hammering a suspended SMTP server. Toggle via admin System Health page.
+  const { isEmailEnabled } = await import("./apiSettingsProvider.js");
+  if (!(await isEmailEnabled())) {
+    console.warn(`[Email] SUSPENDED — skipping send to ${to} (subject: "${subject}")`);
+    return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "Email sending is currently suspended. Re-enable via System Health → Email Circuit Breaker." };
+  }
+
   const transport = getEmailTransport();
   if (!transport) {
     return { ok: false, provider: "SMTP", endpoint: "smtp", errorMessage: "SMTP not configured — check API Settings" };
@@ -614,30 +623,28 @@ export async function sendEmail(to: string, subject: string, body: string, htmlB
   const smtpHost = smtpCfg.apiUrl || process.env.SMTP_HOST || "smtp.gmail.com";
   const endpoint = `smtp://${smtpHost}`;
   // IMPORTANT: 'from' MUST match the SMTP authenticated user, otherwise Gmail/SMTP rejects it
-  // Use the auth user as the sender; set replyTo to the business address
   const smtpUser = smtpCfg.extra.user || process.env.SMTP_USER || "";
   const fromDisplay = smtpCfg.extra.from_name || "Al Burhan Tours & Travels";
   const replyTo = smtpCfg.extra.from_email || "info@alburhantravels.online";
   const from = `${fromDisplay} <${smtpUser}>`;
 
-  // Strip HTML tags from body text for plain-text version
+  // Strip HTML tags for plain-text version
   const plainText = body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
 
+  // Single attempt only — the outer retry engine (notification_retry_queue) handles
+  // exponential backoff. An inner retry loop caused 3× SMTP connections per attempt
+  // and was a primary contributor to Hostinger's suspicious-activity suspension.
   try {
-    await withRetry(() =>
-      transport!.sendMail({
-        from,
-        replyTo,
-        to, subject,
-        text: plainText,
-        html: htmlBody || buildHtmlEmail(plainText),
-        attachments: attachments?.map(a => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
-      })
-    );
-    console.log("[Email] Sent to:", to, "Subject:", subject, attachments?.length ? `(+${attachments.length} attachment${attachments.length > 1 ? "s" : ""})` : "");
+    await transport.sendMail({
+      from, replyTo, to, subject,
+      text: plainText,
+      html: htmlBody || buildHtmlEmail(plainText),
+      attachments: attachments?.map(a => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+    });
+    console.log("[Email] ✅ Sent to:", to, "| Subject:", subject, attachments?.length ? `(+${attachments.length} attachment${attachments.length > 1 ? "s" : ""})` : "");
     return { ok: true, provider: "SMTP", endpoint, requestPayload: { from, to, subject }, responsePayload: { delivered: true } };
   } catch (err: any) {
-    console.error("[Email] Error after retries to", to, ":", err?.message);
+    console.error("[Email] ❌ Failed to", to, ":", err?.message);
     return {
       ok: false, provider: "SMTP", endpoint,
       requestPayload: { to, subject },

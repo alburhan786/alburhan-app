@@ -2180,6 +2180,21 @@ async function runMigrations() {
     }
   } catch (err) { console.error("[Migration] SMTP auto-config failed:", err); }
 
+  // ── Email circuit breaker: insert row if missing; keep 'suspended' until admin re-enables ──
+  // This was added after Hostinger suspended info@alburhantravels.com for suspicious sending.
+  // The row is only written if it doesn't exist yet, so once an admin re-enables it the
+  // flag stays enabled across restarts.
+  try {
+    await pool.query(`
+      INSERT INTO api_settings (key, value, provider, enabled, updated_at, updated_by)
+      VALUES ('email_circuit_breaker', 'suspended', 'email_circuit_breaker', false, NOW(), 'migration-email-suspension')
+      ON CONFLICT (key) DO NOTHING
+    `);
+    const cbRow = await pool.query(`SELECT value FROM api_settings WHERE key='email_circuit_breaker' LIMIT 1`);
+    const cbValue = cbRow.rows[0]?.value;
+    console.log(`[Migration] email_circuit_breaker = '${cbValue}' (suspended until admin re-enables via System Health)`);
+  } catch (err) { console.error("[Migration] email_circuit_breaker setup failed:", err); }
+
   // ── Enterprise: tasks, marketing_campaigns, leads, suppliers ─────────────────
   try {
     await pool.query(`
@@ -2994,8 +3009,14 @@ async function start() {
     setInterval(runRetryEngine, 60 * 1000); // every 60s instead of every 15s
     console.log("[RetryEngine] WhatsApp retry engine scheduled every 60 seconds (exponential backoff, max 5 retries)");
 
-    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) — 1m/5m/15m/1h/24h, max 5 ──
+    // ── Generic cross-channel retry engine (SMS/RCS/Email/Push) ─────────────────
+    // Backoff schedule: 1m → 5m → 15m → 1h → 24h.  Max 5 attempts for SMS/RCS/Push.
+    // Email is capped at 3 attempts and is skipped entirely while the circuit breaker
+    // is set to 'suspended' (toggled via Admin → System Health → Email Circuit Breaker).
+    // Interval is 30 s — previously 10 s, which caused ~60 SMTP connections/min when
+    // emails failed en masse and was the root cause of Hostinger's suspension.
     const RETRY_DELAYS_SEC = [60, 300, 900, 3600, 86400];
+    const EMAIL_MAX_RETRIES = 3;
     const runGenericRetryEngine = async () => {
       try {
         const due = await pool.query(
@@ -3007,7 +3028,25 @@ async function start() {
         console.log(`[GenericRetryEngine] ${due.rowCount} item(s) due for retry`);
         const { sendRCS, sendEmail } = await import("./lib/notifications.js");
         const { sendCustomSMS } = await import("./lib/sms.js");
+        const { isEmailEnabled } = await import("./lib/apiSettingsProvider.js");
+        const emailOn = await isEmailEnabled();
         for (const item of due.rows) {
+          // ── Email-specific guards ─────────────────────────────────────────────
+          if (item.channel === "email") {
+            if (!emailOn) {
+              // Silent skip — circuit breaker is closed; don't update retry_count
+              continue;
+            }
+            if (item.retry_count >= EMAIL_MAX_RETRIES) {
+              await pool.query(
+                `UPDATE notification_retry_queue SET status='failed', last_error=$1, updated_at=NOW() WHERE id=$2`,
+                ["Email max retries (3) reached", item.id]
+              );
+              console.warn(`[GenericRetryEngine] email → capped at ${EMAIL_MAX_RETRIES} retries (${item.recipient})`);
+              continue;
+            }
+          }
+
           let ok = false;
           let errorMessage: string | undefined;
           try {
@@ -3073,8 +3112,18 @@ async function start() {
         console.error("[GenericRetryEngine] engine error:", err);
       }
     };
-    setInterval(runGenericRetryEngine, 10 * 1000);
-    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine: 1m/5m/15m/1h/24h backoff, max 5 retries");
+    // ── Pause any pending email retries that built up before this fix ────────
+    pool.query(
+      `UPDATE notification_retry_queue
+       SET status='failed', last_error='Email paused — automatic retry suspended pending SMTP review'
+       WHERE channel='email' AND status='pending'`
+    ).then((r: any) => {
+      if ((r.rowCount ?? 0) > 0)
+        console.log(`[GenericRetryEngine] Paused ${r.rowCount} stuck email retry item(s) in queue`);
+    }).catch(() => {});
+
+    setInterval(runGenericRetryEngine, 30 * 1000); // was 10 s — 30 s prevents SMTP hammering
+    console.log("[GenericRetryEngine] SMS/RCS/Email retry engine: 30s interval, 1m/5m/15m/1h/24h backoff, max 5 (SMS/RCS/Push) / 3 (Email) retries");
   });
 }
 

@@ -282,3 +282,31 @@ function buildEnvFallback(provider: ProviderName): ProviderConfig {
       return { enabled: false, extra: {} };
   }
 }
+
+// ── Email circuit breaker ─────────────────────────────────────────────────────
+// Reads key='email_circuit_breaker' from api_settings.
+// value='suspended' → email disabled. Any other value (or row missing) → enabled.
+// Cache is 30 s so a UI toggle takes effect within half a minute without a restart.
+let _emailEnabledCache: boolean | null = null;
+let _emailEnabledCachedAt = 0;
+const EMAIL_CB_TTL = 30_000;
+
+export async function isEmailEnabled(): Promise<boolean> {
+  if (_emailEnabledCache !== null && Date.now() - _emailEnabledCachedAt < EMAIL_CB_TTL) {
+    return _emailEnabledCache;
+  }
+  try {
+    const r = await pool.query(
+      `SELECT value FROM api_settings WHERE key='email_circuit_breaker' LIMIT 1`
+    );
+    _emailEnabledCache = r.rows[0]?.value !== "suspended";
+    _emailEnabledCachedAt = Date.now();
+    return _emailEnabledCache;
+  } catch {
+    return false; // fail-safe: treat as suspended on DB error
+  }
+}
+
+export function bustEmailEnabledCache(): void {
+  _emailEnabledCache = null;
+}
