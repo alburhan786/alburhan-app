@@ -1,0 +1,107 @@
+URGENT SECURITY FIX – SEPARATE CUSTOMER AND ADMIN LOGIN
+
+Problem:
+
+The Admin OTP login option is currently appearing on the normal customer sign-in page.
+
+This must be fixed immediately.
+
+REQUIREMENTS
+
+1. Separate authentication portals
+
+Customer Login:
+- Route: /login
+- Only for customer accounts
+- Allow customer mobile OTP, email OTP, password, or approved social login
+- After successful login, redirect only to the Customer Dashboard
+
+Admin Login:
+- Route: /admin/login
+- Only for Super Admin, Admin, Finance, Branch, Agent, and Staff accounts
+- Allow admin username/email + password
+- Require Admin OTP or two-factor authentication
+- After login, redirect according to the authenticated staff role
+
+2. Hide admin authentication from customers
+
+On the customer login page, do not show:
+
+- Admin OTP
+- Admin login
+- Staff role selection
+- Super Admin login
+- Branch login
+- Finance login
+- Agent login
+- Admin dashboard links
+
+3. Backend security
+
+Do not rely only on hiding frontend buttons.
+
+Enforce backend role validation on every protected admin API and admin route.
+
+A customer token must receive:
+
+403 Forbidden
+
+when trying to access any admin, branch, finance, agent, or staff route.
+
+An admin token must not automatically access customer private records unless the assigned permission allows it.
+
+4. Account detection
+
+When a mobile number or email is entered:
+
+- Search only the correct account type for that portal
+- Customer login must query customer accounts only
+- Admin login must query staff/admin accounts only
+
+Do not automatically treat a customer as an admin even if the same mobile number exists in both systems.
+
+5. OTP separation
+
+Use separate OTP purposes:
+
+CUSTOMER_LOGIN_OTP
+
+ADMIN_LOGIN_OTP
+
+Do not accept a customer OTP on the admin portal.
+
+Do not accept an admin OTP on the customer portal.
+
+OTP records must store:
+
+- account ID
+- account type
+- login purpose
+- expiry time
+- attempt count
+- verification status
+
+6. Rate limiting and security
+
+- Limit OTP requests
+- Limit invalid OTP attempts
+- Add temporary lock after repeated failures
+- Do not expose whether an admin account exists
+- Log IP address, device, date, and login result
+- Revoke sessions on logout
+- Use secure HTTP-only cookies or secure token storage
+
+7. Testing
+
+Test all cases:
+
+- Customer login succeeds on /login
+- Customer OTP is rejected on /admin/login
+- Admin login succeeds on /admin/login
+- Admin OTP is rejected on /login
+- Customer cannot access admin dashboard
+- Customer cannot call admin APIs
+- Staff role opens only permitted modules
+- Logout clears the correct session
+
+Do not mark this task complete until frontend separation and backend authorization tests both pass.

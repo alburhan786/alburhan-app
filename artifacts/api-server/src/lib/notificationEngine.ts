@@ -585,9 +585,14 @@ export async function sendBotBeeEventTemplate(
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
   const paymentUrl = ctx.bookingNumber
     ? `${siteBase}/pay/${ctx.bookingNumber}` : `${siteBase}`;
-  // forceTemplateApi removed — Meta Cloud API (line ~758) is tried FIRST in sendOnChannelWithType.
-  // BotBee template API (/whatsapp/send/template) is only reached as a last resort fallback.
-  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true };
+  // forceTemplateApi: true — bypasses the session-based /whatsapp/send text API entirely and goes
+  // straight to BotBee's approved template API (/whatsapp/send/template).
+  // WHY: The text API only works inside a 24h customer-reply window. For ERP-initiated outbound
+  // notifications (booking approved, payment received, etc.) the window is almost never open —
+  // BotBee returns HTTP 200 but Meta silently drops the message or (worse) re-delivers the
+  // template's mixed_body_text with literal #!Name!# placeholders unsubstituted.
+  // forceTemplateApi guarantees delivery + a real wamid regardless of session state.
+  const opts = { eventType, bookingId, customerId, customerName: ctx.customerName, skipFailureLog: true, noInternalLog: true, forceTemplateApi: true };
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────
@@ -838,10 +843,15 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         invoice_url:    (ctx.invoiceUrl as string | undefined) ||
                         (ctx.bookingNumber ? `https://alburhantravels.online/invoice/${ctx.bookingNumber}` : undefined),
       };
-      const variableValues = varNames.map((v) => String(varMap[v] ?? "-"));
+      // Build named-variable object — BotBee substitutes #!Key!# ONLY when variables are sent as a
+      // named object { "Name":"val", "BookingID":"val2" } whose keys match the template variable_map.
+      // Passing a flat array ["val1","val2"] produces numeric keys {0:"val1"} → "#!0!#" which NEVER
+      // matches any BotBee placeholder, so the delivered message shows literal #!Name!# unsubstituted.
+      const namedVariables: Record<string, string> = {};
+      for (const v of varNames) { namedVariables[v] = String(varMap[v] ?? "-"); }
       const result = await sendBotBeeTemplate(ctx.customerMobile, tplId || name, {
         eventType, bookingId, customerId,
-        variables: variableValues.length ? variableValues : undefined,
+        variables: Object.keys(namedVariables).length ? namedVariables : undefined,
       });
       if (result.ok) return { status: "sent", providerResponse: result };
       console.warn(`[notificationEngine] wa_template "${name}" failed for ${eventType}:`, result.errorMessage);

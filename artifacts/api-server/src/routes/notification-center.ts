@@ -757,4 +757,130 @@ router.get("/event-types", requireAdmin as any, async (_req: AuthenticatedReques
   res.json({ eventTypes: EVENT_TYPES, channels: CHANNELS, labels: EVENT_LABELS, groups: EVENT_GROUPS });
 });
 
+// ── Template Preview ──────────────────────────────────────────────────────────
+// Returns all ABT WhatsApp templates with their variable schema.
+// Optional ?bookingId=ABT123 resolves live values from the booking for preview.
+const TEMPLATE_VARIABLE_SCHEMA: Record<string, Array<{ key: string; description: string; erpField: string }>> = {
+  booking_submitted:      [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"PackageContent",description:"Package",erpField:"package_name" },{ key:"Amount",description:"Total Amount",erpField:"total_amount" }],
+  booking_approved:       [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"PackageContent",description:"Package",erpField:"package_name" },{ key:"Amount",description:"Total Amount",erpField:"total_amount" },{ key:"Paymenturllink",description:"Invoice / Payment Link",erpField:"invoice_url" }],
+  payment_received:       [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Invoice",description:"Invoice Number",erpField:"invoice_number" },{ key:"Amount",description:"Amount Received",erpField:"paid_amount" }],
+  pending_payment:        [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"PackageContent",description:"Package",erpField:"package_name" },{ key:"Amount",description:"Balance Amount",erpField:"outstanding_amount" },{ key:"Paymenturllink",description:"Payment Link",erpField:"payment_url" }],
+  invoice_ready:          [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Invoice",description:"Invoice Number",erpField:"invoice_number" },{ key:"Amount",description:"Total Amount",erpField:"total_amount" },{ key:"Paymenturllink",description:"Invoice Link",erpField:"invoice_url" }],
+  agreement_ready:        [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Agreement",description:"Agreement Number",erpField:"agreement_number" },{ key:"Download",description:"Agreement Sign Link",erpField:"agreement_url" }],
+  agreement_signed:       [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"Agreement",description:"Agreement ID",erpField:"agreement_number" }],
+  visa_issued:            [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Visano",description:"Visa Number",erpField:"visa_number" },{ key:"Download",description:"Visa Download Link",erpField:"visa_url" }],
+  ticket_issued:          [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Flightnumber",description:"PNR / Flight Number",erpField:"pnr" },{ key:"Download",description:"Ticket Download Link",erpField:"ticket_url" }],
+  departure_reminder:     [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Departuredate",description:"Departure Date",erpField:"departure_date" },{ key:"Reportingtime",description:"Reporting Time",erpField:"reporting_time" },{ key:"T2",description:"Airport",erpField:"departure_airport" }],
+  flight_reminder:        [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"PackageContent",description:"Package",erpField:"package_name" },{ key:"Flightnumber",description:"Flight Number",erpField:"flight_number" },{ key:"Departuredate",description:"Departure Date",erpField:"departure_date" },{ key:"Reportingtime",description:"Reporting Time",erpField:"reporting_time" },{ key:"Airport",description:"Airport",erpField:"departure_airport" }],
+  return_flight_reminder: [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Flightnumber",description:"Flight Number",erpField:"flight_number" },{ key:"Departuredate",description:"Return Date",erpField:"return_date" },{ key:"Reportingtime",description:"Reporting Time",erpField:"reporting_time" },{ key:"Airport",description:"Airport",erpField:"return_airport" }],
+  room_allocation:        [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"BookingID",description:"Booking ID",erpField:"booking_number" },{ key:"Hotel",description:"Hotel Name",erpField:"hotel_name" },{ key:"Roomnumber",description:"Room Number",erpField:"room_number" }],
+  group_orientation:      [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"date",description:"Date",erpField:"orientation_date" },{ key:"Time",description:"Time",erpField:"orientation_time" },{ key:"Hussainhall",description:"Venue",erpField:"venue" }],
+  welcome_saudi:          [{ key:"Name",description:"Customer Name",erpField:"customer_name" }],
+  arrival_india:          [{ key:"Name",description:"Customer Name",erpField:"customer_name" }],
+  hajj_mubarak:           [{ key:"Name",description:"Customer Name",erpField:"customer_name" }],
+  hajj_launch:            [{ key:"Name",description:"Customer Name",erpField:"customer_name" },{ key:"2027",description:"Year",erpField:"year" }],
+};
+
+router.get("/template-preview", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookingId: qBookingId } = req.query as { bookingId?: string };
+    const { ABT_TEMPLATES, TEMPLATE_BODIES } = await import("../lib/botbee.js");
+    const SITE = "https://alburhantravels.online";
+
+    // Optionally resolve live booking values
+    let liveData: Record<string, string> | null = null;
+    if (qBookingId?.trim()) {
+      try {
+        const bRes = await pool.query(
+          `SELECT b.booking_number, b.total_amount, b.paid_amount,
+                  u.full_name AS customer_name, p.package_name,
+                  COALESCE(i.invoice_number, b.booking_number) AS invoice_number
+           FROM bookings b
+           LEFT JOIN users u ON u.id = b.customer_id
+           LEFT JOIN packages p ON p.id = b.package_id
+           LEFT JOIN invoices i ON i.booking_id = b.id
+           WHERE b.booking_number = $1 OR b.id::text = $1
+           ORDER BY i.created_at DESC
+           LIMIT 1`,
+          [qBookingId.trim()]
+        );
+        if (bRes.rows[0]) {
+          const r = bRes.rows[0];
+          const outstanding = Math.max(0, Number(r.total_amount || 0) - Number(r.paid_amount || 0));
+          const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+          liveData = {
+            customer_name:       r.customer_name || "Customer",
+            booking_number:      r.booking_number || qBookingId.trim(),
+            package_name:        r.package_name || "Hajj/Umrah Package",
+            total_amount:        fmt(Number(r.total_amount || 0)),
+            paid_amount:         fmt(Number(r.paid_amount || 0)),
+            outstanding_amount:  fmt(outstanding),
+            invoice_number:      r.invoice_number || r.booking_number || qBookingId.trim(),
+            invoice_url:         `${SITE}/invoice/${r.booking_number || qBookingId.trim()}`,
+            payment_url:         `${SITE}/pay/${r.booking_number || qBookingId.trim()}`,
+            agreement_url:       `${SITE}/agreement/${r.booking_number || qBookingId.trim()}`,
+            agreement_number:    r.booking_number || qBookingId.trim(),
+          };
+        }
+      } catch (e: any) {
+        console.warn("[template-preview] booking lookup:", e.message);
+      }
+    }
+
+    const templates = Object.entries(ABT_TEMPLATES as Record<string, { id: string; name: string }>).map(([slug, tpl]) => {
+      const varDefs = TEMPLATE_VARIABLE_SCHEMA[slug] || [];
+      const templateId = tpl.id || "";
+      const bodyTemplate = templateId ? (TEMPLATE_BODIES as Record<string, string>)[templateId] || null : null;
+
+      const variables = varDefs.map((v, idx) => {
+        const liveValue = liveData ? (liveData[v.erpField] ?? null) : null;
+        const status = liveData
+          ? (liveValue ? "ok" : "missing")
+          : "no_booking";
+        return { slot: idx + 1, key: v.key, placeholder: `#!${v.key}!#`, description: v.description, erpField: v.erpField, value: liveValue, status };
+      });
+
+      // Render preview body with substituted values
+      let preview: string | null = null;
+      if (bodyTemplate) {
+        preview = bodyTemplate;
+        if (liveData) {
+          // Replace {{N}} positionally
+          const vals = variables.map(v => v.value ?? `[${v.key}]`);
+          preview = preview.replace(/\{\{(\d+)\}\}/g, (_, n) => {
+            const idx = parseInt(n, 10) - 1;
+            return idx >= 0 && idx < vals.length ? vals[idx] : `{{${n}}}`;
+          });
+          // Replace #!Key!#
+          for (const v of variables) {
+            preview = preview!.split(`#!${v.key}!#`).join(v.value ?? `[${v.key}]`);
+          }
+        }
+      }
+
+      // Validate: any missing required variables?
+      const missingVars = variables.filter(v => v.status === "missing").map(v => v.key);
+
+      return {
+        event: slug,
+        templateId,
+        templateName: tpl.name || slug,
+        hasTemplate: !!templateId,
+        hasBody: !!bodyTemplate,
+        variableCount: varDefs.length,
+        variables,
+        bodyTemplate,
+        preview,
+        missingVars,
+        sendBlocked: missingVars.length > 0,
+      };
+    });
+
+    res.json({ templates, bookingId: qBookingId?.trim() || null, bookingFound: !!liveData });
+  } catch (err: any) {
+    console.error("[template-preview]", err);
+    res.status(500).json({ message: err.message || "Failed to load template preview" });
+  }
+});
+
 export default router;

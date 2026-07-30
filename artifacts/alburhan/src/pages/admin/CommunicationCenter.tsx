@@ -13,6 +13,7 @@ const TABS = [
   { id: "scheduled", label: "🕐 Scheduled" },
   { id: "automation", label: "⚙️ Automation" },
   { id: "templates", label: "📝 Templates" },
+  { id: "template-preview", label: "🔍 Template Preview" },
   { id: "whatsapp", label: "💬 WhatsApp" },
   { id: "sms", label: "📱 SMS" },
   { id: "rcs", label: "🔵 RCS" },
@@ -1399,6 +1400,203 @@ function TestCenter() {
   );
 }
 
+// ── Template Preview ──────────────────────────────────────────────────────────
+const TEMPLATE_EVENT_LABELS: Record<string, string> = {
+  booking_submitted: "Booking Submitted", booking_approved: "Booking Approved",
+  payment_received: "Payment Received", pending_payment: "Pending Payment",
+  invoice_ready: "Invoice Ready", agreement_ready: "Agreement Ready",
+  agreement_signed: "Agreement Signed", visa_issued: "Visa Issued",
+  ticket_issued: "Ticket Issued", departure_reminder: "Departure Reminder",
+  flight_reminder: "Flight Reminder", return_flight_reminder: "Return Flight",
+  room_allocation: "Room Allocation", group_orientation: "Group Orientation",
+  welcome_saudi: "Welcome Saudi", arrival_india: "Arrival India",
+  hajj_mubarak: "Hajj Mubarak", hajj_launch: "Hajj Launch",
+};
+
+function TemplatePreview() {
+  const [bookingInput, setBookingInput] = useState("");
+  const [bookingId, setBookingId] = useState("");
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [bookingFound, setBookingFound] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
+
+  const load = async (bid?: string) => {
+    setLoading(true);
+    try {
+      const url = bid ? apiUrl(`/api/notification-center/template-preview?bookingId=${encodeURIComponent(bid)}`) : apiUrl("/api/notification-center/template-preview");
+      const res = await fetch(url, { credentials: "include" });
+      const data = await res.json();
+      setTemplates(data.templates || []);
+      setBookingFound(!!data.bookingFound);
+    } catch (e) {
+      setTemplates([]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const bid = bookingInput.trim();
+    setBookingId(bid);
+    load(bid || undefined);
+  };
+
+  const okCount = templates.filter(t => t.hasTemplate).length;
+  const missingCount = templates.filter(t => !t.hasTemplate).length;
+
+  return (
+    <div style={{ maxWidth: 1100 }}>
+      {/* Header */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px", marginBottom: 20 }}>
+        <h2 style={{ fontWeight: 800, fontSize: 18, margin: "0 0 4px", color: "#111827" }}>🔍 WhatsApp Template Preview</h2>
+        <p style={{ color: "#6b7280", fontSize: 13, margin: "0 0 16px" }}>
+          Inspect all 15 ABT WhatsApp templates and their variable mappings. Enter a booking number to see exactly what message each template would send — before it fires.
+        </p>
+        <form onSubmit={handleSearch} style={{ display: "flex", gap: 10, maxWidth: 480 }}>
+          <input
+            value={bookingInput} onChange={e => setBookingInput(e.target.value)}
+            placeholder="Booking number (e.g. ABT26862764)"
+            style={{ flex: 1, border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 14px", fontSize: 13 }}
+          />
+          <button type="submit" disabled={loading} style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            {loading ? "Loading…" : "Preview"}
+          </button>
+          {bookingId && <button type="button" onClick={() => { setBookingInput(""); setBookingId(""); load(); }} style={{ background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 14px", fontSize: 12, cursor: "pointer", color: "#374151" }}>Clear</button>}
+        </form>
+        {bookingId && !loading && (
+          <div style={{ marginTop: 10, fontSize: 12 }}>
+            {bookingFound
+              ? <span style={{ color: "#166534", background: "#dcfce7", borderRadius: 5, padding: "3px 10px", fontWeight: 600 }}>✅ Booking {bookingId} found — showing live values</span>
+              : <span style={{ color: "#991b1b", background: "#fef2f2", borderRadius: 5, padding: "3px 10px", fontWeight: 600 }}>❌ Booking {bookingId} not found</span>
+            }
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 13 }}>
+          <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 6, padding: "4px 12px", fontWeight: 700 }}>✅ {okCount} templates configured</span>
+          {missingCount > 0 && <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 6, padding: "4px 12px", fontWeight: 700 }}>⚠️ {missingCount} no template ID</span>}
+        </div>
+      </div>
+
+      {/* Template Cards */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>Loading templates…</div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {templates.map((tpl: any) => {
+            const isExpanded = expandedEvent === tpl.event;
+            const anyMissing = tpl.missingVars?.length > 0;
+            const borderColor = !tpl.hasTemplate ? "#fde68a" : anyMissing ? "#fecaca" : "#bbf7d0";
+            const headerBg = !tpl.hasTemplate ? "#fffbeb" : anyMissing ? "#fef2f2" : "#f0fdf4";
+
+            return (
+              <div key={tpl.event} style={{ border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+                {/* Card Header */}
+                <div style={{ background: headerBg, padding: "12px 16px", borderBottom: `1px solid ${borderColor}`, cursor: "pointer" }} onClick={() => setExpandedEvent(isExpanded ? null : tpl.event)}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                        {TEMPLATE_EVENT_LABELS[tpl.event] || tpl.event}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                        {tpl.hasTemplate ? `ID: ${tpl.templateId}` : "No template ID"} · {tpl.variableCount} variable{tpl.variableCount !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      {!tpl.hasTemplate ? (
+                        <span style={{ background: "#fef3c7", color: "#92400e", fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 7px" }}>⚠️ NO TEMPLATE</span>
+                      ) : anyMissing ? (
+                        <span style={{ background: "#fef2f2", color: "#991b1b", fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 7px" }}>❌ MISSING VARS</span>
+                      ) : bookingId ? (
+                        <span style={{ background: "#dcfce7", color: "#166534", fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 7px" }}>✅ READY</span>
+                      ) : (
+                        <span style={{ background: "#dbeafe", color: "#1d4ed8", fontSize: 10, fontWeight: 700, borderRadius: 4, padding: "2px 7px" }}>💬 CONFIGURED</span>
+                      )}
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>{isExpanded ? "▲" : "▼"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Variable Table — always visible */}
+                <div style={{ padding: "10px 16px" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <th style={{ textAlign: "left", padding: "3px 6px 5px 0", color: "#9ca3af", fontWeight: 600 }}>#</th>
+                        <th style={{ textAlign: "left", padding: "3px 6px 5px", color: "#9ca3af", fontWeight: 600 }}>Placeholder</th>
+                        <th style={{ textAlign: "left", padding: "3px 0 5px 6px", color: "#9ca3af", fontWeight: 600 }}>
+                          {bookingId ? "Actual Value" : "Description"}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(tpl.variables || []).map((v: any) => (
+                        <tr key={v.slot} style={{ borderBottom: "1px solid #f9fafb" }}>
+                          <td style={{ padding: "4px 6px 4px 0", color: "#9ca3af" }}>{v.slot}</td>
+                          <td style={{ padding: "4px 6px", fontFamily: "monospace", color: "#6b21a8", background: "#faf5ff", borderRadius: 3 }}>
+                            {v.placeholder}
+                          </td>
+                          <td style={{ padding: "4px 0 4px 8px" }}>
+                            {bookingId ? (
+                              v.value ? (
+                                <span style={{ color: "#166534", fontWeight: 600 }}>{String(v.value).length > 45 ? String(v.value).slice(0, 42) + "…" : v.value}</span>
+                              ) : (
+                                <span style={{ color: "#991b1b", fontStyle: "italic" }}>— missing ({v.erpField})</span>
+                              )
+                            ) : (
+                              <span style={{ color: "#374151" }}>{v.description}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Expanded: full preview */}
+                {isExpanded && tpl.preview && (
+                  <div style={{ borderTop: "1px solid #f3f4f6", padding: "12px 16px", background: "#f8fafc" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".04em" }}>
+                      {bookingId ? "📱 Message Preview" : "📄 Template Body"}
+                    </div>
+                    <pre style={{ background: "#1e293b", color: "#e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 11, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.6, maxHeight: 260, overflow: "auto" }}>
+                      {tpl.preview}
+                    </pre>
+                    {anyMissing && bookingId && (
+                      <div style={{ marginTop: 8, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "8px 12px", fontSize: 11 }}>
+                        <strong style={{ color: "#991b1b" }}>⚠️ Send would be blocked</strong>
+                        <span style={{ color: "#991b1b", marginLeft: 6 }}>Missing: {tpl.missingVars.join(", ")}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {isExpanded && !tpl.preview && tpl.hasTemplate && (
+                  <div style={{ borderTop: "1px solid #f3f4f6", padding: "12px 16px", color: "#9ca3af", fontSize: 12, fontStyle: "italic" }}>
+                    Template body not cached locally — message still delivers via BotBee template API.
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ marginTop: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: "#374151", marginBottom: 8 }}>How variable substitution works</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "6px 20px", fontSize: 12, color: "#6b7280" }}>
+          <div>📋 <strong>Placeholder</strong> = key sent to BotBee as <code style={{ background: "#faf5ff", color: "#6b21a8", padding: "1px 4px", borderRadius: 3 }}>#!Name!#</code></div>
+          <div>💬 BotBee matches placeholder → <code>variable_map</code> → substitutes <code>{"{{1}}"}</code> in template body</div>
+          <div>✅ All ERP notifications now use <strong>forceTemplateApi:true</strong> — bypasses 24h session window, guarantees delivery</div>
+          <div>❌ <strong>BLOCKED</strong> if any variable is <code>null</code>, <code>undefined</code>, or still contains a <code>#!Placeholder!#</code></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function CommunicationCenter() {
   const [tab, setTab] = useState("dashboard");
@@ -1431,6 +1629,7 @@ export default function CommunicationCenter() {
         {tab === "scheduled" && <ScheduledMessages />}
         {tab === "automation" && <AutomationRules />}
         {tab === "templates" && <Templates />}
+        {tab === "template-preview" && <TemplatePreview />}
         {tab === "whatsapp" && <WhatsAppTab />}
         {tab === "sms" && <ChannelTab channel="sms" />}
         {tab === "rcs" && <ChannelTab channel="rcs" />}
