@@ -22,6 +22,24 @@ const GOLD  = "#C9A23F";
 const W = "54mm";
 const H = "86mm";
 
+function formatDDMMYYYY(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  // Already DD/MM/YYYY — return as-is
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr.trim())) return dateStr.trim();
+  // ISO YYYY-MM-DD
+  const iso = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  // Try native Date parse (handles "31 Dec 2026", "December 31, 2026", etc.)
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return dateStr;
+}
+
 const ROLE_LABELS: Record<string, string> = {
   airport_staff:  "AIRPORT STAFF",
   catering_staff: "CATERING STAFF",
@@ -234,24 +252,25 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
           </div>
         )}
 
-        {/* Blood group + Valid upto row */}
-        {(s.bloodGroup || s.validUpto) && (
+        {/* Blood group row */}
+        {s.bloodGroup && (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            gap: "3mm", flexShrink: 0, marginTop: "0.2mm",
+            gap: "0.8mm", flexShrink: 0, marginTop: "0.2mm",
           }}>
-            {s.bloodGroup && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.8mm" }}>
-                <span style={{ fontSize: "3.5pt", fontWeight: 700, color: "#666", letterSpacing: "0.5px", textTransform: "uppercase" }}>BG:</span>
-                <span style={{ fontSize: "6pt", fontWeight: 900, color: "#b91c1c", letterSpacing: "0.5px" }}>{s.bloodGroup}</span>
-              </div>
-            )}
-            {s.validUpto && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.8mm" }}>
-                <span style={{ fontSize: "3.5pt", fontWeight: 700, color: "#666", letterSpacing: "0.5px", textTransform: "uppercase" }}>VALID:</span>
-                <span style={{ fontSize: "4pt", fontWeight: 800, color: GREEN, letterSpacing: "0.3px" }}>{s.validUpto}</span>
-              </div>
-            )}
+            <span style={{ fontSize: "3.5pt", fontWeight: 700, color: "#666", letterSpacing: "0.5px", textTransform: "uppercase" }}>BG:</span>
+            <span style={{ fontSize: "6pt", fontWeight: 900, color: "#b91c1c", letterSpacing: "0.5px" }}>{s.bloodGroup}</span>
+          </div>
+        )}
+
+        {/* Valid upto row */}
+        {s.validUpto && (
+          <div style={{
+            fontSize: "4.5pt", fontWeight: 700, color: "#444",
+            textAlign: "center", lineHeight: 1.3, wordBreak: "break-word",
+            flexShrink: 0,
+          }}>
+            VALID UPTO : <span style={{ color: GREEN, fontWeight: 900 }}>{formatDDMMYYYY(s.validUpto)}</span>
           </div>
         )}
       </div>
