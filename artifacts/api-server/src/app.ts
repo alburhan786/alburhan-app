@@ -125,6 +125,36 @@ function migrationKeyValid(key: string | undefined): boolean {
   return !!key && validKeys.includes(key);
 }
 
+// GET /api/migrate/hotdeploy — GET-based self-update (bypasses CDN POST blocking).
+// Accepts ?key=&source= — same semantics as POST /api/migrate/self-update.
+// Intended for use from within VPS (localhost) or any environment where POST is restricted.
+app.get("/api/migrate/hotdeploy", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const sourceUrl = (req.query.source as string) ||
+    `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
+
+  const binPath = path.join(__dirname, "../dist/index.cjs");
+  try {
+    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(120_000) });
+    if (!response.ok) {
+      return void res.status(502).json({ error: `Download failed: HTTP ${response.status}`, url: sourceUrl });
+    }
+    const buffer = await response.arrayBuffer();
+    const bytes = Buffer.from(buffer);
+    if (bytes.length < 1_000_000) {
+      return void res.status(502).json({ error: `Bundle too small (${bytes.length} bytes)`, url: sourceUrl });
+    }
+    fs.writeFileSync(binPath, bytes);
+    res.json({ ok: true, bytes: bytes.length, source: sourceUrl, message: "Bundle updated. Process exiting for PM2 restart..." });
+    setTimeout(() => process.exit(0), 500);
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ error: err.message, url: sourceUrl });
+  }
+});
+
 // GET /api/migrate/kill-self — immediately exits this process so PM2 restarts with new bundle on disk
 app.get("/api/migrate/kill-self", (req, res) => {
   const key = req.query.key as string;

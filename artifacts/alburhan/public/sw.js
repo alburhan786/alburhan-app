@@ -1,5 +1,5 @@
-// Al Burhan Tours & Travels — Service Worker v5.0 (Caching + FCM Push)
-const CACHE = "alburhan-v5";
+// Al Burhan Tours & Travels — Service Worker v6.0 (Caching + FCM Push)
+const CACHE = "alburhan-v6";
 const STATIC = ["/manifest.json"];
 
 // Install — cache static shell
