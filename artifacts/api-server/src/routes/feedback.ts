@@ -5,6 +5,7 @@ import { eq, and, gt, desc, count, avg, sql, gte } from "drizzle-orm";
 import { requireAuth, requireAdmin, generateOtp, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { sendFeedbackReminders } from "../jobs/feedbackReminder.js";
 import * as XLSX from "xlsx";
 
 const router = Router();
@@ -502,6 +503,45 @@ router.get(
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(buf);
+  }
+);
+
+router.get(
+  "/admin/groups",
+  requireAuth as any,
+  requireAdmin as any,
+  async (_req, res) => {
+    const groups = await db
+      .select({
+        id: hajjGroupsTable.id,
+        groupName: hajjGroupsTable.groupName,
+        companyId: hajjGroupsTable.companyId,
+        returnDate: hajjGroupsTable.returnDate,
+        year: hajjGroupsTable.year,
+      })
+      .from(hajjGroupsTable)
+      .orderBy(desc(hajjGroupsTable.returnDate));
+    res.json(groups);
+  }
+);
+
+router.post(
+  "/send-reminders",
+  requireAuth as any,
+  requireAdmin as any,
+  async (req, res) => {
+    const { groupId } = req.body;
+    if (!groupId) {
+      res.status(400).json({ message: "groupId is required" });
+      return;
+    }
+    try {
+      const result = await sendFeedbackReminders(groupId);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[FeedbackReminder] Manual trigger error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Failed to send feedback reminders" });
+    }
   }
 );
 

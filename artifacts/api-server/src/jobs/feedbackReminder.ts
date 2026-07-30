@@ -18,21 +18,42 @@ function todayString(): string {
   return `${y}-${m}-${d}`;
 }
 
-export async function sendFeedbackReminders(): Promise<void> {
-  const today = todayString();
-  console.log(`[FeedbackReminder] Running for return date: ${today}`);
+export interface FeedbackReminderResult {
+  sent: number;
+  failed: number;
+  groupsProcessed: number;
+  pilgrims: { name: string; mobile: string; success: boolean }[];
+}
 
-  const groups = await db
-    .select()
-    .from(hajjGroupsTable)
-    .where(eq(hajjGroupsTable.returnDate, today));
+export async function sendFeedbackReminders(groupId?: string): Promise<FeedbackReminderResult> {
+  let groups;
+
+  if (groupId) {
+    // Manual trigger: fetch the specific group
+    groups = await db
+      .select()
+      .from(hajjGroupsTable)
+      .where(eq(hajjGroupsTable.id, groupId));
+    console.log(`[FeedbackReminder] Manual trigger for group: ${groupId}`);
+  } else {
+    // Cron trigger: send to groups returning today
+    const today = todayString();
+    console.log(`[FeedbackReminder] Running for return date: ${today}`);
+    groups = await db
+      .select()
+      .from(hajjGroupsTable)
+      .where(eq(hajjGroupsTable.returnDate, today));
+  }
 
   if (groups.length === 0) {
-    console.log("[FeedbackReminder] No groups returning today.");
-    return;
+    console.log("[FeedbackReminder] No groups found.");
+    return { sent: 0, failed: 0, groupsProcessed: 0, pilgrims: [] };
   }
 
   let sent = 0;
+  let failed = 0;
+  const pilgrimResults: { name: string; mobile: string; success: boolean }[] = [];
+
   for (const group of groups) {
     const companyName = COMPANY_NAMES[group.companyId || "alburhan"] || "Al Burhan Tours & Travels";
     const pilgrims = await db
@@ -56,17 +77,22 @@ export async function sendFeedbackReminders(): Promise<void> {
 
       const message = `Assalamu Alaikum ${pilgrim.fullName},\n\nAlhamdulillah! JazakAllah Khair for travelling with *${companyName}* for Hajj ${group.year}.\n\nYour feedback is very important to us. Please share your valuable experience:\n${feedbackUrl}\n\nMay Allah accept your Hajj! Ameen. 🤲\n\n— ${companyName}\n+91 8989701701`;
 
+      let success = false;
       try {
         await sendWhatsApp(pilgrim.mobileIndia, message);
         sent++;
+        success = true;
         await new Promise(r => setTimeout(r, 500));
       } catch (e) {
+        failed++;
         console.error(`[FeedbackReminder] Failed for ${pilgrim.mobileIndia}:`, e);
       }
+      pilgrimResults.push({ name: pilgrim.fullName || pilgrim.mobileIndia, mobile: pilgrim.mobileIndia, success });
     }
   }
 
-  console.log(`[FeedbackReminder] Sent ${sent} feedback requests for ${groups.length} group(s).`);
+  console.log(`[FeedbackReminder] Sent ${sent}, Failed ${failed} for ${groups.length} group(s).`);
+  return { sent, failed, groupsProcessed: groups.length, pilgrims: pilgrimResults };
 }
 
 export function startFeedbackReminderCron(): void {

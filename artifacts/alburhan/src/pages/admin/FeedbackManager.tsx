@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import {
   Star, AlertTriangle, CheckCircle, Clock, Users, TrendingUp,
-  Filter, ChevronRight, X, MessageSquare, RefreshCw, BarChart2, QrCode, Download, Printer
+  Filter, ChevronRight, X, MessageSquare, RefreshCw, BarChart2, QrCode, Download, Printer, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -362,8 +362,204 @@ function FeedbackQRPanel() {
   );
 }
 
+interface HajjGroup {
+  id: string;
+  groupName: string;
+  companyId: string | null;
+  returnDate: string | null;
+  year: string | null;
+}
+
+interface ReminderResult {
+  sent: number;
+  failed: number;
+  groupsProcessed: number;
+  pilgrims: { name: string; mobile: string; success: boolean }[];
+}
+
+function SendRemindersPanel() {
+  const [groups, setGroups] = useState<HajjGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<ReminderResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API}/api/feedback/admin/groups`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => setGroups([]))
+      .finally(() => setLoadingGroups(false));
+  }, []);
+
+  const selectedGroup = groups.find(g => g.id === selectedGroupId);
+
+  async function handleSend() {
+    if (!selectedGroupId) return;
+    setSending(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await fetch(`${API}/api/feedback/send-reminders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ groupId: selectedGroupId }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setError(data.message || "Failed to send reminders");
+      } else {
+        setResult(data);
+      }
+    } catch (e: any) {
+      setError(e?.message || "Network error");
+    } finally {
+      setSending(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <p className="text-sm text-blue-800 font-medium">📩 Send feedback reminder WhatsApp messages to all pilgrims in a group</p>
+        <p className="text-xs text-blue-600 mt-1">Each pilgrim receives a personalised message with their unique feedback link.</p>
+      </div>
+
+      <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Select Group</label>
+          {loadingGroups ? (
+            <div className="text-sm text-gray-400">Loading groups…</div>
+          ) : (
+            <select
+              value={selectedGroupId}
+              onChange={e => { setSelectedGroupId(e.target.value); setResult(null); setError(null); setConfirming(false); }}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-green-600"
+            >
+              <option value="">— Choose a group —</option>
+              {groups.map(g => (
+                <option key={g.id} value={g.id}>
+                  {g.groupName}{g.year ? ` (${g.year})` : ""}{g.returnDate ? ` — Returned: ${g.returnDate}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {selectedGroup && !confirming && !result && (
+          <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-700">{selectedGroup.groupName}</p>
+            {selectedGroup.returnDate && (
+              <p className="text-xs text-gray-500">Return date: {selectedGroup.returnDate}</p>
+            )}
+            {selectedGroup.companyId && (
+              <p className="text-xs text-gray-500">Company: {selectedGroup.companyId}</p>
+            )}
+            <Button
+              onClick={() => setConfirming(true)}
+              className="mt-3 bg-green-700 hover:bg-green-800 text-white gap-2"
+              size="sm"
+            >
+              <Send size={14} />
+              Send Feedback Reminders
+            </Button>
+          </div>
+        )}
+
+        {confirming && !sending && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+            <p className="text-sm font-semibold text-amber-800">⚠ Confirm: Send WhatsApp reminders to all pilgrims in <em>{selectedGroup?.groupName}</em>?</p>
+            <p className="text-xs text-amber-700">This will send a WhatsApp message to every pilgrim in the group. Messages are rate-limited (0.5s delay each).</p>
+            <div className="flex gap-3">
+              <Button
+                onClick={handleSend}
+                className="bg-green-700 hover:bg-green-800 text-white gap-2"
+                size="sm"
+              >
+                <Send size={14} />
+                Yes, Send Reminders
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirming(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {sending && (
+          <div className="flex items-center gap-3 text-sm text-gray-500 py-4">
+            <RefreshCw size={16} className="animate-spin text-green-600" />
+            Sending WhatsApp messages… This may take a moment.
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-700 font-medium">Error: {error}</p>
+          </div>
+        )}
+      </div>
+
+      {result && (
+        <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5">
+          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+            <CheckCircle size={16} className="text-green-500" />
+            Reminder Results
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-green-50 rounded-xl">
+              <p className="text-3xl font-bold text-green-700">{result.sent}</p>
+              <p className="text-xs text-green-600 mt-1 font-medium">Sent</p>
+            </div>
+            <div className="text-center p-4 bg-red-50 rounded-xl">
+              <p className="text-3xl font-bold text-red-700">{result.failed}</p>
+              <p className="text-xs text-red-600 mt-1 font-medium">Failed</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <p className="text-3xl font-bold text-gray-700">{result.pilgrims.length}</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">Total</p>
+            </div>
+          </div>
+          {result.pilgrims.length > 0 && (
+            <div className="max-h-64 overflow-y-auto rounded-lg border divide-y text-sm">
+              {result.pilgrims.map((p, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5">
+                  <div>
+                    <span className="font-medium text-gray-800">{p.name}</span>
+                    <span className="text-gray-400 text-xs ml-2">{p.mobile}</span>
+                  </div>
+                  {p.success ? (
+                    <span className="text-xs text-green-600 font-semibold flex items-center gap-1"><CheckCircle size={12} /> Sent</span>
+                  ) : (
+                    <span className="text-xs text-red-500 font-semibold flex items-center gap-1"><AlertTriangle size={12} /> Failed</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setResult(null); setSelectedGroupId(""); }}
+          >
+            Send to Another Group
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FeedbackManager() {
-  type TabId = "overview" | "list" | "complaints" | "qr";
+  type TabId = "overview" | "list" | "complaints" | "qr" | "reminders";
   const [tab, setTab] = useState<TabId>("overview");
   const [stats, setStats] = useState<Stats | null>(null);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -472,6 +668,7 @@ export default function FeedbackManager() {
             { id: "list", label: "All Feedback", icon: MessageSquare },
             { id: "complaints", label: "Complaints", icon: AlertTriangle },
             { id: "qr", label: "QR Code", icon: QrCode },
+            { id: "reminders", label: "Send Reminders", icon: Send },
           ].map(t => (
             <button
               key={t.id}
@@ -552,6 +749,8 @@ export default function FeedbackManager() {
         )}
 
         {tab === "qr" && <FeedbackQRPanel />}
+
+        {tab === "reminders" && <SendRemindersPanel />}
 
         {(tab === "list" || tab === "complaints") && (
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
