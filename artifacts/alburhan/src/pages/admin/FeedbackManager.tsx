@@ -597,7 +597,29 @@ export default function FeedbackManager() {
                   <option value="3">3★ & above</option>
                   <option value="2">2★ & above</option>
                 </select>
-                <span className="text-sm text-gray-400 ml-auto">{total} records</span>
+                <span className="text-sm text-gray-400">{total} records</span>
+                <button
+                  onClick={async () => {
+                    const params = new URLSearchParams();
+                    if (filters.status) params.set("status", filters.status);
+                    if (filters.companyId) params.set("companyId", filters.companyId);
+                    if (filters.isComplaint) params.set("isComplaint", filters.isComplaint);
+                    if (filters.minRating) params.set("minRating", filters.minRating);
+                    const r = await fetch(`${API}/api/feedback/admin/export?${params}`, { credentials: "include" });
+                    if (!r.ok) { alert("Export failed. Please try again."); return; }
+                    const blob = await r.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `feedback-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="ml-auto flex items-center gap-2 px-4 py-1.5 rounded-lg bg-green-700 hover:bg-green-800 text-white text-sm font-medium transition"
+                >
+                  <Download size={14} />
+                  Export to Excel
+                </button>
               </div>
             )}
 

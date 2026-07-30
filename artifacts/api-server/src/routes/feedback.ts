@@ -5,6 +5,7 @@ import { eq, and, gt, desc, count, avg, sql, gte } from "drizzle-orm";
 import { requireAuth, requireAdmin, generateOtp, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import * as XLSX from "xlsx";
 
 const router = Router();
 
@@ -422,6 +423,85 @@ router.get(
       }
     }
     res.json(map);
+  }
+);
+
+/** Prevent spreadsheet formula injection: prefix cells that start with =, +, -, @, \t, \r */
+function sanitizeCell(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = value.trimStart();
+  if (/^[=+\-@\t\r]/.test(trimmed)) return `'${value}`;
+  return value;
+}
+
+router.get(
+  "/admin/export",
+  requireAuth as any,
+  requireAdmin as any,
+  async (req, res) => {
+    const { status, companyId, isComplaint, minRating } = req.query as Record<string, string>;
+
+    // Normalise: frontend sends "in_progress", DB stores "in_review"
+    const normaliseStatus = (s: string) => (s === "in_progress" ? "in_review" : s);
+
+    const conditions = [];
+    if (status && ["open", "in_progress", "in_review", "resolved", "closed"].includes(status)) {
+      conditions.push(eq(feedbackTable.status, normaliseStatus(status) as any));
+    }
+    if (companyId) conditions.push(eq(feedbackTable.companyId, companyId));
+    if (isComplaint === "true") conditions.push(eq(feedbackTable.isComplaint, true));
+    if (isComplaint === "false") conditions.push(eq(feedbackTable.isComplaint, false));
+    if (minRating && !isNaN(parseInt(minRating))) {
+      conditions.push(gte(feedbackTable.ratingOverall, parseInt(minRating)));
+    }
+
+    const rows = await db
+      .select()
+      .from(feedbackTable)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(feedbackTable.createdAt));
+
+    const sheetData = rows.map(r => ({
+      "Name": sanitizeCell(r.pilgrimName),
+      "Mobile": sanitizeCell(r.pilgrimMobile),
+      "Booking ID": sanitizeCell(r.bookingId),
+      "Group": sanitizeCell(r.groupName),
+      "Company": sanitizeCell(r.companyId),
+      "Overall Rating": r.ratingOverall ?? "",
+      "Accommodation (Aziziah)": r.ratingAccommodationMakkah1 ?? "",
+      "Accommodation (Makkah 2)": r.ratingAccommodationMakkah2 ?? "",
+      "Accommodation (Madinah)": r.ratingAccommodationMadinah ?? "",
+      "Transportation": r.ratingTransportation ?? "",
+      "Food & Meals": r.ratingFood ?? "",
+      "Guide / Tour Leader": r.ratingGuide ?? "",
+      "Visa & Documentation": r.ratingVisaDocumentation ?? "",
+      "Comment": sanitizeCell(r.comment),
+      "What They Liked": sanitizeCell(r.whatDidYouLike),
+      "Suggestions": sanitizeCell(r.suggestions),
+      "Would Recommend": sanitizeCell(r.wouldRecommend),
+      "Is Complaint": r.isComplaint ? "Yes" : "No",
+      "Status": r.status,
+      "Assigned To": sanitizeCell(r.assignedTo),
+      "Date": r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : "",
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(sheetData);
+
+    // Auto-size columns
+    const colWidths = Object.keys(sheetData[0] || {}).map(key => ({
+      wch: Math.max(key.length, ...sheetData.map(r => String(r[key] ?? "").length)) + 2,
+    }));
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Feedback");
+
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const filename = `feedback-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buf);
   }
 );
 
