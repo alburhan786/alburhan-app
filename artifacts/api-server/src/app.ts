@@ -125,34 +125,81 @@ function migrationKeyValid(key: string | undefined): boolean {
   return !!key && validKeys.includes(key);
 }
 
-// GET /api/migrate/hotdeploy — GET-based self-update (bypasses CDN POST blocking).
-// Accepts ?key=&source= — same semantics as POST /api/migrate/self-update.
-// Intended for use from within VPS (localhost) or any environment where POST is restricted.
+// GET /api/migrate/hotdeploy — full deploy: backend bundle + frontend assets.
+// Single GET call deploys both so CDN-blocked POST paths are never needed.
+// Use ?frontend=0 to skip frontend, ?backend=0 to skip backend.
+// Calls process.exit(0) after writing so PM2 restarts with the new bundle.
 app.get("/api/migrate/hotdeploy", async (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
   const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
-  const sourceUrl = (req.query.source as string) ||
-    `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
+  const skipBackend  = req.query.backend  === "0";
+  const skipFrontend = req.query.frontend === "0";
 
-  const binPath = path.join(__dirname, "../dist/index.cjs");
-  try {
-    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(120_000) });
-    if (!response.ok) {
-      return void res.status(502).json({ error: `Download failed: HTTP ${response.status}`, url: sourceUrl });
+  const result: Record<string, any> = { ok: true };
+
+  // ── 1. Backend bundle ──────────────────────────────────────────────────────
+  if (!skipBackend) {
+    const backendUrl = (req.query.source as string) ||
+      `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
+    try {
+      const r = await fetch(backendUrl, { signal: AbortSignal.timeout(120_000) });
+      if (!r.ok) {
+        return void res.status(502).json({ error: `Backend download failed: HTTP ${r.status}`, url: backendUrl });
+      }
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 1_000_000) {
+        return void res.status(502).json({ error: `Bundle too small (${buf.length} bytes)`, url: backendUrl });
+      }
+      const binPath = path.join(__dirname, "../dist/index.cjs");
+      fs.writeFileSync(binPath, buf);
+      result.backend = { updated: true, bytes: buf.length };
+    } catch (err: any) {
+      return void res.status(500).json({ error: `Backend: ${err.message}`, url: backendUrl });
     }
-    const buffer = await response.arrayBuffer();
-    const bytes = Buffer.from(buffer);
-    if (bytes.length < 1_000_000) {
-      return void res.status(502).json({ error: `Bundle too small (${bytes.length} bytes)`, url: sourceUrl });
-    }
-    fs.writeFileSync(binPath, bytes);
-    res.json({ ok: true, bytes: bytes.length, source: sourceUrl, message: "Bundle updated. Process exiting for PM2 restart..." });
-    setTimeout(() => process.exit(0), 500);
-  } catch (err: any) {
-    if (!res.headersSent) res.status(500).json({ error: err.message, url: sourceUrl });
+  } else {
+    result.backend = { updated: false, skipped: true };
   }
+
+  // ── 2. Frontend assets ─────────────────────────────────────────────────────
+  if (!skipFrontend) {
+    const frontendUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
+    // Derive extract path: look for the alburhan dist alongside this bundle
+    const candidates = [
+      "/root/artifacts/alburhan/dist",
+      "/var/www/alburhan/dist",
+      path.join(__dirname, "../../alburhan/dist"),
+    ];
+    const extractTo = candidates.find(p => {
+      try { return fs.statSync(p).isDirectory(); } catch { return false; }
+    }) || candidates[0];
+
+    try {
+      fs.mkdirSync(extractTo, { recursive: true });
+      const tmpTar = path.join(os.tmpdir(), `fe-${Date.now()}.tar.gz`);
+      const fr = await fetch(frontendUrl, { signal: AbortSignal.timeout(120_000) });
+      if (!fr.ok) {
+        result.frontend = { updated: false, error: `Download failed: HTTP ${fr.status}` };
+      } else {
+        fs.writeFileSync(tmpTar, Buffer.from(await fr.arrayBuffer()));
+        await new Promise<void>((resolve, reject) => {
+          const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
+          proc.on("close", code => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
+        });
+        try { fs.unlinkSync(tmpTar); } catch {}
+        result.frontend = { updated: true, extractedTo: extractTo };
+      }
+    } catch (err: any) {
+      result.frontend = { updated: false, error: err.message };
+    }
+  } else {
+    result.frontend = { updated: false, skipped: true };
+  }
+
+  result.message = "Deploy complete. Process exiting for PM2 restart...";
+  res.json(result);
+  setTimeout(() => process.exit(0), 500);
 });
 
 // GET /api/migrate/kill-self — immediately exits this process so PM2 restarts with new bundle on disk
