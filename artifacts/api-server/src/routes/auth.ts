@@ -165,60 +165,64 @@ router.post("/send-otp", async (req, res) => {
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
 
-  // ── Fallback chain: RCS → WhatsApp → SMS → Email ─────────────────────────
-  // Try each channel in order. Respond after first success. Never send on multiple
-  // channels simultaneously — OTP must not be delivered more than once per request.
+  // ── OTP delivery chain: SMS (DLT) → WhatsApp → Email ─────────────────────
+  // Order rationale:
+  //   SMS  — DLT-registered, works on ALL Indian networks, synchronous confirmation.
+  //   WA   — fire-and-forget session message; only works within 24h session window.
+  //   Email— last resort; only if account has a registered email address.
+  //   RCS  — intentionally excluded from OTP chain. LeminAI returns ok:true for
+  //          every accepted HTTP request regardless of network delivery (Jio-only),
+  //          which would silently absorb the request and skip SMS entirely.
+  //
+  // Try each channel in order. Stop and respond after the first success.
+  // Never send on multiple channels simultaneously — OTP must not be
+  // delivered more than once per request.
 
-  // 1. RCS (Lemin AI — Jio template 3663)
-  try {
-    const { sendRCSForOTP } = await import("../lib/rcs.js");
-    const rcsResult = await sendRCSForOTP(cleanMobile, otp);
-    if (rcsResult.ok) {
-      console.log(`[OTP-SEND] ✓ RCS delivered msg_id=${rcsResult.messageId || "?"}`);
-      res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "rcs" });
-      return;
-    }
-    console.log(`[OTP-SEND] RCS failed: ${rcsResult.errorMessage} → trying WhatsApp`);
-  } catch (rcsErr: any) {
-    console.log(`[OTP-SEND] RCS error: ${rcsErr?.message} → trying WhatsApp`);
+  // Helper: log each attempt to notification_logs for a full audit trail
+  const logOtpAttempt = (channel: string, provider: string, status: string, detail: string) =>
+    pool.query(
+      `INSERT INTO notification_logs
+         (id, event_type, channel, recipient, message, status, provider_name, sent_at, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
+      [`otp_${channel}_${Date.now()}`, `${requestedPortal}_login_otp`, channel, cleanMobile, detail, status, provider]
+    ).catch(() => {});
+
+  // 1. SMS — DLT Fast2SMS (primary, most reliable for all Indian numbers)
+  const smsResult = await sendOtpSMS(cleanMobile, otp);
+  if (smsResult.sent) {
+    console.log(`[OTP-SEND] ✓ SMS delivered provider=Fast2SMS route=${smsResult.route || "dlt"} mobile=${cleanMobile}`);
+    await logOtpAttempt("sms", "Fast2SMS", "sent", `route=${smsResult.route || "dlt"}`);
+    res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "sms", smsRoute: smsResult.route });
+    return;
   }
+  const sanitizedSmsError = smsResult.error
+    ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
+    : "SMS provider rejected the request";
+  console.log(`[OTP-SEND] SMS failed: ${sanitizedSmsError} → trying WhatsApp`);
+  await logOtpAttempt("sms", "Fast2SMS", "failed", sanitizedSmsError);
 
-  // 2. WhatsApp (BotBee session message — plain text, no template substitution needed)
-  // NOTE: The alburhan_login_otp template (330483) is AUTHENTICATION category with {{1}} positional
-  // vars. BotBee wraps named keys as #!1!# which never matches {{1}}, causing a substitution
-  // failure and "Parameter at index 0 exceeds length limit 15" from BotBee's pre-validation.
-  // Using a session message bypasses template variable handling entirely.
+  // 2. WhatsApp — BotBee session message (works only if user has active 24h session)
+  // Using sendText (not template) — AUTHENTICATION template positional vars {{1}} are
+  // mis-mapped by BotBee as #!1!#, causing pre-validation failure. Session text bypasses this.
   try {
     const { sendText } = await import("../lib/botbee.js");
     const waMessage = `Your Al Burhan Tours & Travels OTP is *${otp}*. Valid for 5 minutes. Do not share with anyone.`;
     const waResult = await sendText(cleanMobile, waMessage);
     if (waResult?.ok) {
-      // Log to notification_logs for audit trail
-      await pool.query(
-        `INSERT INTO notification_logs
-           (id, event_type, channel, recipient, message, status, provider_name, sent_at, created_at)
-         VALUES ($1,'mobile_otp','whatsapp',$2,$3,'sent','BotBee',NOW(),NOW())`,
-        [`wa_otp_${Date.now()}`, cleanMobile, waMessage]
-      ).catch(() => {});
-      console.log(`[OTP-SEND] ✓ WhatsApp session message delivered`);
+      console.log(`[OTP-SEND] ✓ WhatsApp session OTP delivered mobile=${cleanMobile}`);
+      await logOtpAttempt("whatsapp", "BotBee", "sent", "session message");
       res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "whatsapp" });
       return;
     }
-    console.log(`[OTP-SEND] WhatsApp session failed: ${waResult?.error || "no 24h session"} → trying SMS`);
+    const waError = waResult?.error || "no active 24h session";
+    console.log(`[OTP-SEND] WhatsApp failed: ${waError} → trying Email`);
+    await logOtpAttempt("whatsapp", "BotBee", "failed", waError);
   } catch (waErr: any) {
-    console.log(`[OTP-SEND] WhatsApp error: ${waErr?.message} → trying SMS`);
+    console.log(`[OTP-SEND] WhatsApp error: ${waErr?.message} → trying Email`);
+    await logOtpAttempt("whatsapp", "BotBee", "failed", waErr?.message || "exception");
   }
 
-  // 3. SMS (Fast2SMS DLT)
-  const smsResult = await sendOtpSMS(cleanMobile, otp);
-  if (smsResult.sent) {
-    console.log(`[OTP-SEND] ✓ SMS delivered route=${smsResult.route || "?"}`);
-    res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "sms", smsRoute: smsResult.route });
-    return;
-  }
-  console.log(`[OTP-SEND] SMS failed → trying Email`);
-
-  // 4. Email (last resort — only if customer has an email on file)
+  // 3. Email — last resort; only if account has a registered email address
   const userEmail = existing[0]?.email;
   if (userEmail) {
     try {
@@ -226,21 +230,21 @@ router.post("/send-otp", async (req, res) => {
       const emailResult = await sendOTPEmail(userEmail, userName, otp);
       if (emailResult.ok) {
         console.log(`[OTP-SEND] ✓ Email OTP delivered to ${userEmail}`);
+        await logOtpAttempt("email", "SMTP", "sent", `to=${userEmail}`);
         res.json({ success: true, message: "OTP sent to your registered email", requestId: `otp_${Date.now()}`, isNewUser, channel: "email" });
         return;
       }
+      await logOtpAttempt("email", "SMTP", "failed", emailResult.error || "SMTP error");
     } catch (emailErr: any) {
       console.log(`[OTP-SEND] Email failed: ${emailErr?.message}`);
+      await logOtpAttempt("email", "SMTP", "failed", emailErr?.message || "exception");
     }
   }
 
-  // All channels failed
-  const sanitizedSmsError = smsResult.error
-    ? smsResult.error.replace(/authorization=[^&\s]+/gi, "authorization=***").slice(0, 400)
-    : undefined;
+  // All channels failed — return error with sanitised provider reason for admin users
   res.json({
     success: false,
-    message: "OTP delivery failed — please contact support at +91 8989701701",
+    message: "OTP delivery failed — please contact support at +91 9893225590",
     requestId: `otp_${Date.now()}`,
     isNewUser,
     ...(isAdmin ? { smsFailReason: sanitizedSmsError } : {}),
