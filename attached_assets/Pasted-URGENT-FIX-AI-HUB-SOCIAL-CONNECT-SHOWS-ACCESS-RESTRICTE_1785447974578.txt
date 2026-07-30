@@ -1,0 +1,243 @@
+URGENT FIX — AI HUB / SOCIAL CONNECT SHOWS “ACCESS RESTRICTED”
+
+Project:
+AL BURHAN TOURS & TRAVELS ERP & CRM
+
+Problem:
+
+The page opens at:
+
+/admin/social-oauth
+
+Breadcrumb:
+Dashboard → Marketing → AI Hub – Social Connect
+
+But the page displays:
+
+“Access restricted.”
+
+The logged-in user is Super Admin and should have complete access.
+
+==================================================
+1. FIX SUPER ADMIN ACCESS
+==================================================
+
+SUPER_ADMIN must automatically receive unrestricted access to:
+
+- AI Hub
+- Social Connect
+- Facebook integration
+- Instagram integration
+- WhatsApp integration
+- Messenger integration
+- Google integration
+- Marketing integrations
+- OAuth settings
+- API connection status
+- Webhook configuration
+- Token management
+- Social inbox
+- Lead capture integrations
+
+Do not require manually assigned permissions for SUPER_ADMIN.
+
+Implement a backend rule:
+
+If role === "SUPER_ADMIN":
+    allow all modules and actions
+
+This rule must apply on both frontend and backend.
+
+==================================================
+2. AUDIT ROUTE PERMISSION
+==================================================
+
+Audit route:
+
+/admin/social-oauth
+
+Check:
+
+- Route guard
+- Required permission name
+- Role middleware
+- Navigation permission
+- API permission
+- User session role
+- Cached role information
+
+Possible permission names may include:
+
+social_oauth.view
+marketing.social_connect
+social_integrations.view
+ai_hub.view
+manage_social_integrations
+manage_oauth
+marketing.manage
+
+Ensure the frontend and backend use the exact same permission key.
+
+Do not allow a mismatch such as:
+
+Frontend:
+social_connect.view
+
+Backend:
+social_oauth.manage
+
+==================================================
+3. FIX ROLE AND PERMISSION RECORDS
+==================================================
+
+Verify the logged-in Super Admin account has:
+
+- account_type = ADMIN
+- role = SUPER_ADMIN
+- status = ACTIVE
+- permissions loaded correctly
+- no branch-only restriction
+- no staff-only restriction
+
+Repair missing role-permission mappings if necessary.
+
+Do not downgrade the Super Admin role.
+
+==================================================
+4. FIX FRONTEND ACCESS CHECK
+==================================================
+
+The page must not show “Access restricted” for SUPER_ADMIN.
+
+Use a secure check such as:
+
+const canAccess =
+    user.role === "SUPER_ADMIN" ||
+    hasPermission("marketing.social_connect");
+
+If access is denied for another role, show:
+
+“You do not have permission to access Social Connect. Contact your administrator.”
+
+Do not leave a nearly blank page.
+
+==================================================
+5. FIX BACKEND API AUTHORIZATION
+==================================================
+
+Audit all APIs used by Social Connect, including:
+
+- connection status
+- OAuth authorization URL
+- callback handling
+- token status
+- webhook status
+- Facebook Page list
+- Instagram account list
+- WhatsApp account status
+- Messenger configuration
+
+SUPER_ADMIN must be authorized.
+
+Other roles should require explicit permissions.
+
+Unauthorized APIs must return:
+
+403 Forbidden
+
+Authenticated SUPER_ADMIN APIs must return:
+
+200 OK
+
+==================================================
+6. SOCIAL CONNECT PAGE CONTENT
+==================================================
+
+After fixing access, the page should display cards for:
+
+Facebook
+- Connect account
+- Page status
+- Access token status
+- Webhook status
+- Reconnect
+- Disconnect
+
+Instagram
+- Connected business account
+- Page association
+- Messaging permission
+- Lead access
+- Reconnect
+- Disconnect
+
+WhatsApp
+- Business account status
+- Phone number status
+- Template status
+- Webhook status
+- Provider details
+
+Messenger
+- Page connection
+- Webhook verification
+- Subscription status
+
+Google
+- OAuth connection
+- Calendar or business integration status, if enabled
+
+Each card must show:
+
+- Connected / Not Connected
+- Last synchronization time
+- Token expiry
+- Error details
+- Connect
+- Test connection
+- Reconnect
+- Disconnect
+
+==================================================
+7. CACHE AND SESSION FIX
+==================================================
+
+After updating permissions:
+
+- Rebuild frontend
+- Rebuild backend
+- Deploy to VPS
+- Restart PM2 services
+- Clear service-worker cache
+- Increment frontend cache version
+- Log out and log in again
+- Test in incognito mode
+
+Old permission data must not remain in local storage or cached sessions.
+
+==================================================
+8. TESTING
+==================================================
+
+Test:
+
+1. SUPER_ADMIN opens /admin/social-oauth successfully
+2. Page no longer shows “Access restricted”
+3. Social connection cards load
+4. Connection-status APIs return 200
+5. ADMIN with permission can access
+6. ADMIN without permission receives 403
+7. STAFF cannot access unless explicitly allowed
+8. CUSTOMER, AGENT and BRANCH users cannot access
+9. Direct URL access follows backend authorization
+10. Page works after logout and fresh login
+
+FINAL REPORT REQUIRED:
+
+- Root cause
+- Incorrect permission key found
+- Files changed
+- Role records updated
+- APIs tested
+- Deployment status
+- Production test result

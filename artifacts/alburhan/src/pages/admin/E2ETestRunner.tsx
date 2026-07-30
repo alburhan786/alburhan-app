@@ -37,7 +37,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function E2ETestRunner() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<E2EResult | null>(null);
   const [channelResults, setChannelResults] = useState<Record<string, ChannelResult>>({});
@@ -79,7 +79,7 @@ export default function E2ETestRunner() {
     setTestingChannel(null);
   }, [testMobile, testEmail]);
 
-  if (!can("system:health")) {
+  if (!isSuper && !can("settings", "view")) {
     return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
   }
 

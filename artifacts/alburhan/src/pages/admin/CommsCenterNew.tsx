@@ -123,7 +123,7 @@ const KNOWN_EVENTS = [
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function CommsCenterNew() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const { toast } = useToast();
   const [tab, setTab] = useState("overview");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -319,7 +319,7 @@ export default function CommsCenterNew() {
     loadDlq(); loadSummary();
   };
 
-  if (!can("system:health")) {
+  if (!isSuper && !can("settings", "view")) {
     return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
   }
 

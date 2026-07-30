@@ -54,7 +54,7 @@ function ConnectedBadge({ connected, expiry }: { connected: boolean; expiry?: st
 }
 
 export default function OAuthHub() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const { toast } = useToast();
   const [connections, setConnections]   = useState<OAuthConn[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -150,8 +150,14 @@ export default function OAuthHub() {
     setSavingCreds(false);
   };
 
-  if (!can("system:health")) {
-    return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
+  if (!isSuper && !can("settings", "view")) {
+    return (
+      <AdminLayout>
+        <div className="p-8 text-gray-500">
+          You do not have permission to access Social Connect. Contact your administrator.
+        </div>
+      </AdminLayout>
+    );
   }
 
   const connMap: Record<string, OAuthConn> = {};

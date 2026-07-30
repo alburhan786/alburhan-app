@@ -78,7 +78,7 @@ function ChannelToggle({ ch, enabled, onChange }: { ch: string; enabled: boolean
 }
 
 export default function AutomationBuilder() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const { toast } = useToast();
   const [rules, setRules]       = useState<WorkflowRule[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -163,7 +163,7 @@ export default function AutomationBuilder() {
   const enabledCount  = rules.filter(r => r.enabled).length;
   const disabledCount = rules.filter(r => !r.enabled).length;
 
-  if (!can("system:health")) {
+  if (!isSuper && !can("settings", "view")) {
     return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
   }
 

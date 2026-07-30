@@ -56,7 +56,7 @@ function MetricRow({ label, value, unit = "", status }: { label: string; value: 
 }
 
 export default function PerformanceMonitor() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const [data, setData]       = useState<PerfData | null>(null);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -85,7 +85,7 @@ export default function PerformanceMonitor() {
     return () => clearInterval(timerRef.current);
   }, [autoRefresh, load]);
 
-  if (!can("system:health")) {
+  if (!isSuper && !can("settings", "view")) {
     return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
   }
 

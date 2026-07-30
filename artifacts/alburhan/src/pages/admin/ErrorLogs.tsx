@@ -27,7 +27,7 @@ function StatusCodeBadge({ code }: { code: number }) {
 }
 
 export default function ErrorLogs() {
-  const { can } = usePermissions();
+  const { can, isSuper } = usePermissions();
   const { toast } = useToast();
   const [logs,    setLogs]    = useState<ErrorLog[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -77,7 +77,7 @@ export default function ErrorLogs() {
     }
   };
 
-  if (!can("system:health")) {
+  if (!isSuper && !can("settings", "view")) {
     return <AdminLayout><div className="p-8 text-gray-500">Access restricted.</div></AdminLayout>;
   }
 
