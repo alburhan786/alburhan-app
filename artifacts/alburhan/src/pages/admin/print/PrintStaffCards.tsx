@@ -229,6 +229,27 @@ function StaffCardFront({ s, groupName, photoDataUrls }: { s: StaffMember; group
             </span>
           </div>
         )}
+
+        {/* Blood group + Valid upto row */}
+        {(s.bloodGroup || s.validUpto) && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: "3mm", flexShrink: 0, marginTop: "0.2mm",
+          }}>
+            {s.bloodGroup && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.8mm" }}>
+                <span style={{ fontSize: "3.5pt", fontWeight: 700, color: "#666", letterSpacing: "0.5px", textTransform: "uppercase" }}>BG:</span>
+                <span style={{ fontSize: "6pt", fontWeight: 900, color: "#b91c1c", letterSpacing: "0.5px" }}>{s.bloodGroup}</span>
+              </div>
+            )}
+            {s.validUpto && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.8mm" }}>
+                <span style={{ fontSize: "3.5pt", fontWeight: 700, color: "#666", letterSpacing: "0.5px", textTransform: "uppercase" }}>VALID:</span>
+                <span style={{ fontSize: "4pt", fontWeight: 800, color: GREEN, letterSpacing: "0.3px" }}>{s.validUpto}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── FOOTER: personal mobile LEFT + website RIGHT ── */}
