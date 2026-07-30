@@ -104,3 +104,4 @@
 - [Lemin RCS variable key formats](lemin-rcs-variable-keys.md) — 3 distinct formats per template family; message_id at body.data.id; status endpoint redirects (webhook-only delivery updates)
 - [WhatsApp forceTemplateApi root cause](wa-template-forceTemplateApi.md) — #!Name!# appears when forceTemplateApi:true is absent; text API delivers mixed_body_text unsubstituted; Priority 2 array→named-object bug
 - [Portal login isolation](portal-login-isolation.md) — send-otp/verify-otp require portal= field; backend rejects 403 if role≠portal; otps.purpose column isolates OTPs per portal; all attempts logged to audit_logs
+- [Zombie tsx processes block port 8080](zombie-tsx-port-block.md) — multiple stale api-server tsx processes survive WorkflowsRestart; oldest owns port so new process exits silently; fix: pkill -f "artifacts/api-server" before restarting workflow

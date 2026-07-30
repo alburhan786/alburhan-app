@@ -47,6 +47,7 @@ const _envKeys = [
   "FIREBASE_PROJECT_ID",
   "FIREBASE_CLIENT_EMAIL",
   "FIREBASE_PRIVATE_KEY",
+  "MIGRATION_KEY",   // deploy auth — must be set on both Replit and VPS
 ];
 for (const k of _envKeys) {
   const v = process.env[k];

@@ -299,14 +299,61 @@ app.post("/api/migrate/self-update", async (req, res) => {
   }
 });
 
+// GET /api/migrate/key-status — diagnostic: confirms key config without exposing the value.
+// Returns length, first-4 and last-4 chars (enough to spot copy-paste errors), and whether
+// the supplied ?key= matches.  No auth required — safe because it never reveals the full key.
+app.get("/api/migrate/key-status", (req, res) => {
+  const configuredKey = process.env.MIGRATION_KEY;
+  if (!configuredKey) {
+    return void res.json({
+      configured: false,
+      hint: "MIGRATION_KEY is not set on this server. Restart the workflow after saving the Replit Secret.",
+    });
+  }
+  const provided = String(req.query.key || "");
+  const match = provided.length > 0 && provided === configuredKey;
+  res.json({
+    configured: true,
+    server_key_length: configuredKey.length,
+    server_key_prefix: configuredKey.slice(0, 4),   // 4 chars — not enough to brute-force
+    server_key_suffix: configuredKey.slice(-4),
+    provided_key_length: provided.length,
+    match,
+    hint: match
+      ? "Key matches — /api/migrate/server.cjs should return HTTP 200."
+      : provided.length === 0
+      ? "No key supplied. Add ?key=YOUR_MIGRATION_KEY to the URL."
+      : `Key mismatch. Check for trailing newlines, extra spaces, or quotes in VPS .env (provided length=${provided.length}, expected length=${configuredKey.length}).`,
+  });
+});
+
 // GET /api/migrate/server.cjs — serves the built bundle for VPS to download
 app.get("/api/migrate/server.cjs", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  const configuredKey = process.env.MIGRATION_KEY;
+
+  if (!configuredKey) {
+    return void res.status(503).json({
+      error: "MIGRATION_KEY not configured on this server",
+      hint: "Restart the Replit dev workflow after setting the MIGRATION_KEY secret.",
+    });
+  }
+  if (!migrationKeyValid(key)) {
+    const providedLen = (key || "").length;
+    return void res.status(403).json({
+      error: "Key mismatch",
+      hint: `Provided key length: ${providedLen}. Expected: ${configuredKey.length} chars. ` +
+        `Run GET /api/migrate/key-status?key=YOUR_KEY for a character-level diff hint.`,
+    });
+  }
   const binPath = path.join(__dirname, "../dist/index.cjs");
-  if (!fs.existsSync(binPath)) return void res.status(404).send("Not found");
+  if (!fs.existsSync(binPath)) {
+    return void res.status(404).json({ error: "Bundle not found — run pnpm build first" });
+  }
+  const stat = fs.statSync(binPath);
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Disposition", "attachment; filename=index.cjs");
+  res.setHeader("X-Bundle-Size-Bytes", String(stat.size));
   res.sendFile(binPath);
 });
 
