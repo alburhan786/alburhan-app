@@ -1,0 +1,159 @@
+URGENT FIX — OTP DELIVERY FAILED FOR VALID MOBILE NUMBERS
+
+Project:
+AL BURHAN TOURS & TRAVELS ERP & CRM
+
+Problem:
+For some valid mobile numbers, the login flow reaches the OTP screen but shows:
+
+"OTP delivery failed. Please try again or contact support."
+
+Example tested number:
+9867114562
+
+The account is found, but OTP is not delivered.
+
+REQUIRED INVESTIGATION
+
+1. Check the complete OTP delivery flow:
+- OTP generation
+- OTP database save
+- Provider API call
+- Template selection
+- Variable mapping
+- DLT template ID
+- Sender ID/Header
+- Route
+- Provider response
+- Delivery status callback
+
+2. Verify the mobile number format.
+
+Always normalize Indian numbers to:
+
+919867114562
+
+Do not send:
++919867114562
+09867114562
+9867114562
+
+unless the provider specifically requires that format.
+
+Store the original number separately, but send the provider-approved normalized format.
+
+3. Verify DLT details:
+- Approved DLT template ID
+- Correct sender ID/header: ALBURH
+- Correct PE/entity ID
+- Correct OTP template text
+- Correct variable count
+- Correct route: OTP or Transactional
+- Template content must exactly match the registered DLT template
+
+4. Do not use booking or promotional templates for login OTP.
+
+Create and map a separate event:
+
+ADMIN_LOGIN_OTP
+CUSTOMER_LOGIN_OTP
+AGENT_LOGIN_OTP
+BRANCH_LOGIN_OTP
+STAFF_LOGIN_OTP
+
+Each event must use the correct approved OTP template.
+
+5. Capture the real provider error.
+
+Do not only show:
+"OTP delivery failed."
+
+Save and display internally:
+
+- provider_name
+- provider_message_id
+- HTTP status
+- provider error code
+- provider error message
+- request timestamp
+- destination number
+- template ID
+- sender ID
+- delivery channel
+- retry count
+
+Never expose the OTP value.
+
+6. Add fallback logic.
+
+Recommended order:
+
+Primary: DLT SMS
+Fallback 1: RCS
+Fallback 2: WhatsApp approved OTP template
+Fallback 3: Email OTP
+
+Rules:
+- Trigger fallback only if the primary provider rejects or fails.
+- Do not generate a new OTP for every fallback.
+- Use the same OTP and expiry period.
+- Do not send multiple successful OTP messages simultaneously.
+
+7. Fix the incorrect support number display.
+
+The screen currently shows support number:
++91 8989701701
+
+Verify that this is the correct customer-support number.
+
+If the official number is:
++91 9893225590
+
+then update it consistently on:
+- Customer login
+- Admin login
+- Agent login
+- Branch login
+- Staff login
+- OTP failure screen
+
+Do not display an admin’s private login number as customer support unless explicitly configured.
+
+8. Test these numbers:
+
+8989701701
+9893989786
+9893225590
+9867114562
+
+For every number, report:
+- Portal used
+- Account type
+- Account lookup result
+- OTP generated
+- Provider selected
+- Template ID
+- Provider response
+- Delivery result
+- Fallback used
+- Final status
+
+9. Security:
+- Do not return OTP in API response
+- Do not display OTP on screen
+- Do not log OTP in production
+- Limit resend requests
+- Limit failed verification attempts
+- Expire OTP after 5 minutes
+- Mark OTP as used after successful verification
+
+FINAL REPORT REQUIRED
+
+Provide:
+- Root cause
+- Provider error response
+- DLT mapping status
+- Number-format fix
+- Files changed
+- Test results for all four numbers
+- Production deployment status
