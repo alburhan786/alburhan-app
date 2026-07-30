@@ -79,6 +79,10 @@ const STAFF_ROLE_LABELS: Record<string, string> = {
   airport_staff:  "Airport Staff",
   catering_staff: "Catering Staff",
   office_staff:   "Office Staff",
+  group_guide:    "Group Guide",
+  driver:         "Driver",
+  medical_staff:  "Medical Staff",
+  group_leader:   "Group Leader",
 };
 
 const ALL_ADMIN_ROLES: AdminRole[] = [
@@ -109,7 +113,7 @@ export default function StaffManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [photoUploading, setPhotoUploading] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff" | "office_staff">("all");
+  const [filter, setFilter] = useState<"all" | "airport_staff" | "catering_staff" | "office_staff" | "group_guide" | "driver" | "medical_staff" | "group_leader">("all");
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
@@ -404,7 +408,7 @@ export default function StaffManager() {
       {activeTab === "staff" && (
         <>
           <div className="flex flex-wrap gap-2 mb-6 items-center">
-            {(["all", "airport_staff", "catering_staff", "office_staff"] as const).map(r => (
+            {(["all", "airport_staff", "catering_staff", "office_staff", "group_guide", "driver", "medical_staff", "group_leader"] as const).map(r => (
               <button
                 key={r}
                 onClick={() => setFilter(r)}
@@ -716,6 +720,10 @@ export default function StaffManager() {
                     <option value="airport_staff">Airport Staff</option>
                     <option value="catering_staff">Catering Staff</option>
                     <option value="office_staff">Office Staff</option>
+                    <option value="group_guide">Group Guide</option>
+                    <option value="driver">Driver</option>
+                    <option value="medical_staff">Medical Staff</option>
+                    <option value="group_leader">Group Leader</option>
                   </select>
                 </div>
                 <div className="space-y-1">

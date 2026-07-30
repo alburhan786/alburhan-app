@@ -26,6 +26,10 @@ const ROLE_LABELS: Record<string, string> = {
   airport_staff:  "AIRPORT STAFF",
   catering_staff: "CATERING STAFF",
   office_staff:   "OFFICE STAFF",
+  group_guide:    "GROUP GUIDE",
+  driver:         "DRIVER",
+  medical_staff:  "MEDICAL STAFF",
+  group_leader:   "GROUP LEADER",
 };
 
 /* ── Premium Kaaba Icon — solid cube with kiswa & gold accents ── */
