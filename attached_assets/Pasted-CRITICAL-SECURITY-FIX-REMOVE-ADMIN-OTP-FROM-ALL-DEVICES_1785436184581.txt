@@ -1,0 +1,245 @@
+CRITICAL SECURITY FIX — REMOVE ADMIN OTP FROM ALL DEVICES
+
+Project:
+AL BURHAN TOURS & TRAVELS ERP & CRM
+
+Problem:
+The OTP verification screen is displaying the actual OTP inside a visible box:
+
+"Admin debug — your OTP: 235584"
+
+This OTP is visible on every phone, browser, and device. This is a serious production security vulnerability.
+
+The OTP must NEVER be displayed on screen, included in API responses, browser console, HTML source, network response, toast message, notification, or frontend state.
+
+==================================================
+1. REMOVE OTP DISPLAY FROM FRONTEND
+==================================================
+
+Completely remove:
+
+- "Admin debug — your OTP"
+- OTP value display
+- Debug OTP cards
+- Test OTP text
+- Development OTP banners
+- OTP in toast messages
+- OTP in console logs
+- OTP in hidden HTML
+- OTP in frontend environment variables
+
+The screen should show only:
+
+"OTP sent successfully to +91 XXXXXXX786"
+
+and:
+
+"OTP sent via SMS"
+
+Never show the actual OTP.
+
+==================================================
+2. REMOVE OTP FROM API RESPONSES
+==================================================
+
+Audit all OTP request endpoints.
+
+The API response must never contain:
+
+- otp
+- code
+- generatedOtp
+- debugOtp
+- verificationCode
+- testCode
+
+Correct production response example:
+
+{
+  "success": true,
+  "message": "OTP sent successfully",
+  "expiresIn": 300
+}
+
+Incorrect response:
+
+{
+  "success": true,
+  "otp": "235584"
+}
+
+Delete all OTP values from production API responses.
+
+==================================================
+3. ENVIRONMENT-BASED DEBUG CONTROL
+==================================================
+
+Create strict production protection:
+
+If NODE_ENV === "production":
+- Never return OTP
+- Never render OTP
+- Never log OTP
+- Never store OTP in plain text
+- Never enable debug OTP mode
+
+Remove or disable configuration such as:
+
+SHOW_OTP=true
+DEBUG_OTP=true
+BYPASS_OTP=true
+TEST_OTP=123456
+OTP_DEBUG_MODE=true
+
+Production values must be:
+
+SHOW_OTP=false
+DEBUG_OTP=false
+BYPASS_OTP=false
+OTP_DEBUG_MODE=false
+
+Do not rely only on frontend hiding.
+
+==================================================
+4. OPTIONAL PERSONAL MACBOOK TEST MODE
+==================================================
+
+The user requested that debug OTP may be visible only on their personal MacBook Air.
+
+Best security recommendation:
+Do not display OTP even on the personal MacBook. Use SMS, email, authenticator app, or secure development logs instead.
+
+However, if a temporary development-only mode is absolutely required:
+
+- Allow it only on localhost or a non-production staging domain
+- Never allow it on alburhantravels.com
+- Require admin authentication first
+- Require an environment flag available only on the development server
+- Restrict by server-side allowlist
+- Never depend only on browser device name, user-agent, or frontend checks
+- Automatically disable before production deployment
+
+Example allowed environments:
+
+localhost
+127.0.0.1
+staging.alburhantravels.com
+
+Production domain must always block debug OTP:
+
+alburhantravels.com
+
+Do not attempt to identify the MacBook only through JavaScript or browser user-agent because that can be spoofed.
+
+==================================================
+5. SECURE OTP STORAGE
+==================================================
+
+- Generate OTP server-side
+- Hash the OTP before database storage
+- Store expiry time
+- Store purpose and account type
+- Limit verification attempts
+- Mark OTP as used after successful verification
+- Delete or expire old OTP records
+- Never store the OTP in plain text
+- Never write OTP to production logs
+
+OTP record fields:
+
+account_id
+account_type
+login_purpose
+otp_hash
+expires_at
+attempt_count
+is_used
+requested_ip
+device_id
+created_at
+
+==================================================
+6. OTP PORTAL ISOLATION
+==================================================
+
+Use separate purposes:
+
+CUSTOMER_LOGIN_OTP
+AGENT_LOGIN_OTP
+BRANCH_LOGIN_OTP
+STAFF_LOGIN_OTP
+ADMIN_LOGIN_OTP
+
+The mobile number 9893989786 must receive Admin OTP only from:
+
+/admin/login
+
+It must not generate or expose an Admin OTP from:
+
+/login
+/agent/login
+/branch/login
+/staff/login
+
+==================================================
+7. CACHE AND OLD BUILD CLEANUP
+==================================================
+
+After removing debug OTP:
+
+- Rebuild frontend
+- Redeploy backend
+- Clear CDN cache
+- Clear service-worker cache
+- Increment application build version
+- Remove old JavaScript bundles
+- Verify incognito mode
+- Verify multiple phones
+- Verify Android app
+- Verify iOS app
+- Verify desktop browsers
+
+The old OTP display must not remain because of cached frontend files.
+
+==================================================
+8. SECURITY TESTS
+==================================================
+
+Test on:
+
+- Personal MacBook Air
+- Android phone
+- iPhone
+- Chrome
+- Safari
+- Incognito mode
+- Customer login
+- Agent login
+- Branch login
+- Staff login
+- Admin login
+
+Confirm:
+
+1. Actual OTP is not visible anywhere
+2. API response does not contain OTP
+3. Browser console does not contain OTP
+4. Network response does not contain OTP
+5. HTML source does not contain OTP
+6. Production logs do not contain OTP
+7. Admin OTP works only on /admin/login
+8. OTP expires correctly
+9. OTP cannot be reused
+10. Incorrect OTP attempts are rate-limited
+
+Do not mark this task complete until the OTP is fully removed from every production device and production response.
+
+FINAL REPORT REQUIRED:
+
+- Files changed
+- Debug code removed
+- Environment variables changed
+- API response before and after
+- Cache cleared
+- Production deployment completed
+- Device test results
