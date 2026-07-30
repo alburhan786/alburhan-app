@@ -19,6 +19,16 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 const RESEND_COOLDOWN = 30;
 const MAX_RESENDS = 5;
 
+type PortalType = "customer" | "agent" | "branch" | "staff" | "admin";
+
+const PORTAL_CONFIG: Record<PortalType, { title: string; subtitle: string; badge: string; badgeColor: string }> = {
+  customer: { title: "Welcome", subtitle: "Enter your mobile number to continue.", badge: "", badgeColor: "" },
+  agent:    { title: "Agent Portal", subtitle: "Sign in to your agent account.", badge: "Agent", badgeColor: "bg-blue-100 text-blue-700 border-blue-200" },
+  branch:   { title: "Branch Portal", subtitle: "Sign in to your branch manager account.", badge: "Branch Manager", badgeColor: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+  staff:    { title: "Staff Portal", subtitle: "Sign in to your staff account.", badge: "Staff", badgeColor: "bg-amber-100 text-amber-700 border-amber-200" },
+  admin:    { title: "Admin Login", subtitle: "Restricted access — authorised personnel only.", badge: "Admin", badgeColor: "bg-red-100 text-red-700 border-red-200" },
+};
+
 async function postJson(url: string, body: object) {
   let res: Response;
   try {
@@ -69,7 +79,7 @@ function validateMobile(mobile: string): string {
 
 const FRONTEND_BUILD = "v24.0 · 2026-07-20";
 
-export default function Login() {
+export default function Login({ portalType = "customer" }: { portalType?: PortalType }) {
   const { updateProfile, isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -169,7 +179,7 @@ export default function Login() {
     console.log(`[Login] Sending OTP request for mobile: ${cleanNum} (E.164: +91${cleanNum})`);
 
     try {
-      const result = await postJson("/api/auth/send-otp", { mobile: cleanNum });
+      const result = await postJson("/api/auth/send-otp", { mobile: cleanNum, portal: portalType });
       console.log("[Login] send-otp response:", result);
       setIsNewUser(!!result?.isNewUser);
       setSmsSent(result?.smsSent === true);
@@ -213,7 +223,7 @@ export default function Login() {
     setIsVerifyingOtp(true);
     console.log(`[Login] Verifying OTP for mobile: ${mobile} (E.164: +91${mobile})`);
     try {
-      const result = await postJson("/api/auth/verify-otp", { mobile, otp });
+      const result = await postJson("/api/auth/verify-otp", { mobile, otp, portal: portalType });
       console.log("[Login] verify-otp response:", { ok: true, user: result?.user?.mobile });
       queryClient.setQueryData(["/api/auth/me"], result.user);
       if (result?.isNewUser) {
@@ -233,6 +243,7 @@ export default function Login() {
       if (msg.includes("expired")) title = "OTP Expired";
       else if (msg.includes("already been used")) title = "OTP Already Used";
       else if (msg.includes("Too many")) title = "Too Many Attempts";
+      else if (msg.includes("Access denied") || msg.includes("does not have")) title = "Wrong Portal";
       toast({ title, description: msg, variant: "destructive" });
     } finally {
       setIsVerifyingOtp(false);
@@ -290,8 +301,13 @@ export default function Login() {
             {step === 1 && (
               <>
                 <div className="mb-8 text-center">
-                  <h2 className="text-3xl font-serif font-bold text-foreground mb-2">Welcome</h2>
-                  <p className="text-muted-foreground">Enter your mobile number to continue.</p>
+                  {PORTAL_CONFIG[portalType].badge && (
+                    <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-full border mb-3 ${PORTAL_CONFIG[portalType].badgeColor}`}>
+                      {PORTAL_CONFIG[portalType].badge}
+                    </span>
+                  )}
+                  <h2 className="text-3xl font-serif font-bold text-foreground mb-2">{PORTAL_CONFIG[portalType].title}</h2>
+                  <p className="text-muted-foreground">{PORTAL_CONFIG[portalType].subtitle}</p>
                 </div>
                 <form onSubmit={handleSendOtp} className="space-y-6">
                   <div className="space-y-2">

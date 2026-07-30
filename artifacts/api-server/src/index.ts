@@ -622,7 +622,8 @@ async function runMigrations() {
   try {
     await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
     await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS otp_hash TEXT`);
-    console.log("[Migration] otps.attempts + otps.otp_hash columns ensured");
+    await pool.query(`ALTER TABLE otps ADD COLUMN IF NOT EXISTS purpose TEXT DEFAULT 'customer'`);
+    console.log("[Migration] otps.attempts + otps.otp_hash + otps.purpose columns ensured");
   } catch (err) {
     console.error("[Migration] otps columns failed:", err);
   }

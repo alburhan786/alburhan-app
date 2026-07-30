@@ -103,3 +103,4 @@
 - [RCS Template Engine](rcs-template-engine.md) — sendRCSForEvent is the ERP entry point; rcs_template_mappings table (9 approved IDs seeded); 7 new notification_logs cols; user_id NEVER logged; template_not_found = failure not success
 - [Lemin RCS variable key formats](lemin-rcs-variable-keys.md) — 3 distinct formats per template family; message_id at body.data.id; status endpoint redirects (webhook-only delivery updates)
 - [WhatsApp forceTemplateApi root cause](wa-template-forceTemplateApi.md) — #!Name!# appears when forceTemplateApi:true is absent; text API delivers mixed_body_text unsubstituted; Priority 2 array→named-object bug
+- [Portal login isolation](portal-login-isolation.md) — send-otp/verify-otp require portal= field; backend rejects 403 if role≠portal; otps.purpose column isolates OTPs per portal; all attempts logged to audit_logs

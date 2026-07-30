@@ -232,7 +232,7 @@ function CustomerRoute({ component: Component }: { component: React.ComponentTyp
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="py-20 text-center">Loading...</div>;
-  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!isAuthenticated) return <Redirect to="/admin/login" />;
   if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
   if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
   if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
@@ -244,7 +244,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 function BranchRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!isAuthenticated) return <Redirect to="/branch/login" />;
   if (user?.role !== 'branch_manager') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -253,7 +253,7 @@ function BranchRoute({ component: Component }: { component: React.ComponentType 
 function AgentRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!isAuthenticated) return <Redirect to="/agent/login" />;
   if (user?.role !== 'agent') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -262,7 +262,7 @@ function AgentRoute({ component: Component }: { component: React.ComponentType }
 function StaffRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!isAuthenticated) return <Redirect to="/staff/login" />;
   if (user?.role !== 'staff') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -285,7 +285,12 @@ function Router() {
       <Route path="/terms" component={TermsAndConditions} />
       <Route path="/cancellation" component={CancellationPolicy} />
       <Route path="/refund" component={RefundPolicy} />
-      <Route path="/login" component={Login} />
+      {/* Portal-specific login routes — each only accepts its own account type */}
+      <Route path="/login" component={() => <Login portalType="customer" />} />
+      <Route path="/admin/login" component={() => <Login portalType="admin" />} />
+      <Route path="/agent/login" component={() => <Login portalType="agent" />} />
+      <Route path="/branch/login" component={() => <Login portalType="branch" />} />
+      <Route path="/staff/login" component={() => <Login portalType="staff" />} />
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />

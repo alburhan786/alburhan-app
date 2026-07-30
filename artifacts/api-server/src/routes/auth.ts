@@ -89,23 +89,67 @@ router.post("/send-otp", async (req, res) => {
   const existing = await db.select().from(usersTable).where(eq(usersTable.mobile, cleanMobile)).limit(1);
   const isNewUser = !existing[0];
 
-  if (isNewUser) {
-    // Detect if this mobile belongs to a branch manager, agent, or staff member
-    let portalRole: "admin" | "customer" | "branch_manager" | "agent" | "staff" =
-      ADMIN_MOBILES.includes(cleanMobile) ? "admin" : "customer";
+  // ── Portal isolation ──────────────────────────────────────────────────────
+  // Each login portal must ONLY authenticate the account type it owns.
+  // A staff/agent/branch/admin mobile must never produce a session on the
+  // customer portal, and vice-versa.
+  const requestedPortal: string = ((req.body?.portal as string) || "customer").trim().toLowerCase();
+  const VALID_PORTALS = ["customer", "agent", "branch", "staff", "admin"];
+  if (!VALID_PORTALS.includes(requestedPortal)) {
+    res.status(400).json({ message: "Invalid portal type." });
+    return;
+  }
+  const PORTAL_ALLOWED_ROLES: Record<string, string[]> = {
+    customer: ["customer"],
+    agent: ["agent"],
+    branch: ["branch_manager"],
+    staff: ["staff"],
+    admin: ["admin", "super_admin"],
+  };
+  const PORTAL_ERROR: Record<string, string> = {
+    customer: "No customer account found for this mobile number.",
+    agent: "This mobile number is not registered as an agent.",
+    branch: "This mobile number is not registered as a branch manager.",
+    staff: "This mobile number is not registered as a staff member.",
+    admin: "This mobile number does not have admin access.",
+  };
 
-    if (portalRole === "customer") {
+  // Determine actual role: for new users probe entity tables; for existing users read from DB.
+  let actualRole: string;
+  if (isNewUser) {
+    let detectedRole: "admin" | "customer" | "branch_manager" | "agent" | "staff" =
+      ADMIN_MOBILES.includes(cleanMobile) ? "admin" : "customer";
+    if (detectedRole === "customer") {
       const [branchRow, agentRow, staffRow] = await Promise.all([
         pool.query(`SELECT id FROM branches WHERE manager_mobile=$1 AND is_active=true LIMIT 1`, [cleanMobile]),
         pool.query(`SELECT id FROM agents WHERE mobile=$1 AND is_active=true LIMIT 1`, [cleanMobile]),
         pool.query(`SELECT id FROM staff WHERE mobile_india=$1 AND status='active' LIMIT 1`, [cleanMobile]),
       ]);
-      if (branchRow.rows[0]) portalRole = "branch_manager";
-      else if (agentRow.rows[0]) portalRole = "agent";
-      else if (staffRow.rows[0]) portalRole = "staff";
+      if (branchRow.rows[0]) detectedRole = "branch_manager";
+      else if (agentRow.rows[0]) detectedRole = "agent";
+      else if (staffRow.rows[0]) detectedRole = "staff";
     }
+    actualRole = detectedRole;
+  } else {
+    actualRole = existing[0].role as string;
+  }
 
-    await db.insert(usersTable).values({ mobile: cleanMobile, role: portalRole as any });
+  // Enforce portal isolation — reject if the mobile does not belong to this portal.
+  const allowedRoles = PORTAL_ALLOWED_ROLES[requestedPortal] || ["customer"];
+  if (!allowedRoles.includes(actualRole)) {
+    const _ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+    pool.query(
+      `INSERT INTO audit_logs (id, actor_id, actor_name, action, entity_table, entity_id, old_value, new_value, ip, created_at)
+       VALUES (gen_random_uuid()::text, 'system', $1, 'created', 'login_attempts', gen_random_uuid()::text, NULL, $2::jsonb, $3, NOW())`,
+      [cleanMobile, JSON.stringify({ event: "otp_portal_mismatch", portal: requestedPortal, mobile: cleanMobile, actual_role: actualRole }), _ip]
+    ).catch(() => {});
+    console.warn(`[OTP-SEND] SECURITY: mobile=${cleanMobile} requested_portal=${requestedPortal} actual_role=${actualRole} → REJECTED`);
+    res.status(403).json({ message: PORTAL_ERROR[requestedPortal] || "Access denied." });
+    return;
+  }
+
+  if (isNewUser) {
+    await db.insert(usersTable).values({ mobile: cleanMobile, role: actualRole as any });
   }
 
   const otp = generateOtp();
@@ -115,8 +159,8 @@ router.post("/send-otp", async (req, res) => {
   const otpHash = hashOtp(otp, cleanMobile);
   const otpId   = randomBytes(8).toString("hex");
   await pool.query(
-    `INSERT INTO otps (id, mobile, otp, otp_hash, expires_at) VALUES ($1,$2,$3,$4,$5)`,
-    [otpId, cleanMobile, "[hashed]", otpHash, expiresAt]
+    `INSERT INTO otps (id, mobile, otp, otp_hash, expires_at, purpose) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [otpId, cleanMobile, "[hashed]", otpHash, expiresAt, requestedPortal]
   );
 
   const isAdmin = ADMIN_MOBILES.includes(cleanMobile);
@@ -227,6 +271,9 @@ router.post("/verify-otp", async (req, res) => {
     return;
   }
 
+  // Portal the client claims to be logging into (must match send-otp portal)
+  const requestedPortalVerify: string = ((req.body?.portal as string) || "customer").trim().toLowerCase();
+
   const now     = new Date();
   const otpHash = hashOtp(otp, cleanMobile);
 
@@ -271,12 +318,14 @@ router.post("/verify-otp", async (req, res) => {
   }
 
   // Find valid OTP (hash-first, plaintext fallback for legacy rows)
+  // Require matching purpose (IS NULL fallback accepts pre-isolation legacy rows)
   const otpRecord = await pool.query(
     `SELECT id FROM otps
      WHERE mobile=$1 AND (otp_hash=$2 OR (otp_hash IS NULL AND otp=$3))
        AND used=false AND expires_at > $4
+       AND (purpose IS NULL OR purpose=$5)
      ORDER BY created_at DESC LIMIT 1`,
-    [cleanMobile, otpHash, otp, now]
+    [cleanMobile, otpHash, otp, now, requestedPortalVerify]
   );
 
   if (!otpRecord.rows[0]) {
@@ -298,6 +347,37 @@ router.post("/verify-otp", async (req, res) => {
     res.status(401).json({ message: "User not found. Please contact support." });
     return;
   }
+
+  // ── Portal isolation (second gate) ───────────────────────────────────────
+  // Even if the OTP matched, reject if the user's stored role does not belong
+  // to the portal they are logging into (prevents role escalation via stale sessions).
+  const VERIFY_PORTAL_ROLES: Record<string, string[]> = {
+    customer: ["customer"],
+    agent: ["agent"],
+    branch: ["branch_manager"],
+    staff: ["staff"],
+    admin: ["admin", "super_admin"],
+  };
+  const verifyAllowedRoles = VERIFY_PORTAL_ROLES[requestedPortalVerify] || ["customer"];
+  if (!verifyAllowedRoles.includes(user.role as string)) {
+    const _secIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+    pool.query(
+      `INSERT INTO audit_logs (id, actor_id, actor_name, action, entity_table, entity_id, old_value, new_value, ip, created_at)
+       VALUES (gen_random_uuid()::text, $1, $2, 'created', 'login_attempts', gen_random_uuid()::text, NULL, $3::jsonb, $4, NOW())`,
+      [user.id, user.mobile, JSON.stringify({ event: "verify_portal_mismatch", portal: requestedPortalVerify, mobile: cleanMobile, user_role: user.role }), _secIp]
+    ).catch(() => {});
+    console.warn(`[OTP-VERIFY] SECURITY: mobile=${cleanMobile} requested_portal=${requestedPortalVerify} user_role=${user.role} → REJECTED (403)`);
+    res.status(403).json({ message: "Access denied — this account does not have permission to access this portal." });
+    return;
+  }
+
+  // Audit: record successful login
+  const _loginIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+  pool.query(
+    `INSERT INTO audit_logs (id, actor_id, actor_name, action, entity_table, entity_id, old_value, new_value, ip, created_at)
+     VALUES (gen_random_uuid()::text, $1, $2, 'created', 'login_attempts', gen_random_uuid()::text, NULL, $3::jsonb, $4, NOW())`,
+    [user.id, user.mobile, JSON.stringify({ event: "login_success", portal: requestedPortalVerify, mobile: cleanMobile, user_role: user.role }), _loginIp]
+  ).catch(() => {});
 
   // Admin and super_admin users are never treated as "new users" regardless of
   // whether their name field is set — they always go straight to the admin portal.
