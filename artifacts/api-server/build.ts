@@ -103,6 +103,10 @@ async function buildAll() {
     "LEMIN_BASE_URL",
     "LEMIN_DIAL_CODE",
     "LEMIN_AGENT",
+    // Deploy key — baked in so hotdeploy works even if PM2 has a stale/empty placeholder.
+    // After key rotation: rebuild + manual bootstrap (see DEPLOYMENT-REPORT.md), then
+    // hotdeploy resumes working because the new bundle carries the new key.
+    "MIGRATION_KEY",
   ];
   for (const key of injectKeys) {
     const val = process.env[key];
