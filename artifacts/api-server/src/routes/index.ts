@@ -398,8 +398,9 @@ router.use(storageRouter);
 // These mirror the app-level routes in app.ts. Being in the router guarantees
 // they work on VPS even if the app-level registration order is wrong.
 function migrationKeyOk(key: string | undefined): boolean {
-  const valid = [process.env.MIGRATION_KEY, "alburhan-migrate-2026"].filter(Boolean);
-  return !!key && valid.includes(key);
+  const configuredKey = process.env.MIGRATION_KEY;
+  if (!configuredKey) return false; // deny all when key not configured
+  return typeof key === "string" && key.length > 0 && key === configuredKey;
 }
 
 router.get("/migrate/db-check", async (req: any, res: any) => {

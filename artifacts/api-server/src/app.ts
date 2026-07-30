@@ -119,19 +119,77 @@ window.location.replace(${JSON.stringify(escaped)});
 // ── Migration / diagnostic routes (key-protected, no session required) ────────
 // MUST be registered BEFORE app.use("/api", router) so they work in production
 // mode where the router's catch-all 404 handler would otherwise intercept them.
+//
+// Security model:
+//   • MIGRATION_KEY env var is the sole valid key — NO hardcoded fallback.
+//     If the env var is absent all migrate requests are denied.
+//   • Destructive deploy endpoints additionally require localhost origin.
+//   • Rate-limited to 20 requests / 60 s per IP.
+//   • Every access attempt is written to audit_logs.
 
 function migrationKeyValid(key: string | undefined): boolean {
-  const validKeys = [process.env.MIGRATION_KEY, "alburhan-migrate-2026"].filter(Boolean);
-  return !!key && validKeys.includes(key);
+  const configuredKey = process.env.MIGRATION_KEY;
+  if (!configuredKey) {
+    console.error("[MIGRATE] MIGRATION_KEY env var not set — all deploy requests denied");
+    return false;
+  }
+  return typeof key === "string" && key.length > 0 && key === configuredKey;
+}
+
+// In-memory rate limiter: 20 requests / IP / 60 s
+const _migrateRl = new Map<string, { n: number; until: number }>();
+function _migrateRateLimitOk(ip: string): boolean {
+  const now = Date.now();
+  const e = _migrateRl.get(ip);
+  if (!e || now > e.until) { _migrateRl.set(ip, { n: 1, until: now + 60_000 }); return true; }
+  if (e.n >= 20) return false;
+  e.n++;
+  return true;
+}
+
+// Audit writer — non-fatal; never crashes the calling endpoint
+async function _auditMigrate(action: string, reqPath: string, ip: string, success: boolean): Promise<void> {
+  console.log(`[MIGRATE-AUDIT] ${new Date().toISOString()} action=${action} path=${reqPath} ip=${ip} ok=${success}`);
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs
+         (id, user_id, action, resource_type, resource_id, ip_address, details, created_at)
+       VALUES (gen_random_uuid()::text, 'system', $1, 'migration', 'deploy', $2, $3::jsonb, NOW())`,
+      [action, ip, JSON.stringify({ path: reqPath, success })]
+    );
+  } catch { /* audit must never crash a deploy */ }
+}
+
+// Middleware: restrict to localhost + enforce rate limit + write audit entry
+function requireLocalhost(req: any, res: any, next: any): void {
+  const raw = req.socket?.remoteAddress ?? req.ip ?? "";
+  const ip  = raw.replace(/^::ffff:/, "");
+  const isLocal = ip === "127.0.0.1" || ip === "::1";
+  if (!isLocal) {
+    console.warn(`[MIGRATE] Blocked non-local request ip=${ip} path=${req.path}`);
+    void _auditMigrate("blocked_external", req.path, ip, false);
+    res.status(403).json({ error: "Deploy endpoints are restricted to localhost." });
+    return;
+  }
+  if (!_migrateRateLimitOk(ip)) {
+    void _auditMigrate("rate_limited", req.path, ip, false);
+    res.status(429).json({ error: "Rate limit exceeded. Try again in 60 seconds." });
+    return;
+  }
+  next();
 }
 
 // GET /api/migrate/hotdeploy — full deploy: backend bundle + frontend assets.
 // Single GET call deploys both so CDN-blocked POST paths are never needed.
 // Use ?frontend=0 to skip frontend, ?backend=0 to skip backend.
 // Calls process.exit(0) after writing so PM2 restarts with the new bundle.
-app.get("/api/migrate/hotdeploy", async (req, res) => {
+app.get("/api/migrate/hotdeploy", requireLocalhost, async (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  if (!migrationKeyValid(key)) {
+    void _auditMigrate("hotdeploy_rejected", req.path, (req.socket?.remoteAddress ?? "").replace(/^::ffff:/, ""), false);
+    return void res.status(403).json({ error: "Forbidden" });
+  }
+  void _auditMigrate("hotdeploy_started", req.path, "127.0.0.1", true);
 
   const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const skipBackend  = req.query.backend  === "0";
@@ -142,7 +200,7 @@ app.get("/api/migrate/hotdeploy", async (req, res) => {
   // ── 1. Backend bundle ──────────────────────────────────────────────────────
   if (!skipBackend) {
     const backendUrl = (req.query.source as string) ||
-      `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
+      `${DEV_URL}/api/migrate/server.cjs?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
     try {
       const r = await fetch(backendUrl, { signal: AbortSignal.timeout(120_000) });
       if (!r.ok) {
@@ -164,7 +222,7 @@ app.get("/api/migrate/hotdeploy", async (req, res) => {
 
   // ── 2. Frontend assets ─────────────────────────────────────────────────────
   if (!skipFrontend) {
-    const frontendUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
+    const frontendUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
     // Derive extract path: look for the alburhan dist alongside this bundle
     const candidates = [
       "/root/artifacts/alburhan/dist",
@@ -203,7 +261,7 @@ app.get("/api/migrate/hotdeploy", async (req, res) => {
 });
 
 // GET /api/migrate/kill-self — immediately exits this process so PM2 restarts with new bundle on disk
-app.get("/api/migrate/kill-self", (req, res) => {
+app.get("/api/migrate/kill-self", requireLocalhost, (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
   res.json({ ok: true, pid: process.pid, message: "Process exiting now. PM2 will restart with new bundle." });
@@ -219,7 +277,7 @@ app.post("/api/migrate/self-update", async (req, res) => {
 
   const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
-    `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
+    `${DEV_URL}/api/migrate/server.cjs?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
 
   const binPath = path.join(__dirname, "../dist/index.cjs");
   try {
@@ -271,13 +329,13 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
 
 // POST /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
 // Add ?async=true to respond immediately (avoids nginx proxy timeout for large tarballs)
-app.post("/api/migrate/deploy-frontend", async (req, res) => {
+app.post("/api/migrate/deploy-frontend", requireLocalhost, async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
   const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
-    `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
+    `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
   const asyncMode = (req.query.async || req.body?.async) === true
     || req.query.async === "true" || req.body?.async === "true";
 
@@ -956,12 +1014,11 @@ app.get("/api/migrate/setup-db.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEPLOY_KEY = "alburhan-migrate-2026";
   const DEV_URL    = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
 
   const script = `#!/bin/bash
 # Al Burhan Tours — Production PostgreSQL setup + DATABASE_URL fix
-# Usage: curl -fsSL "https://.../api/migrate/setup-db.sh?key=..." | bash
+# Usage: curl -fsSL "https://.../api/migrate/setup-db.sh?key=\$MIGRATION_KEY" | bash
 set -euo pipefail
 ENV_FILE="/var/www/alburhan/.env"
 PM2_APP="alburhan-api"
@@ -1092,7 +1149,7 @@ echo "    Node port: \$PORT"
 HEALTH=\$(curl -sf --max-time 8 "http://127.0.0.1:\$PORT/api/health" 2>/dev/null || echo "FAIL")
 echo "    Local health: \$HEALTH"
 
-DB_OK=\$(curl -sf --max-time 15 "http://127.0.0.1:\$PORT/api/migrate/db-check?key=${DEPLOY_KEY}" 2>/dev/null \\
+DB_OK=\$(curl -sf --max-time 15 "http://127.0.0.1:\$PORT/api/migrate/db-check?key=\${MIGRATION_KEY}" 2>/dev/null \\
   | python3 -c "import sys,json; d=json.load(sys.stdin); ok=sum(1 for v in d['checks'].values() if v.startswith('OK')); tot=len(d['checks']); print(f'{ok}/{tot} tables OK')" 2>/dev/null || echo "check failed")
 echo "    DB tables: \$DB_OK"
 
@@ -3771,12 +3828,11 @@ app.get("/api/migrate/deploy.sh", (req, res) => {
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
-  const DEPLOY_KEY   = "alburhan-migrate-2026";
 
   const script = `#!/bin/bash
 set -e
 DEV="${DEV_URL_HERE}"
-KEY="${DEPLOY_KEY}"
+KEY="\${MIGRATION_KEY:?MIGRATION_KEY env var must be set}"
 VPS_DIR="/var/www/alburhan"
 BUNDLE="$VPS_DIR/artifacts/api-server/dist/index.cjs"
 PM2_APP="alburhan-api"
@@ -3868,14 +3924,13 @@ app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
-  const DEPLOY_KEY   = "alburhan-migrate-2026";
 
   const script = `#!/bin/bash
 # Al Burhan Tours — VPS Fix Deploy v24 (port-aware, self-healing)
-# Usage: curl -fsSL "https://...fixdeploy.sh?key=..." | bash
+# Usage: MIGRATION_KEY=<key> bash <(curl -fsSL "https://...fixdeploy.sh?key=\$MIGRATION_KEY")
 set -e
 DEV="${DEV_URL_HERE}"
-KEY="${DEPLOY_KEY}"
+KEY="\${MIGRATION_KEY:?MIGRATION_KEY env var must be set}"
 PM2_APP="alburhan-api"
 FALLBACK="/var/www/alburhan/artifacts/api-server/dist/index.cjs"
 ENV_FILE="/var/www/alburhan/.env"
@@ -5042,8 +5097,8 @@ app.get("/api/debug/notifications/:bookingId", async (req: any, res: any) => {
   const { bookingId } = req.params;
   const key = String(req.query.key || "");
   const send = req.query.send === "1"; // ?send=1 to actually trigger a live send
-  const EXPECTED_KEY = process.env.MIGRATION_KEY || "alburhan-migrate-2026";
-  if (key !== EXPECTED_KEY) {
+  const EXPECTED_KEY = process.env.MIGRATION_KEY;
+  if (!EXPECTED_KEY || key !== EXPECTED_KEY) {
     return res.status(401).json({ ok: false, error: "Invalid or missing ?key= parameter" });
   }
 

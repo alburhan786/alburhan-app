@@ -101,7 +101,7 @@ rsync -avz --exclude='node_modules' --exclude='.git' \
   root@YOUR_VPS_IP:/var/www/alburhan/
 
 # Or use the built-in no-SSH deploy (once first bundle is on VPS):
-# curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=alburhan-migrate-2026"
+# curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=<set-from-replit-secrets>"
 ```
 
 ### Step 3: Configure Environment on VPS
@@ -188,7 +188,7 @@ Once the VPS is running, update the app without SSH access:
 pnpm --filter @workspace/api-server run build
 
 # 2. Trigger VPS to pull the new bundle from Replit:
-curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=alburhan-migrate-2026"
+curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=<set-from-replit-secrets>"
 
 # The VPS will download the new bundle from Replit and restart PM2 automatically.
 ```
@@ -251,7 +251,7 @@ SMTP_PORT=587
 SMTP_USER=info@alburhantravels.online
 SMTP_PASS=XXXX
 SMTP_FROM=Al Burhan Tours <info@alburhantravels.online>
-MIGRATION_KEY=alburhan-migrate-2026
+MIGRATION_KEY=<set-from-replit-secrets>
 REPLIT_DEV_URL=                    # blank = VPS is fully independent
 DELETE_ADMIN_PASSWORD=XXXX
 ```

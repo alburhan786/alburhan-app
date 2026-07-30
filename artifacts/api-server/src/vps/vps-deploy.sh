@@ -4,7 +4,7 @@
 #  Target domain: https://alburhantravels.online
 #
 #  Run on VPS as root (or with sudo):
-#    curl -fsSL "https://alburhantravels.online/api/migrate/vps-deploy.sh?key=alburhan-migrate-2026" | bash
+#    curl -fsSL "https://alburhantravels.online/api/migrate/vps-deploy.sh?key=$MIGRATION_KEY" | bash
 #  Or copy this file to VPS and run:
 #    chmod +x vps-deploy.sh && sudo bash vps-deploy.sh
 # ══════════════════════════════════════════════════════════════════════════════
@@ -19,7 +19,7 @@ API_PORT="3000"
 PDF_PORT="3001"
 NGINX_CONF="/etc/nginx/sites-available/$DOMAIN"
 LOG_DIR="/var/log/pm2"
-DEPLOY_KEY="alburhan-migrate-2026"
+DEPLOY_KEY="${MIGRATION_KEY:?MIGRATION_KEY must be set}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}  ✓ $*${NC}"; }
@@ -199,6 +199,6 @@ echo "║  ✅ DEPLOY COMPLETE — https://alburhantravels.online             �
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Future no-SSH deploys:                                          ║"
 echo "║  curl -X POST 'https://alburhantravels.online/api/              ║"
-echo "║    migrate/self-update?key=alburhan-migrate-2026'               ║"
+echo "║    migrate/self-update?key=$MIGRATION_KEY'               ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
