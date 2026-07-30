@@ -7,9 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
-import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon, UserCheck } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Eye, Printer, ChevronDown, Hash, Wand2, Save, ChevronUp, ChevronDown as ChevronDownIcon, UserCheck, Building2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { COMPANIES, getCompanyById } from "@/lib/companies";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -17,6 +18,7 @@ interface HajjGroup {
   id: string;
   groupName: string;
   year: number;
+  companyId?: string;
   startingSerialNumber?: number;
   departureDate?: string;
   returnDate?: string;
@@ -29,7 +31,7 @@ interface HajjGroup {
 }
 
 const emptyForm = {
-  groupName: "", year: new Date().getFullYear(), departureDate: "", returnDate: "",
+  groupName: "", year: new Date().getFullYear(), companyId: "alburhan", departureDate: "", returnDate: "",
   flightNumber: "", maktabNumber: "", notes: "", groupLeader: "",
   startingSerialNumber: 1,
   hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahNameAr: "", hotelMakkahAddressAr: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "", hotelMakkahGoogleMaps: "",
@@ -133,7 +135,8 @@ export default function GroupsManager() {
   const openEdit = (g: HajjGroup) => {
     setEditingId(g.id);
     setForm({
-      groupName: g.groupName, year: g.year, departureDate: g.departureDate || "",
+      groupName: g.groupName, year: g.year, companyId: g.companyId || "alburhan",
+      departureDate: g.departureDate || "",
       returnDate: g.returnDate || "", flightNumber: g.flightNumber || "",
       maktabNumber: g.maktabNumber || "", notes: g.notes || "",
       startingSerialNumber: g.startingSerialNumber || 1,
@@ -166,7 +169,8 @@ export default function GroupsManager() {
   const handleSave = async () => {
     if (!form.groupName || !form.year) { toast({ title: "Name and year required", variant: "destructive" }); return; }
     const body = {
-      groupName: form.groupName, year: form.year, departureDate: form.departureDate || null,
+      groupName: form.groupName, year: form.year, companyId: form.companyId || "alburhan",
+      departureDate: form.departureDate || null,
       returnDate: form.returnDate || null, flightNumber: form.flightNumber || null,
       maktabNumber: form.maktabNumber || null, notes: form.notes || null,
       startingSerialNumber: Number(form.startingSerialNumber) || 1,
@@ -233,6 +237,7 @@ export default function GroupsManager() {
           body: JSON.stringify({
             groupName: g.groupName,
             year: g.year,
+            companyId: g.companyId || "alburhan",
             departureDate: g.departureDate || null,
             returnDate: g.returnDate || null,
             flightNumber: g.flightNumber || null,
@@ -385,6 +390,11 @@ export default function GroupsManager() {
                   <div>
                     <h3 className="font-bold text-lg">{g.groupName}</h3>
                     <p className="text-sm text-muted-foreground">Year: {g.year}</p>
+                    {g.companyId && g.companyId !== "alburhan" && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 mt-1">
+                        <Building2 size={10} /> {getCompanyById(g.companyId).nameShort}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Edit size={16} /></Button>
@@ -447,6 +457,19 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Maktab Number</label><Input value={form.maktabNumber} onChange={e => f("maktabNumber", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Starting Serial No. <span className="text-xs text-muted-foreground">(e.g. 79 if prev group ended at 78)</span></label><Input type="number" min="1" value={form.startingSerialNumber} onChange={e => f("startingSerialNumber", Number(e.target.value))} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Group Leader</label><Input value={form.groupLeader} onChange={e => f("groupLeader", e.target.value)} placeholder="e.g. Mohammed Altaf" /></div>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-sm font-medium">Company</label>
+                  <select
+                    value={form.companyId}
+                    onChange={e => f("companyId", e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {COMPANIES.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">Sets the default company on all print templates for this group.</p>
+                </div>
               </div>
             </div>
             <div>

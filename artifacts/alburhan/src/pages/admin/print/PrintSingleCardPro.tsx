@@ -258,7 +258,6 @@ export default function PrintSingleCardPro() {
 
   const frontRef = useRef<HTMLDivElement>(null);
   const backRef  = useRef<HTMLDivElement>(null);
-  const company  = getCompanyById("alburhan");
 
   const frontUrl = `${BASE}/admin/groups/${groupId}/print/card-front/${pilgrimId}`;
   const backUrl  = `${BASE}/admin/groups/${groupId}/print/card-back/${pilgrimId}`;
@@ -308,6 +307,7 @@ export default function PrintSingleCardPro() {
   if (!group || !pilgrim) return <div style={{ padding: "60px", textAlign: "center", fontFamily: "Arial", fontSize: "16px" }}>Loading...</div>;
 
   const safeName  = pilgrim.fullName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  const company   = getCompanyById((group as any).companyId || "alburhan");
   const cardProps: CardProps = { p: pilgrim, group, company, photoDataUrl };
 
   return (

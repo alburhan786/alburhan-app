@@ -124,7 +124,7 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
 });
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
+  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
   if (!groupName || !year) {
     res.status(400).json({ message: "groupName and year are required" });
     return;
@@ -133,6 +133,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
     const [group] = await db.insert(hajjGroupsTable).values({
       groupName,
       year: Number(year),
+      companyId: companyId || null,
       departureDate: departureDate || null,
       returnDate: returnDate || null,
       flightNumber: flightNumber || null,
@@ -163,11 +164,12 @@ router.get("/:id", requireAdmin as any, async (req, res) => {
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const id = String(req.params.id);
-  const { groupName, year, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
+  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
   try {
     const [before] = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
     const [updated] = await db.update(hajjGroupsTable).set({
-      groupName, year: Number(year), departureDate, returnDate, flightNumber, maktabNumber,
+      groupName, year: Number(year), companyId: companyId || null,
+      departureDate, returnDate, flightNumber, maktabNumber,
       startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
       hotels: hotels || {}, notes, updatedAt: new Date(),
     }).where(eq(hajjGroupsTable.id, id)).returning();
