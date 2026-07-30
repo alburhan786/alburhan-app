@@ -15,6 +15,8 @@ export interface CompanyInfo {
   website: string;
   logoUrl: string | null;
   isDefault: boolean;
+  /** Service / package label printed on the back of luggage stickers e.g. "Rehmat E Haram CHGo" */
+  serviceLabel?: string;
 }
 
 export const COMPANIES: CompanyInfo[] = [
@@ -31,6 +33,7 @@ export const COMPANIES: CompanyInfo[] = [
     website: "www.alburhantravels.online",
     logoUrl: `${BASE}images/logo.png`,
     isDefault: true,
+    serviceLabel: "Rehmat E Haram CHGo",
   },
   {
     id: "horizon",
@@ -45,6 +48,7 @@ export const COMPANIES: CompanyInfo[] = [
     website: "www.horizontravels.in",
     logoUrl: HORIZON_LOGO_DATA_URL,
     isDefault: false,
+    serviceLabel: "",
   },
 ];
 

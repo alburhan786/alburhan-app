@@ -261,8 +261,8 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
 /* ════════════════════════════════════════════════════
    BACK STICKER — two sizes, both exactly matching front
    ════════════════════════════════════════════════════ */
-function BackSticker({ p, group, company, compact }: {
-  p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>; compact: boolean;
+function BackSticker({ p, group, company, compact, serviceLabel }: {
+  p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>; compact: boolean; serviceLabel: string;
 }) {
   if (compact) {
     /* ── COMPACT BACK (96 × 68 mm) ── */
@@ -316,6 +316,11 @@ function BackSticker({ p, group, company, compact }: {
                   </div>
                 </div>
               </div>
+              {serviceLabel ? (
+                <div style={{ marginTop: "1mm", background: GOLD, borderRadius: "3px", padding: "0.8mm 2mm", textAlign: "center" }}>
+                  <div style={{ fontSize: "6.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.3px" }}>{serviceLabel}</div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -395,6 +400,11 @@ function BackSticker({ p, group, company, compact }: {
                 </div>
               </div>
             </div>
+            {serviceLabel ? (
+              <div style={{ margin: "1.5mm 3mm 0", background: GOLD, borderRadius: "3px", padding: "1.2mm 3mm", textAlign: "center" }}>
+                <div style={{ fontSize: "8.5pt", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>{serviceLabel}</div>
+              </div>
+            ) : null}
           </div>
         </div>
         <div style={{ background: GREEN, padding: "2mm 3mm 1.5mm", flexShrink: 0 }}>
@@ -435,6 +445,7 @@ export default function PrintLuggageSquare() {
   const [companyId, setCompanyId] = useState("alburhan");
   const [view, setView]         = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
+  const [serviceLabel, setServiceLabel] = useState<string>(company.serviceLabel ?? "");
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const [logoDataUrl, setLogoDataUrl] = useState<string>("");
@@ -458,6 +469,8 @@ export default function PrintLuggageSquare() {
     if (!company.logoUrl) { setLogoDataUrl(""); return; }
     if (company.logoUrl.startsWith("data:")) { setLogoDataUrl(company.logoUrl); return; }
     fetchAsDataUrl(company.logoUrl).then(d => setLogoDataUrl(d || company.logoUrl!));
+    // Reset service label to the newly selected company's default
+    setServiceLabel(company.serviceLabel ?? "");
   }, [companyId]);
 
   useEffect(() => {
@@ -566,6 +579,13 @@ export default function PrintLuggageSquare() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <input
+          type="text"
+          value={serviceLabel}
+          onChange={e => setServiceLabel(e.target.value)}
+          placeholder="Service label on back (e.g. Rehmat E Haram CHGo)"
+          style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff", minWidth: "260px" }}
+        />
         {(["both", "front", "back"] as const).map(v => (
           <button key={v} onClick={() => setView(v)} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: 600, cursor: "pointer", border: "1.5px solid", background: view === v ? DARK : "#fff", color: view === v ? "#fff" : DARK, borderColor: DARK }}>
             {v === "front" ? "🪪 Fronts only" : v === "back" ? "🔄 Backs only" : "📄 Both sides"}
@@ -610,7 +630,7 @@ export default function PrintLuggageSquare() {
             </div>
             <div key={`bp-${pi}`} className="sq-page-single">
               {[page[1], page[0], page[3], page[2]].map((p, idx) =>
-                p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} /> : <div key={`empty-${idx}`} />
+                p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} /> : <div key={`empty-${idx}`} />
               )}
             </div>
           </>
@@ -629,7 +649,7 @@ export default function PrintLuggageSquare() {
         {view === "back" && pages.map((page, pi) => (
           <div key={`bp-${pi}`} className="sq-page-single">
             {page.map(p => (
-              <BackSticker key={p.id} p={p} group={group} company={company} compact={false} />
+              <BackSticker key={p.id} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} />
             ))}
           </div>
         ))}
