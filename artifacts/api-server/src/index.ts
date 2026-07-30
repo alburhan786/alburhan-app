@@ -2370,6 +2370,12 @@ async function runMigrations() {
     console.log("[Migration] staff table ensured");
   } catch (err) { console.error("[Migration] staff table failed:", err); }
 
+  try {
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS staff_staff_id_unique ON staff (staff_id) WHERE staff_id IS NOT NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS staff_qr_token_unique ON staff (qr_token) WHERE qr_token IS NOT NULL`);
+    console.log("[Migration] staff unique indexes ensured");
+  } catch (err) { console.error("[Migration] staff unique indexes failed:", err); }
+
   // ── sender_ids: DLT approved sender headers ───────────────────────────────
   try {
     await pool.query(`
