@@ -140,7 +140,7 @@ app.post("/api/migrate/self-update", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
-  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l-h3duzr4n.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
     `${DEV_URL}/api/migrate/server.cjs?key=alburhan-migrate-2026`;
 
@@ -198,7 +198,7 @@ app.post("/api/migrate/deploy-frontend", async (req, res) => {
   const key = (req.query.key || req.body?.key) as string;
   if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
 
-  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l-h3duzr4n.spock.replit.dev";
   const sourceUrl = ((req.query.source || req.body?.source) as string) ||
     `${DEV_URL}/api/migrate/frontend.tar.gz?key=alburhan-migrate-2026`;
   const asyncMode = (req.query.async || req.body?.async) === true
@@ -880,7 +880,7 @@ app.get("/api/migrate/setup-db.sh", (req, res) => {
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
   const DEPLOY_KEY = "alburhan-migrate-2026";
-  const DEV_URL    = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL    = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l-h3duzr4n.spock.replit.dev";
 
   const script = `#!/bin/bash
 # Al Burhan Tours — Production PostgreSQL setup + DATABASE_URL fix
@@ -3693,7 +3693,7 @@ app.get("/api/migrate/deploy.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l-h3duzr4n.spock.replit.dev";
   const DEPLOY_KEY   = "alburhan-migrate-2026";
 
   const script = `#!/bin/bash
@@ -3790,7 +3790,7 @@ app.get("/api/migrate/fixdeploy.sh", (req, res) => {
   const key = req.query.key as string;
   if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
 
-  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l.spock.replit.dev";
+  const DEV_URL_HERE = process.env.REPLIT_DEV_URL || "https://57456384-023a-43e4-a60f-e6d8f967d324-00-vmg20t5z0q5l-h3duzr4n.spock.replit.dev";
   const DEPLOY_KEY   = "alburhan-migrate-2026";
 
   const script = `#!/bin/bash
