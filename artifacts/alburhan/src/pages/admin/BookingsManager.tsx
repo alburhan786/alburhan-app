@@ -2390,6 +2390,29 @@ export default function BookingsManager() {
     }
   };
 
+  const handleCopyPaymentLink = (booking: any) => {
+    const url = `https://alburhantravels.com/pay/${booking.bookingNumber}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast({ title: "Payment link copied!", description: url });
+    }).catch(() => {
+      toast({ title: "Copy failed", description: "Please copy manually: " + url, variant: "destructive" });
+    });
+  };
+
+  const handleWhatsAppPaymentLink = (booking: any) => {
+    const url = `https://alburhantravels.com/pay/${booking.bookingNumber}`;
+    const remaining = booking.finalAmount && booking.paidAmount
+      ? Number(booking.finalAmount) - Number(booking.paidAmount)
+      : null;
+    const amtText = remaining != null && remaining > 0
+      ? ` Balance due: ₹${remaining.toLocaleString("en-IN")}.`
+      : "";
+    const text = `Dear ${booking.customerName}, please complete your payment for Booking #${booking.bookingNumber}.${amtText} Pay securely here: ${url}`;
+    const phone = String(booking.customerMobile || "").replace(/\D/g, "");
+    const waPhone = phone.startsWith("91") ? phone : `91${phone}`;
+    window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'approved': return 'bg-blue-100 text-blue-800';
@@ -2650,6 +2673,28 @@ export default function BookingsManager() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 hover:bg-indigo-50" onClick={() => handleDuplicate(booking.id)} title="Duplicate Booking">
                           <Copy size={15} />
                         </Button>
+                        {/* Copy Payment Link — only for approved/partially_paid with outstanding balance */}
+                        {(booking.status === "approved" || booking.status === "partially_paid") &&
+                         booking.finalAmount && Number(booking.finalAmount) > Number(booking.paidAmount ?? 0) && (
+                          <>
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                              title="Copy payment page link"
+                              onClick={() => handleCopyPaymentLink(booking)}
+                            >
+                              <Link2 size={15} />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon"
+                              className="h-8 w-8 text-green-600 hover:bg-green-50"
+                              title="Send payment link via WhatsApp"
+                              onClick={() => handleWhatsAppPaymentLink(booking)}
+                            >
+                              <Send size={15} />
+                            </Button>
+                          </>
+                        )}
                         {/* Audit Log */}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:bg-gray-100" onClick={() => setAuditBooking(booking)} title="View Audit Log">
                           <History size={15} />
