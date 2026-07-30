@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeleteGuard } from "@/components/DeleteGuard";
-import { Plus, Edit, Trash2, Printer, UserCheck, Upload, Camera, RefreshCw, ShieldCheck, Info, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Printer, UserCheck, Upload, Camera, RefreshCw, ShieldCheck, Info, Users, FileSpreadsheet, CheckCircle2, XCircle, Download } from "lucide-react";
 import { Link } from "wouter";
 import { COMPANIES } from "@/lib/companies";
 import { PermissionGuard } from "@/components/PermissionGuard";
@@ -113,6 +113,18 @@ export default function StaffManager() {
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
+
+  // Bulk import state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{
+    imported: number;
+    failed: number;
+    rows: { staffId: string; fullName: string; row: number }[];
+    errors: { row: number; name: string; reason: string }[];
+  } | null>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
   // Admin roles tab state
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
@@ -248,6 +260,52 @@ export default function StaffManager() {
     }
   };
 
+  const downloadTemplate = () => {
+    const headers = [
+      "fullName", "fatherName", "designation", "department", "role",
+      "companyId", "mobileIndia", "bloodGroup", "dateOfBirth", "address",
+      "aadhaarLast4", "emergencyContact", "emergencyMobile",
+      "joiningDate", "validUpto", "employeeCode", "status", "notes",
+    ];
+    const sample = [
+      "Mohammed Altaf", "Abdul Rahman", "Ground Handler", "Operations", "airport_staff",
+      "alburhan", "9876543210", "O+", "15 Jan 1990", "123 Main Street Hyderabad",
+      "7890", "Father Name", "9876500000",
+      "01 Jan 2025", "31 Dec 2026", "EMP-001", "active", "",
+    ];
+    const rows = [headers.join(","), sample.join(",")].join("\n");
+    const blob = new Blob([rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "staff_import_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkImport = async () => {
+    if (!bulkFile) return;
+    setBulkImporting(true);
+    setBulkResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", bulkFile);
+      const res = await fetch(`${API}/api/staff/bulk-import`, {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      setBulkResult(data);
+      if (data.imported > 0) fetchData();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   const changeAdminRole = async (userId: string, newRole: AdminRole) => {
     setSavingRole(userId);
     try {
@@ -300,6 +358,15 @@ export default function StaffManager() {
                 <Printer size={16} /> Print All Cards
               </Button>
             </Link>
+            <PermissionGuard module="staff" action="create">
+              <Button
+                variant="outline"
+                className="gap-2 rounded-xl border-blue-400 text-blue-700 hover:bg-blue-50"
+                onClick={() => { setBulkFile(null); setBulkResult(null); setBulkDialogOpen(true); }}
+              >
+                <FileSpreadsheet size={16} /> Bulk Import
+              </Button>
+            </PermissionGuard>
             <PermissionGuard module="staff" action="create">
               <Button onClick={openCreate} className="bg-primary text-white gap-2 rounded-xl">
                 <Plus size={18} /> Add Staff
@@ -747,6 +814,153 @@ export default function StaffManager() {
             </Button>
             <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">Cancel</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Bulk Import Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={open => { setBulkDialogOpen(open); if (!open) { setBulkFile(null); setBulkResult(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl flex items-center gap-2">
+              <FileSpreadsheet size={22} /> Bulk Import Staff
+            </DialogTitle>
+          </DialogHeader>
+
+          {!bulkResult ? (
+            <div className="space-y-5 mt-4">
+              {/* Instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-2">
+                <p className="font-semibold">How to use bulk import:</p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                  <li>Download the CSV template below and fill in your staff data.</li>
+                  <li>Required column: <span className="font-mono font-bold">fullName</span></li>
+                  <li>Role values: <span className="font-mono">airport_staff</span>, <span className="font-mono">catering_staff</span>, <span className="font-mono">office_staff</span></li>
+                  <li>Maximum 500 rows per import.</li>
+                  <li>Upload the completed file (CSV or Excel) and click Import.</li>
+                </ol>
+              </div>
+
+              {/* Template download */}
+              <div>
+                <Button variant="outline" className="gap-2 rounded-xl border-blue-300 text-blue-700 hover:bg-blue-50" onClick={downloadTemplate}>
+                  <Download size={15} /> Download CSV Template
+                </Button>
+              </div>
+
+              {/* File picker */}
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Upload your file (CSV or Excel)</label>
+                <input
+                  ref={bulkFileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={e => setBulkFile(e.target.files?.[0] || null)}
+                />
+                <div
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                    bulkFile ? "border-primary/50 bg-primary/5" : "border-muted-foreground/30 hover:border-primary/40 hover:bg-muted/30"
+                  }`}
+                  onClick={() => bulkFileInputRef.current?.click()}
+                >
+                  {bulkFile ? (
+                    <div className="flex items-center justify-center gap-2 text-primary">
+                      <FileSpreadsheet size={20} />
+                      <span className="font-medium text-sm">{bulkFile.name}</span>
+                      <span className="text-xs text-muted-foreground">({(bulkFile.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">
+                      <FileSpreadsheet size={28} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Click to browse or drag a file here</p>
+                      <p className="text-xs mt-1">Supports CSV, .xlsx, .xls</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleBulkImport}
+                  disabled={!bulkFile || bulkImporting}
+                  className="flex-1 bg-primary text-white gap-2"
+                >
+                  {bulkImporting ? (
+                    <><RefreshCw size={15} className="animate-spin" /> Importing…</>
+                  ) : (
+                    <><Upload size={15} /> Import Staff</>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={() => setBulkDialogOpen(false)} className="flex-1">Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5 mt-4">
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                  <CheckCircle2 size={22} className="text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-2xl font-bold text-green-700">{bulkResult.imported}</p>
+                    <p className="text-sm text-green-600">Successfully imported</p>
+                  </div>
+                </div>
+                <div className={`border rounded-xl p-4 flex items-center gap-3 ${bulkResult.failed > 0 ? "bg-red-50 border-red-200" : "bg-muted border-muted"}`}>
+                  <XCircle size={22} className={bulkResult.failed > 0 ? "text-red-500 shrink-0" : "text-muted-foreground shrink-0"} />
+                  <div>
+                    <p className={`text-2xl font-bold ${bulkResult.failed > 0 ? "text-red-600" : "text-muted-foreground"}`}>{bulkResult.failed}</p>
+                    <p className={`text-sm ${bulkResult.failed > 0 ? "text-red-500" : "text-muted-foreground"}`}>Failed rows</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Imported rows */}
+              {bulkResult.rows.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold mb-2 text-green-700">Imported Staff</p>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border divide-y text-sm">
+                    {bulkResult.rows.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/30">
+                        <CheckCircle2 size={13} className="text-green-500 shrink-0" />
+                        <span className="font-mono text-xs text-muted-foreground">{r.staffId}</span>
+                        <span className="flex-1 truncate">{r.fullName}</span>
+                        <span className="text-xs text-muted-foreground">Row {r.row}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Error rows */}
+              {bulkResult.errors.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold mb-2 text-red-600">Failed Rows</p>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border divide-y text-sm">
+                    {bulkResult.errors.map((e, i) => (
+                      <div key={i} className="flex items-start gap-2 px-3 py-2 hover:bg-red-50/40">
+                        <XCircle size={13} className="text-red-400 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{e.name}</span>
+                          <span className="text-xs text-muted-foreground ml-1">(Row {e.row})</span>
+                          <p className="text-xs text-red-500 mt-0.5">{e.reason}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => { setBulkFile(null); setBulkResult(null); }}
+                  className="flex-1 gap-2"
+                >
+                  <Upload size={14} /> Import Another File
+                </Button>
+                <Button onClick={() => setBulkDialogOpen(false)} className="flex-1 bg-primary text-white">Done</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </AdminLayout>

@@ -2376,6 +2376,23 @@ async function runMigrations() {
     console.log("[Migration] staff unique indexes ensured");
   } catch (err) { console.error("[Migration] staff unique indexes failed:", err); }
 
+  // ── Staff ID sequences (concurrency-safe ID generation) ───────────────────
+  try {
+    // Derive start value from existing max so the sequence never produces a
+    // collision with IDs that were already assigned by the old MAX() approach.
+    const abtMax = await pool.query(
+      `SELECT COALESCE(MAX(CAST(split_part(staff_id, '-', 3) AS INTEGER)), 0) AS n FROM staff WHERE staff_id LIKE 'ABT-STAFF-%'`
+    );
+    const hznMax = await pool.query(
+      `SELECT COALESCE(MAX(CAST(split_part(staff_id, '-', 3) AS INTEGER)), 0) AS n FROM staff WHERE staff_id LIKE 'HZN-STAFF-%'`
+    );
+    const abtStart = (abtMax.rows[0]?.n ?? 0) + 1;
+    const hznStart = (hznMax.rows[0]?.n ?? 0) + 1;
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS staff_id_seq_abt START WITH ${abtStart} MINVALUE 1`);
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS staff_id_seq_hzn START WITH ${hznStart} MINVALUE 1`);
+    console.log("[Migration] staff ID sequences ensured (abt_start=%d, hzn_start=%d)", abtStart, hznStart);
+  } catch (err) { console.error("[Migration] staff ID sequences failed:", err); }
+
   // ── sender_ids: DLT approved sender headers ───────────────────────────────
   try {
     await pool.query(`
