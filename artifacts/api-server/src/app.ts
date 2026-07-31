@@ -434,9 +434,16 @@ async function deployFrontendHandler(req: any, res: any) {
     }
   }
 
-  const DEV_URL = getDeploySourceUrl();
-  if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js env, then run: pm2 reload ecosystem.config.js --update-env" });
-  // Source URL is always derived from DEPLOY_SOURCE_URL — never caller-supplied
+  // Localhost callers may pass ?src=https://... to override the baked-in DEPLOY_SOURCE_URL.
+  // This is essential when the VPS bundle is older and has a stale domain baked in.
+  // External callers cannot override — they don't have the auth level to supply arbitrary URLs.
+  const srcOverride = isLocalhost
+    ? ((req.query.src || req.body?.src) as string | undefined)
+    : undefined;
+
+  const DEV_URL = srcOverride || getDeploySourceUrl();
+  if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Pass ?src=https://YOUR-REPLIT-DOMAIN from localhost, or set DEPLOY_SOURCE_URL in VPS ecosystem.config.js env." });
+  // Source URL is derived from DEPLOY_SOURCE_URL (or ?src= override for localhost) — never from external callers
   const sourceUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
   const asyncMode = req.query.async === "true" || req.body?.async === "true";
 
