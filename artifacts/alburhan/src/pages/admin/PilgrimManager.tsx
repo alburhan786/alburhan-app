@@ -2597,32 +2597,33 @@ export default function PilgrimManager() {
                       return (
                         <tr key={`${row.roomNumber}-${fam.familyId}`}
                           className={`hover:bg-muted/30 transition-colors ${isSwapSelected ? "bg-amber-50 ring-1 ring-inset ring-amber-300" : ""}`}>
-                          {fi === 0 ? (
-                            <td rowSpan={row.families.length} className="px-3 py-2 border-r align-top pt-3">
-                              {isEditing ? (
-                                <div className="flex flex-col gap-1">
-                                  <input
-                                    autoFocus
-                                    className="w-20 border rounded px-1.5 py-0.5 text-xs font-mono"
-                                    value={editingRoom!.value}
-                                    onChange={e => setEditingRoom({ familyId: fam.familyId, value: e.target.value })}
-                                    onKeyDown={e => {
-                                      if (e.key === "Enter") handleChangeRoomNumber(fam.familyId, editingRoom!.value);
-                                      if (e.key === "Escape") setEditingRoom(null);
-                                    }}
-                                  />
-                                  <div className="flex gap-1">
-                                    <button onClick={() => handleChangeRoomNumber(fam.familyId, editingRoom!.value)}
-                                      className="text-green-600 hover:text-green-800"><Check size={12} /></button>
-                                    <button onClick={() => setEditingRoom(null)}
-                                      className="text-red-400 hover:text-red-700"><X size={12} /></button>
-                                  </div>
+                          {/* Room No. cell — shown per-row so each family can independently edit its room number */}
+                          <td className="px-3 py-2 border-r">
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1">
+                                <input
+                                  autoFocus
+                                  className="w-20 border rounded px-1.5 py-0.5 text-xs font-mono"
+                                  value={editingRoom!.value}
+                                  onChange={e => setEditingRoom({ familyId: fam.familyId, value: e.target.value })}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter") handleChangeRoomNumber(fam.familyId, editingRoom!.value);
+                                    if (e.key === "Escape") setEditingRoom(null);
+                                  }}
+                                />
+                                <div className="flex gap-1">
+                                  <button onClick={() => handleChangeRoomNumber(fam.familyId, editingRoom!.value)}
+                                    className="text-green-600 hover:text-green-800"><Check size={12} /></button>
+                                  <button onClick={() => setEditingRoom(null)}
+                                    className="text-red-400 hover:text-red-700"><X size={12} /></button>
                                 </div>
-                              ) : (
-                                <span className="font-black text-primary">{row.roomNumber}</span>
-                              )}
-                            </td>
-                          ) : null}
+                              </div>
+                            ) : (
+                              <span className={`font-black text-primary ${fi > 0 ? "opacity-40 text-sm" : ""}`}>
+                                {fam.roomNumber ?? row.roomNumber}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <div className="font-medium">{fam.headName}</div>
                             <div className="text-[10px] text-muted-foreground">{fam.familyId}</div>
@@ -2648,7 +2649,7 @@ export default function PilgrimManager() {
                               <button
                                 title="Edit room number"
                                 className="p-1 rounded hover:bg-blue-50 text-blue-500 hover:text-blue-700 transition-colors"
-                                onClick={() => setEditingRoom(isEditing ? null : { familyId: fam.familyId, value: row.roomNumber })}
+                                onClick={() => setEditingRoom(isEditing ? null : { familyId: fam.familyId, value: fam.roomNumber ?? row.roomNumber })}
                               ><Pencil size={12} /></button>
                               <button
                                 title={swapSelectA ? (isSwapSelected ? "Cancel swap" : "Swap with this family") : "Select to swap"}
