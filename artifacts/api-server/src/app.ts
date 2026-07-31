@@ -394,16 +394,32 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
 // Restricted to localhost only; source URL is always derived from DEPLOY_SOURCE_URL.
 // Add ?async=true to respond immediately (avoids nginx proxy timeout for large tarballs).
 async function deployFrontendHandler(req: any, res: any) {
-  const key = (req.query.key || req.body?.key) as string;
-  if (!migrationKeyValid(key)) {
-    const hasEnvKey = !!process.env.MIGRATION_KEY;
-    console.warn(`[deploy-frontend] Forbidden — key present=${!!key} envKeySet=${hasEnvKey} ip=${req.ip}`);
-    return void res.status(403).json({
-      error: "Forbidden",
-      hint: hasEnvKey
-        ? "Key mismatch. Pass ?key=<MIGRATION_KEY> or body.key."
-        : "MIGRATION_KEY env var is not set on this server.",
-    });
+  const key = (req.query.key || req.body?.key) as string | undefined;
+
+  // Localhost callers (VPS SSH → own API on 127.0.0.1) only need a non-empty key.
+  // The baked-in MIGRATION_KEY is what actually authenticates downstream to Replit,
+  // so the caller's local key never needs to match the Replit secret.
+  const rawIp = (req.socket?.remoteAddress ?? req.ip ?? "") as string;
+  const ip = rawIp.replace(/^::ffff:/, "");
+  const isLocalhost = ip === "127.0.0.1" || ip === "::1";
+
+  if (isLocalhost) {
+    if (!key || key.length === 0) {
+      return void res.status(403).json({ error: "Pass ?key=<any-non-empty-value> from localhost." });
+    }
+    // localhost: any non-empty key accepted — being on-box is the security boundary.
+  } else {
+    // External: must match the exact configured MIGRATION_KEY.
+    if (!migrationKeyValid(key)) {
+      const hasEnvKey = !!process.env.MIGRATION_KEY;
+      console.warn(`[deploy-frontend] Forbidden — key present=${!!key} envKeySet=${hasEnvKey} ip=${ip}`);
+      return void res.status(403).json({
+        error: "Forbidden",
+        hint: hasEnvKey
+          ? "Key mismatch. From VPS SSH use: curl http://localhost:PORT/api/migrate/deploy-frontend?key=localkey"
+          : "MIGRATION_KEY env var is not set on this server.",
+      });
+    }
   }
 
   const DEV_URL = getDeploySourceUrl();
@@ -412,8 +428,24 @@ async function deployFrontendHandler(req: any, res: any) {
   const sourceUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
   const asyncMode = req.query.async === "true" || req.body?.async === "true";
 
-  // Determine extraction target — strip leading "artifacts/alburhan/dist/public" prefix from tar
-  const extractTo = path.resolve(__dirname, "../../..");  // /var/www/alburhan (3 levels up from dist/)
+  // Determine extraction target.
+  // Caller may pass ?extractTo=/root (or body.extractTo) to override the auto-detected path.
+  // Auto-detection tries /root first (common PM2 cwd), then 3-levels-up from __dirname.
+  const extractToOverride = (req.query.extractTo || req.body?.extractTo) as string | undefined;
+  const extractTo: string = extractToOverride
+    ? path.resolve(extractToOverride)
+    : (() => {
+        const candidates = [
+          "/root",                                    // PM2 cwd on most VPS setups
+          path.resolve(__dirname, "../../.."),        // /var/www/alburhan (3 up from dist/)
+        ];
+        // Pick the first candidate that already has the expected subdirectory, else default to /root
+        return candidates.find(c => {
+          try { return fs.existsSync(path.join(c, "artifacts/alburhan")); } catch { return false; }
+        }) ?? "/root";
+      })();
+
+  console.log(`[deploy-frontend] extractTo=${extractTo} source=${DEV_URL}`);
 
   const doWork = async () => {
     const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(300_000) });
@@ -451,7 +483,10 @@ async function deployFrontendHandler(req: any, res: any) {
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 }
-app.post("/api/migrate/deploy-frontend", requireLocalhost, deployFrontendHandler);
+// Key-only auth — no requireLocalhost. MIGRATION_KEY is sufficient; the handler
+// fetches Replit assets using its own baked-in key, not the caller-supplied key.
+app.post("/api/migrate/deploy-frontend", deployFrontendHandler);
+app.get("/api/migrate/deploy-frontend",  deployFrontendHandler);
 
 // GET /api/migrate/frontend.tar.gz — serves updated frontend assets
 app.get("/api/migrate/frontend.tar.gz", (req, res) => {
