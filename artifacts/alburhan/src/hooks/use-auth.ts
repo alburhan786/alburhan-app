@@ -83,7 +83,7 @@ export function useAuth() {
         try { localStorage.removeItem("__dev_user__"); } catch { /* ignore */ }
         queryClient.setQueryData(['/api/auth/me'], null);
         queryClient.clear();
-        setLocation("/");
+        setLocation("/login");
         toast({
           title: "Logged out",
           description: "You have been securely logged out.",

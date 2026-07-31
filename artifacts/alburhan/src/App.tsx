@@ -232,7 +232,7 @@ function CustomerRoute({ component: Component }: { component: React.ComponentTyp
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="py-20 text-center">Loading...</div>;
-  if (!isAuthenticated) return <Redirect to="/admin/login" />;
+  if (!isAuthenticated) return <Redirect to="/login?portal=admin" />;
   if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
   if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
   if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
@@ -244,7 +244,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 function BranchRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/branch/login" />;
+  if (!isAuthenticated) return <Redirect to="/login?portal=branch" />;
   if (user?.role !== 'branch_manager') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -253,7 +253,7 @@ function BranchRoute({ component: Component }: { component: React.ComponentType 
 function AgentRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/agent/login" />;
+  if (!isAuthenticated) return <Redirect to="/login?portal=agent" />;
   if (user?.role !== 'agent') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -262,7 +262,7 @@ function AgentRoute({ component: Component }: { component: React.ComponentType }
 function StaffRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
-  if (!isAuthenticated) return <Redirect to="/staff/login" />;
+  if (!isAuthenticated) return <Redirect to="/login?portal=staff" />;
   if (user?.role !== 'staff') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
@@ -285,12 +285,13 @@ function Router() {
       <Route path="/terms" component={TermsAndConditions} />
       <Route path="/cancellation" component={CancellationPolicy} />
       <Route path="/refund" component={RefundPolicy} />
-      {/* Portal-specific login routes — each only accepts its own account type */}
-      <Route path="/login" component={() => <Login portalType="customer" />} />
-      <Route path="/admin/login" component={() => <Login portalType="admin" />} />
-      <Route path="/agent/login" component={() => <Login portalType="agent" />} />
-      <Route path="/branch/login" component={() => <Login portalType="branch" />} />
-      <Route path="/staff/login" component={() => <Login portalType="staff" />} />
+      {/* Unified multi-portal login — ?portal=customer|admin|staff|agent|branch pre-selects the portal */}
+      <Route path="/login" component={Login} />
+      {/* Legacy portal-specific login routes — redirect to unified page with portal pre-selected */}
+      <Route path="/admin/login"  component={() => <Redirect to="/login?portal=admin" />} />
+      <Route path="/agent/login"  component={() => <Redirect to="/login?portal=agent" />} />
+      <Route path="/branch/login" component={() => <Redirect to="/login?portal=branch" />} />
+      <Route path="/staff/login"  component={() => <Redirect to="/login?portal=staff" />} />
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
