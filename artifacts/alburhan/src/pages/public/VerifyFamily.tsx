@@ -18,9 +18,13 @@ interface FamilyMember {
   passportNumber?: string;
   gender?: string;
   relation?: string;
+  familyRelation?: string;
   familyHead?: boolean;
   roomNumber?: string;
+  roomType?: string;
   roomHotel?: string;
+  busNumber?: string;
+  seatNumber?: string;
   mobileIndia?: string;
   mobileSaudi?: string;
   photoUrl?: string;
@@ -31,38 +35,84 @@ interface FamilyData {
   groupId: string;
   groupName: string;
   year: number;
+  flightNumber?: string | null;
+  departureDate?: string | null;
+  returnDate?: string | null;
+  maktabNumber?: string | null;
+  hotels?: Record<string, string>;
   members: FamilyMember[];
   head: FamilyMember | null;
 }
 
+function fmt(date?: string | null) {
+  if (!date) return null;
+  try {
+    return new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return date;
+  }
+}
+
+function InfoPill({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, minWidth: "80px", padding: "8px 4px", gap: "2px" }}>
+      <span style={{ fontSize: "18px" }}>{icon}</span>
+      <span style={{ fontSize: "10px", color: GOLD, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
+      <span style={{ fontSize: "12px", fontWeight: 700, color: DARK, textAlign: "center", wordBreak: "break-word" }}>{value}</span>
+    </div>
+  );
+}
+
 function MemberRow({ m, apiUrl }: { m: FamilyMember; apiUrl: string }) {
   const name = [m.salutation, m.fullName].filter(Boolean).join(" ");
+  const role = m.familyRelation || m.relation;
   const photoSrc = m.photoUrl
     ? m.photoUrl.startsWith("http") ? m.photoUrl : `${apiUrl.replace("/api", "")}${m.photoUrl}`
     : null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
       <div style={{ flexShrink: 0 }}>
         {photoSrc ? (
-          <img src={photoSrc} alt={m.fullName} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", border: `2px solid ${DARK}30` }} />
+          <img src={photoSrc} alt={m.fullName} style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: `2px solid ${DARK}30` }} />
         ) : (
-          <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: `${DARK}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+          <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: `${DARK}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
             {m.gender?.toLowerCase() === "female" ? "👩" : "👨"}
           </div>
         )}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
           <span style={{ fontSize: "14px", fontWeight: 700, color: DARK }}>{name}</span>
-          {m.familyHead && <span style={{ fontSize: "10px", background: GOLD, color: "#fff", borderRadius: "10px", padding: "1px 7px", fontWeight: 700 }}>HEAD</span>}
+          {m.familyHead && (
+            <span style={{ fontSize: "10px", background: GOLD, color: "#fff", borderRadius: "10px", padding: "1px 7px", fontWeight: 700, flexShrink: 0 }}>HEAD</span>
+          )}
         </div>
-        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
-          {m.relation && <span>{m.relation}</span>}
-          {m.passportNumber && <span style={{ marginLeft: m.relation ? "8px" : "0" }}>· {m.passportNumber}</span>}
-        </div>
+        {role && <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>{role}</div>}
+        {m.passportNumber && <div style={{ fontSize: "11px", color: "#999", marginTop: "1px" }}>🛂 {m.passportNumber}</div>}
+
+        {/* Room */}
         {m.roomNumber && (
-          <div style={{ fontSize: "11px", color: DARK, marginTop: "2px", fontWeight: 600 }}>
-            Room {m.roomNumber}{m.roomHotel ? ` · ${m.roomHotel}` : ""}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "5px" }}>
+            <span style={{ fontSize: "11px", background: `${DARK}12`, color: DARK, fontWeight: 600, borderRadius: "6px", padding: "2px 7px" }}>
+              🏨 Room {m.roomNumber}{m.roomHotel ? ` · ${m.roomHotel}` : ""}
+              {m.roomType ? ` (${m.roomType})` : ""}
+            </span>
+          </div>
+        )}
+
+        {/* Bus / Seat */}
+        {(m.busNumber || m.seatNumber) && (
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+            {m.busNumber && (
+              <span style={{ fontSize: "11px", background: "#fef9ee", color: "#92400e", fontWeight: 600, borderRadius: "6px", padding: "2px 7px", border: "1px solid #fde68a" }}>
+                🚌 Bus {m.busNumber}
+              </span>
+            )}
+            {m.seatNumber && (
+              <span style={{ fontSize: "11px", background: "#fef9ee", color: "#92400e", fontWeight: 600, borderRadius: "6px", padding: "2px 7px", border: "1px solid #fde68a" }}>
+                💺 Seat {m.seatNumber}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -133,6 +183,16 @@ export default function VerifyFamily() {
   const hotel = head?.roomHotel;
   const mobile = head?.mobileIndia || head?.mobileSaudi || data.members.find(m => m.mobileIndia)?.mobileIndia;
 
+  // Collect unique bus numbers from all members
+  const buses = [...new Set(data.members.map(m => m.busNumber).filter(Boolean))] as string[];
+
+  // Group info pills
+  const infoPills: { icon: string; label: string; value: string }[] = [];
+  if (data.flightNumber) infoPills.push({ icon: "✈️", label: "Flight", value: data.flightNumber });
+  if (data.departureDate) infoPills.push({ icon: "📅", label: "Departure", value: fmt(data.departureDate)! });
+  if (data.returnDate) infoPills.push({ icon: "🏠", label: "Return", value: fmt(data.returnDate)! });
+  if (data.maktabNumber) infoPills.push({ icon: "🕌", label: "Maktab", value: data.maktabNumber });
+
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${DARK} 0%, #1a7a5e 40%, #f5f5f5 60%)`, padding: "0 0 40px 0", fontFamily: "'Segoe UI', Arial, sans-serif" }}>
 
@@ -151,11 +211,11 @@ export default function VerifyFamily() {
         {/* Family header */}
         <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f0f0f0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ background: `${DARK}15`, border: `2px solid ${DARK}30`, borderRadius: "12px", padding: "10px 16px", textAlign: "center" }}>
+            <div style={{ background: `${DARK}15`, border: `2px solid ${DARK}30`, borderRadius: "12px", padding: "10px 16px", textAlign: "center", flexShrink: 0 }}>
               <div style={{ fontSize: "9px", color: DARK, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Family</div>
               <div style={{ fontSize: "18px", fontWeight: 900, color: DARK }}>{data.familyId}</div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: "18px", fontWeight: 800, color: DARK, lineHeight: 1.2 }}>{headName}</div>
               <div style={{ fontSize: "12px", color: "#666", marginTop: "3px" }}>{data.groupName} · {data.year}</div>
               <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>{data.members.length} member{data.members.length !== 1 ? "s" : ""}</div>
@@ -167,11 +227,31 @@ export default function VerifyFamily() {
           </div>
         </div>
 
+        {/* Trip info pills */}
+        {infoPills.length > 0 && (
+          <div style={{ padding: "14px 20px", background: `${DARK}06`, borderBottom: "1px solid #f0f0f0" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "10px" }}>✈️ Trip Details</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              {infoPills.map(p => <InfoPill key={p.label} {...p} />)}
+            </div>
+          </div>
+        )}
+
         {/* Room info */}
         {room && (
           <div style={{ padding: "14px 20px", background: `${DARK}08`, borderBottom: "1px solid #f0f0f0" }}>
             <div style={{ fontSize: "11px", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "6px" }}>🏨 Room Assignment</div>
             <div style={{ fontSize: "16px", fontWeight: 800, color: DARK }}>Room {room}{hotel ? ` · ${hotel.charAt(0).toUpperCase() + hotel.slice(1)}` : ""}</div>
+          </div>
+        )}
+
+        {/* Bus info (group-level summary) */}
+        {buses.length > 0 && (
+          <div style={{ padding: "14px 20px", background: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "6px" }}>🚌 Bus Assignment</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#92400e" }}>
+              {buses.length === 1 ? `Bus ${buses[0]}` : buses.map(b => `Bus ${b}`).join(" · ")}
+            </div>
           </div>
         )}
 
