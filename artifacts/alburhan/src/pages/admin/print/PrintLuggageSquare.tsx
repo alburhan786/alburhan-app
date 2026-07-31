@@ -293,23 +293,68 @@ function FrontSticker({ p, group, company, groupColor, groupLabel, photoDataUrls
 /* ════════════════════════════════════════════════════
    BACK STICKER — two sizes, both exactly matching front
    ════════════════════════════════════════════════════ */
-function BackSticker({ p, group, company, compact, serviceLabel }: {
+type BackBranding = "almasiah" | "alburhan" | "custom";
+
+function BackStickerHeader({
+  backBranding, company, logoDataUrl, customBrandingName, compact,
+}: {
+  backBranding: BackBranding; company: ReturnType<typeof getCompanyById>;
+  logoDataUrl: string; customBrandingName: string; compact: boolean;
+}) {
+  const h = compact ? "7mm" : "10mm";
+  const nameSize = compact ? "9pt" : "13pt";
+  const subSize  = compact ? "5pt"  : "6.5pt";
+
+  if (backBranding === "almasiah") {
+    return (
+      <>
+        <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: compact ? "0.8mm" : "1.5mm" }}>
+          <img src={mashariqLogoUrl} alt="mashariq" style={{ height: h, objectFit: "contain", flex: 1 }} />
+          <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
+          <img src={almasiahLogoUrl} alt="almasiah" style={{ height: h, objectFit: "contain", flex: 1 }} />
+        </div>
+        <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: nameSize, color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>شركة مشارق الماسية لخدمات الحجاج</div>
+        <div style={{ fontSize: subSize, color: "#111", fontWeight: 900, lineHeight: 1.4 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+      </>
+    );
+  }
+
+  if (backBranding === "alburhan") {
+    return (
+      <>
+        <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: compact ? "0.8mm" : "1.5mm" }}>
+          {company.logoUrl
+            ? <img src={logoDataUrl || company.logoUrl} alt={company.nameShort} style={{ height: h, objectFit: "contain", maxWidth: "28mm" }} />
+            : <div style={{ height: h, width: h, background: DARK, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: GOLD, fontWeight: 900, fontSize: "6pt", flexShrink: 0 }}>{company.nameShort[0]}</div>
+          }
+        </div>
+        <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: nameSize, color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>{company.arabicName}</div>
+        <div style={{ fontSize: subSize, color: "#111", fontWeight: 900, lineHeight: 1.4 }}>{company.name}</div>
+      </>
+    );
+  }
+
+  /* custom */
+  return (
+    <>
+      <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: nameSize, color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>{customBrandingName || "—"}</div>
+      <div style={{ fontSize: subSize, color: "#111", fontWeight: 900, lineHeight: 1.4, marginTop: "0.5mm" }}>{customBrandingName || "Custom Partner"}</div>
+    </>
+  );
+}
+
+function BackSticker({ p, group, company, compact, serviceLabel, backBranding, logoDataUrl, customBrandingName }: {
   p: Pilgrim; group: Group; company: ReturnType<typeof getCompanyById>; compact: boolean; serviceLabel: string;
+  backBranding: BackBranding; logoDataUrl: string; customBrandingName: string;
 }) {
   if (compact) {
     /* ── COMPACT BACK (96 × 68 mm) ── */
     return (
       <div className="sq-sticker-sm">
         <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff", overflow: "hidden" }}>
-          {/* Header — logos */}
+          {/* Header — branding */}
           <div style={{ borderBottom: `2px solid ${GREEN}`, padding: "1.5mm 2.5mm", flexShrink: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "0.8mm" }}>
-              <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "7mm", objectFit: "contain", flex: 1 }} />
-              <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
-              <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "7mm", objectFit: "contain", flex: 1 }} />
-            </div>
-            <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "9pt", color: GREEN, fontWeight: 900, lineHeight: 1.1 }}>شركة مشارق الماسية لخدمات الحجاج</div>
-            <div style={{ fontSize: "5pt", color: "#111", fontWeight: 900 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+            <BackStickerHeader backBranding={backBranding} company={company} logoDataUrl={logoDataUrl} customBrandingName={customBrandingName} compact={true} />
           </div>
 
           {/* Middle — service center + flag */}
@@ -394,13 +439,7 @@ function BackSticker({ p, group, company, compact, serviceLabel }: {
     <div className="sq-sticker">
       <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#fff", overflow: "hidden" }}>
         <div style={{ borderBottom: `2px solid ${GREEN}`, padding: "2mm 3mm", flexShrink: 0, height: "26mm", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "2mm", marginBottom: "1.5mm" }}>
-            <img src={mashariqLogoUrl} alt="mashariq" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
-            <div style={{ width: "0.5mm", background: "#ddd", alignSelf: "stretch" }} />
-            <img src={almasiahLogoUrl} alt="almasiah" style={{ height: "10mm", objectFit: "contain", flex: 1 }} />
-          </div>
-          <div style={{ fontFamily: "Arial", direction: "rtl", textAlign: "right", fontSize: "13pt", color: GREEN, fontWeight: 900, lineHeight: 1.25 }}>شركة مشارق الماسية لخدمات الحجاج</div>
-          <div style={{ fontSize: "6.5pt", color: "#111", fontWeight: 900, lineHeight: 1.4 }}>Mashariq Almasiah Company for Pilgrim Services</div>
+          <BackStickerHeader backBranding={backBranding} company={company} logoDataUrl={logoDataUrl} customBrandingName={customBrandingName} compact={false} />
         </div>
         <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", pointerEvents: "none" }}><SnowflakeSVG size={160} /></div>
@@ -484,6 +523,12 @@ export default function PrintLuggageSquare() {
   const [view, setView]         = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
   const [serviceLabel, setServiceLabel] = useState<string>("");
+  const [backBranding, setBackBranding] = useState<BackBranding>(() =>
+    (localStorage.getItem("sq_back_branding") as BackBranding) || "almasiah"
+  );
+  const [customBrandingName, setCustomBrandingName] = useState<string>(
+    () => localStorage.getItem("sq_custom_branding_name") || ""
+  );
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const [logoDataUrl, setLogoDataUrl] = useState<string>("");
@@ -635,6 +680,25 @@ export default function PrintLuggageSquare() {
         <select value={companyId} onChange={e => setCompanyId(e.target.value)} style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff" }}>
           {COMPANIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <select
+          value={backBranding}
+          onChange={e => { const v = e.target.value as BackBranding; setBackBranding(v); localStorage.setItem("sq_back_branding", v); }}
+          style={{ padding: "8px 12px", border: "1.5px solid #0d5040", borderRadius: "6px", fontSize: "13px", background: "#fff", fontWeight: 600, color: "#0d5040" }}
+          title="Back sticker branding"
+        >
+          <option value="almasiah">🕌 Mashariq Almasiah</option>
+          <option value="alburhan">🟢 Al Burhan (selected company)</option>
+          <option value="custom">✏️ Custom partner</option>
+        </select>
+        {backBranding === "custom" && (
+          <input
+            type="text"
+            value={customBrandingName}
+            onChange={e => { setCustomBrandingName(e.target.value); localStorage.setItem("sq_custom_branding_name", e.target.value); }}
+            placeholder="Custom partner name (Arabic or English)"
+            style={{ padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "#fff", minWidth: "240px" }}
+          />
+        )}
         <input
           type="text"
           value={serviceLabel}
@@ -686,7 +750,7 @@ export default function PrintLuggageSquare() {
             </div>
             <div key={`bp-${pi}`} className="sq-page-single">
               {[page[1], page[0], page[3], page[2]].map((p, idx) =>
-                p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} /> : <div key={`empty-${idx}`} />
+                p ? <BackSticker key={`b-${p.id}-${idx}`} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} backBranding={backBranding} logoDataUrl={logoDataUrl} customBrandingName={customBrandingName} /> : <div key={`empty-${idx}`} />
               )}
             </div>
           </>
@@ -705,7 +769,7 @@ export default function PrintLuggageSquare() {
         {view === "back" && pages.map((page, pi) => (
           <div key={`bp-${pi}`} className="sq-page-single">
             {page.map(p => (
-              <BackSticker key={p.id} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} />
+              <BackSticker key={p.id} p={p} group={group} company={company} compact={false} serviceLabel={serviceLabel} backBranding={backBranding} logoDataUrl={logoDataUrl} customBrandingName={customBrandingName} />
             ))}
           </div>
         ))}
