@@ -47,4 +47,40 @@ Thumbs.db
 # Replit
 .cache/
 .local/
-alburhan-update.tar.gz
+
+# ── Build artifacts (compiled by CI — never commit) ───────────────────────
+dist/
+*.cjs
+*.tsbuildinfo
+
+# ── Deployment packages (never commit ZIPs or tarballs) ──────────────────
+*.zip
+*.tar.gz
+*.tar.bz2
+deploy-pkg/
+alburhan-manual-vps-deployment/
+alburhan-meta-oauth-deploy/
+
+# ── Secrets & environment files ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Customer uploads & generated PDFs ────────────────────────────────────
+artifacts/api-server/uploads/
+uploads/
+
+# ── SSH keys ──────────────────────────────────────────────────────────────
+*.pem
+*.key
+id_rsa
+id_ed25519
+deploy_key
+
+# ── Temporary & log files ─────────────────────────────────────────────────
+*.log
+*.tmp
+/tmp/
+
+# ── Attached assets (Replit file uploads — not source code) ──────────────
+attached_assets/

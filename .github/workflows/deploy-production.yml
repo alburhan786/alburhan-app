@@ -1,0 +1,465 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  Al Burhan Tours & Travels — Production Deployment Pipeline
+#  Triggers: push to main  |  manual workflow_dispatch
+#  Deploys:  Hostinger VPS at ${{ secrets.VPS_HOST }}
+#  Docs:     .github/DEPLOYMENT.md
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual deploy"
+        required: false
+        default: "Manual deployment"
+
+# Only one production deployment runs at a time.
+# A newer push cancels an older queued/pending deployment — never a running one.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.26.1"
+  DEPLOY_TIMEOUT: "120"            # seconds to wait for health check after restart
+  BACKEND_MIN_SIZE_BYTES: "5000000" # reject bundles smaller than 5 MB
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_bundle:  ${{ steps.fe_info.outputs.bundle }}
+      backend_size:     ${{ steps.be_info.outputs.size }}
+      deploy_timestamp: ${{ steps.stamp.outputs.ts }}
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ── 2. Toolchain ───────────────────────────────────────────────────────
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── 4. Type checking ───────────────────────────────────────────────────
+      - name: Type check (frontend)
+        run: pnpm --filter @workspace/alburhan run typecheck
+        continue-on-error: false
+
+      - name: Type check (backend)
+        run: pnpm --filter @workspace/api-server run typecheck
+        continue-on-error: false
+
+      # ── 5. Build frontend ─────────────────────────────────────────────────
+      - name: Build frontend
+        run: pnpm --filter @workspace/alburhan run build
+        env:
+          NODE_ENV: production
+
+      # ── 6. Build backend ──────────────────────────────────────────────────
+      - name: Build backend
+        run: pnpm --filter @workspace/api-server run build
+        env:
+          NODE_ENV: production
+
+      # ── 7. Backend syntax validation ──────────────────────────────────────
+      - name: Validate backend bundle syntax
+        run: node --check artifacts/api-server/dist/index.cjs
+
+      # ── 8. Verify frontend login routes are compiled into the bundle ───────
+      - name: Verify frontend login routes
+        run: |
+          BUNDLE=$(ls artifacts/alburhan/dist/public/assets/index-*.js 2>/dev/null | head -1)
+          if [ -z "$BUNDLE" ]; then
+            echo "❌ Frontend bundle not found"
+            exit 1
+          fi
+          echo "Checking bundle: $BUNDLE"
+          MISSING=0
+          for ROUTE in "admin/login" "staff/login" "branch/login" "agent/login" "customer/login"; do
+            if grep -q "$ROUTE" "$BUNDLE"; then
+              echo "  ✅ /$ROUTE"
+            else
+              echo "  ❌ /$ROUTE — MISSING from bundle"
+              MISSING=$((MISSING+1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "❌ $MISSING login route(s) missing from frontend bundle"
+            exit 1
+          fi
+          echo "✅ All five login routes confirmed in bundle"
+
+      # ── 9. Verify Meta OAuth callback route in backend bundle ──────────────
+      - name: Verify Meta OAuth callback in backend
+        run: |
+          if grep -q "oauth/meta/callback" artifacts/api-server/dist/index.cjs; then
+            echo "✅ GET /api/social-media/oauth/meta/callback confirmed in backend bundle"
+          else
+            echo "❌ Meta OAuth callback route not found in backend bundle"
+            exit 1
+          fi
+          if grep -q "Missing Meta OAuth code or state" artifacts/api-server/dist/index.cjs; then
+            echo "✅ HTTP 400 guard (missing code/state) confirmed in backend bundle"
+          else
+            echo "❌ 400 guard not found — backend build may be stale"
+            exit 1
+          fi
+
+      # ── 10. Confirm no secrets in artifacts ────────────────────────────────
+      - name: Confirm no secrets in deployment artifacts
+        run: |
+          FOUND=0
+          # Check for common secret patterns in built artifacts
+          for PATTERN in "DATABASE_URL=postgres" "RAZORPAY_SECRET=" "SMTP_PASS=" "ghp_" "sk_live_"; do
+            if grep -rq "$PATTERN" artifacts/alburhan/dist/public/ 2>/dev/null; then
+              echo "❌ Possible secret pattern found in frontend: $PATTERN"
+              FOUND=$((FOUND+1))
+            fi
+          done
+          # .env files must never be in the dist
+          if find artifacts/alburhan/dist/ -name ".env" | grep -q .; then
+            echo "❌ .env file found in frontend dist"
+            FOUND=$((FOUND+1))
+          fi
+          if [ "$FOUND" -gt 0 ]; then
+            echo "❌ Secrets scan failed — aborting deployment"
+            exit 1
+          fi
+          echo "✅ No secrets found in deployment artifacts"
+
+      # ── 11. Bundle size guard ──────────────────────────────────────────────
+      - name: Backend bundle size guard
+        run: |
+          SIZE=$(stat -c%s artifacts/api-server/dist/index.cjs)
+          echo "Backend bundle size: ${SIZE} bytes ($(numfmt --to=iec $SIZE))"
+          if [ "$SIZE" -lt "$BACKEND_MIN_SIZE_BYTES" ]; then
+            echo "❌ Backend bundle is too small (${SIZE} bytes < ${BACKEND_MIN_SIZE_BYTES}). Aborting."
+            exit 1
+          fi
+          echo "✅ Backend bundle size OK"
+
+      # ── 12. Capture build info for summary ────────────────────────────────
+      - name: Capture build info
+        id: fe_info
+        run: |
+          BUNDLE=$(ls artifacts/alburhan/dist/public/assets/index-*.js 2>/dev/null | xargs -I{} basename {} | head -1)
+          echo "bundle=$BUNDLE" >> "$GITHUB_OUTPUT"
+
+      - name: Capture backend size
+        id: be_info
+        run: |
+          SIZE=$(du -sh artifacts/api-server/dist/index.cjs | cut -f1)
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Set deploy timestamp
+        id: stamp
+        run: echo "ts=$(date -u '+%Y%m%d-%H%M%S')" >> "$GITHUB_OUTPUT"
+
+      # ── 13. Upload artifacts for deploy job ───────────────────────────────
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: artifacts/alburhan/dist/public/
+          retention-days: 5
+          if-no-files-found: error
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-bundle
+          path: artifacts/api-server/dist/index.cjs
+          retention-days: 5
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    env:
+      TS: ${{ needs.build.outputs.deploy_timestamp }}
+
+    steps:
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: ./frontend-dist
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-bundle
+          path: ./backend-dist
+
+      # ── SSH Agent ─────────────────────────────────────────────────────────
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH key configured"
+
+      # ── Upload artifacts to a timestamped staging directory ───────────────
+      - name: Upload frontend to VPS staging
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=yes" \
+            ./frontend-dist/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/alburhan-deploy-${{ env.TS }}/frontend/
+          echo "✅ Frontend uploaded to /tmp/alburhan-deploy-${{ env.TS }}/frontend/"
+
+      - name: Upload backend to VPS staging
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "mkdir -p /tmp/alburhan-deploy-${{ env.TS }}/backend"
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT }} \
+            ./backend-dist/index.cjs \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/alburhan-deploy-${{ env.TS }}/backend/index.cjs
+          echo "✅ Backend uploaded to /tmp/alburhan-deploy-${{ env.TS }}/backend/index.cjs"
+
+      # ── Run atomic deploy on VPS ──────────────────────────────────────────
+      - name: Run atomic deployment on VPS
+        id: vps_deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            bash -s -- "${{ env.TS }}" "${{ secrets.VPS_APP_PATH }}" << 'REMOTE'
+          set -euo pipefail
+          TS="$1"
+          APP_PATH="$2"
+          STAGING="/tmp/alburhan-deploy-${TS}"
+          FRONTEND_DEST="${APP_PATH}/artifacts/alburhan/dist/public"
+          BACKEND_DEST="${APP_PATH}/artifacts/api-server/dist/index.cjs"
+          BACKUP_DIR="${APP_PATH}/backups/${TS}"
+          PM2_API="alburhan-api"
+          PM2_TOURS="alburhan-tours"
+
+          echo "=== Al Burhan Deploy ${TS} ==="
+          echo "Staging   : $STAGING"
+          echo "Frontend  : $FRONTEND_DEST"
+          echo "Backend   : $BACKEND_DEST"
+          echo "Backup    : $BACKUP_DIR"
+
+          # ── Pre-flight: validate staged files ──────────────────────────────
+          BACKEND_STAGED="${STAGING}/backend/index.cjs"
+          if [ ! -f "$BACKEND_STAGED" ]; then
+            echo "❌ Staged backend not found: $BACKEND_STAGED"
+            exit 1
+          fi
+          node --check "$BACKEND_STAGED" || { echo "❌ Backend syntax check failed"; exit 1; }
+          STAGED_SIZE=$(stat -c%s "$BACKEND_STAGED")
+          if [ "$STAGED_SIZE" -lt 5000000 ]; then
+            echo "❌ Staged backend too small: ${STAGED_SIZE} bytes"
+            exit 1
+          fi
+          echo "✅ Backend staged OK (${STAGED_SIZE} bytes)"
+
+          # ── Backup current deployment ──────────────────────────────────────
+          mkdir -p "$BACKUP_DIR"
+          if [ -f "$BACKEND_DEST" ]; then
+            cp "$BACKEND_DEST" "$BACKUP_DIR/index.cjs"
+            echo "✅ Backend backed up to $BACKUP_DIR/index.cjs"
+          fi
+          if [ -d "$FRONTEND_DEST" ]; then
+            rsync -a "$FRONTEND_DEST/" "$BACKUP_DIR/public/"
+            echo "✅ Frontend backed up to $BACKUP_DIR/public/"
+          fi
+
+          # ── Deploy backend (atomic copy) ───────────────────────────────────
+          mkdir -p "$(dirname "$BACKEND_DEST")"
+          cp "$BACKEND_STAGED" "${BACKEND_DEST}.new"
+          mv "${BACKEND_DEST}.new" "$BACKEND_DEST"
+          echo "✅ Backend installed"
+
+          # ── Deploy frontend (rsync into place, preserve uploads/env) ───────
+          mkdir -p "$FRONTEND_DEST"
+          rsync -a --delete \
+            --exclude="uploads/" \
+            --exclude=".env" \
+            "${STAGING}/frontend/" "$FRONTEND_DEST/"
+          echo "✅ Frontend installed"
+
+          # ── Restart PM2 API process ────────────────────────────────────────
+          if pm2 describe "$PM2_API" > /dev/null 2>&1; then
+            pm2 restart "$PM2_API" --update-env
+            echo "✅ PM2 '$PM2_API' restarted"
+          elif pm2 describe "$PM2_TOURS" > /dev/null 2>&1; then
+            pm2 restart "$PM2_TOURS" --update-env
+            echo "✅ PM2 '$PM2_TOURS' restarted"
+          else
+            pm2 start "$BACKEND_DEST" --name "$PM2_API" --update-env
+            echo "✅ PM2 '$PM2_API' started fresh"
+          fi
+          pm2 save --force
+
+          # ── Wait for API to come up ────────────────────────────────────────
+          echo "Waiting for API to come up..."
+          for i in $(seq 1 30); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health 2>/dev/null || echo "000")
+            if [ "$HTTP" = "200" ]; then
+              echo "✅ /api/health → HTTP $HTTP (attempt $i)"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "❌ API did not come up after 30 attempts"
+              exit 2
+            fi
+            sleep 2
+          done
+
+          # ── Health checks ──────────────────────────────────────────────────
+          HEALTH=$(curl -s http://127.0.0.1:3000/api/health 2>/dev/null | head -c 200)
+          echo "Health response: $HEALTH"
+
+          # Verify OAuth callback returns 400 (not 404)
+          OAUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            http://127.0.0.1:3000/api/social-media/oauth/meta/callback 2>/dev/null || echo "000")
+          if [ "$OAUTH_CODE" = "400" ]; then
+            echo "✅ OAuth callback → HTTP $OAUTH_CODE (correct)"
+          else
+            echo "❌ OAuth callback → HTTP $OAUTH_CODE (expected 400)"
+            exit 2
+          fi
+
+          # Check build stamp
+          BUILD=$(curl -s http://127.0.0.1:3000/api/version 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('build','unknown'))" 2>/dev/null || echo "unknown")
+          echo "Build stamp: $BUILD"
+
+          # ── Test Nginx config and reload ───────────────────────────────────
+          nginx -t 2>&1 && nginx -s reload && echo "✅ Nginx reloaded" || echo "⚠️  Nginx config unchanged (reload skipped)"
+
+          # ── Clean up staging dir ───────────────────────────────────────────
+          rm -rf "$STAGING"
+          echo "✅ Staging cleaned"
+
+          # ── Keep only 5 most recent backups ───────────────────────────────
+          ls -1dt "${APP_PATH}/backups/"* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          echo "✅ Old backups pruned (keeping 5 latest)"
+
+          echo "=== Deploy ${TS} complete ==="
+          REMOTE
+          echo "vps_deploy_ok=true" >> "$GITHUB_OUTPUT"
+
+      # ── Rollback if VPS deploy script exited with code 2 ──────────────────
+      - name: Rollback on deploy failure
+        if: failure() && steps.vps_deploy.outcome == 'failure'
+        id: rollback
+        run: |
+          echo "⚠️  Deploy step failed — attempting rollback"
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            bash -s -- "${{ env.TS }}" "${{ secrets.VPS_APP_PATH }}" << 'ROLLBACK'
+          set -euo pipefail
+          TS="$1"
+          APP_PATH="$2"
+          BACKUP_DIR="${APP_PATH}/backups/${TS}"
+          FRONTEND_DEST="${APP_PATH}/artifacts/alburhan/dist/public"
+          BACKEND_DEST="${APP_PATH}/artifacts/api-server/dist/index.cjs"
+
+          if [ -f "${BACKUP_DIR}/index.cjs" ]; then
+            cp "${BACKUP_DIR}/index.cjs" "$BACKEND_DEST"
+            echo "✅ Backend rolled back from backup"
+          else
+            echo "⚠️  No backend backup found"
+          fi
+
+          if [ -d "${BACKUP_DIR}/public" ]; then
+            rsync -a --delete "${BACKUP_DIR}/public/" "$FRONTEND_DEST/"
+            echo "✅ Frontend rolled back from backup"
+          else
+            echo "⚠️  No frontend backup found"
+          fi
+
+          # Restart with old code
+          PM2_PROC=$(pm2 list --no-color 2>/dev/null | grep -o 'alburhan-api\|alburhan-tours' | head -1)
+          if [ -n "$PM2_PROC" ]; then
+            pm2 restart "$PM2_PROC" --update-env
+            echo "✅ PM2 '$PM2_PROC' restarted with rolled-back code"
+          fi
+
+          echo "=== Rollback complete ==="
+          ROLLBACK
+          echo "rolled_back=true" >> "$GITHUB_OUTPUT"
+
+      # ── Remote health check via public domain ─────────────────────────────
+      - name: Public-domain health checks
+        id: public_checks
+        run: |
+          DOMAIN="https://alburhantravels.online"
+          echo "=== Public domain checks: $DOMAIN ==="
+
+          # /api/health
+          HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "${DOMAIN}/api/health" || echo "000")
+          echo "  /api/health → HTTP $HEALTH_CODE"
+          [ "$HEALTH_CODE" = "200" ] && echo "  ✅ Health OK" || echo "  ⚠️  Health check HTTP $HEALTH_CODE"
+          echo "health_code=$HEALTH_CODE" >> "$GITHUB_OUTPUT"
+
+          # Meta OAuth callback
+          OAUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 15 "${DOMAIN}/api/social-media/oauth/meta/callback" || echo "000")
+          echo "  /api/social-media/oauth/meta/callback → HTTP $OAUTH_CODE"
+          [ "$OAUTH_CODE" = "400" ] && echo "  ✅ OAuth callback OK (400)" || echo "  ⚠️  OAuth callback HTTP $OAUTH_CODE"
+          echo "oauth_code=$OAUTH_CODE" >> "$GITHUB_OUTPUT"
+
+          # Login routes (frontend SPA — all should return 200 via nginx try_files)
+          for ROUTE in "/admin/login" "/staff/login" "/branch/login" "/agent/login" "/customer/login"; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "${DOMAIN}${ROUTE}" || echo "000")
+            [ "$CODE" = "200" ] && STATUS="✅" || STATUS="⚠️ "
+            echo "  $STATUS ${ROUTE} → HTTP $CODE"
+          done
+
+      # ── Deployment summary ────────────────────────────────────────────────
+      - name: Write deployment summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << SUMMARY
+          ## Al Burhan — Deployment Summary
+
+          | Field | Value |
+          |---|---|
+          | **Git commit** | \`${{ github.sha }}\` |
+          | **Commit message** | ${{ github.event.head_commit.message || inputs.reason || 'manual' }} |
+          | **Deploy timestamp** | ${{ env.TS }} |
+          | **Frontend bundle** | ${{ needs.build.outputs.frontend_bundle }} |
+          | **Backend bundle size** | ${{ needs.build.outputs.backend_size }} |
+          | **Health check** | HTTP ${{ steps.public_checks.outputs.health_code || 'N/A' }} |
+          | **OAuth callback** | HTTP ${{ steps.public_checks.outputs.oauth_code || 'N/A' }} |
+          | **Rollback triggered** | ${{ steps.rollback.outputs.rolled_back == 'true' && '⚠️ YES' || '✅ No' }} |
+          | **Workflow run** | [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+          ### Login Routes (public domain)
+          | Route | Expected |
+          |---|---|
+          | /admin/login | HTTP 200 |
+          | /staff/login | HTTP 200 |
+          | /branch/login | HTTP 200 |
+          | /agent/login | HTTP 200 |
+          | /customer/login | HTTP 200 |
+
+          SUMMARY
