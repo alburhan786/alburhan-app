@@ -865,7 +865,7 @@ export function startVisaReminderCron() {
            AND NOT EXISTS (
              SELECT 1 FROM documents d
              WHERE d.booking_id = b.id
-               AND d.doc_type = 'visa'
+               AND d.document_type = 'visa'
                AND d.deleted_at IS NULL
            )`
       );

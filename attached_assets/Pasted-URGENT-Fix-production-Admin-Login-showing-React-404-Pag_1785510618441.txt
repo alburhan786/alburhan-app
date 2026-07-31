@@ -1,0 +1,57 @@
+URGENT: Fix production Admin Login showing React “404 Page Not Found”.
+
+Current production URL:
+https://alburhantravels.com/admin/login
+
+Observed behaviour:
+- Domain opens correctly.
+- Server returns the frontend application.
+- React displays: “404 Page Not Found – Did you forget to add the page to the router?”
+- Therefore this is a frontend routing/build issue, not a DNS issue.
+
+Required fixes:
+
+1. Inspect the production frontend router.
+2. Add and verify these exact public login routes:
+   /login
+   /admin/login
+   /staff/login
+   /agent/login
+   /branch/login
+
+3. Route mappings must be:
+   /login → CustomerLogin
+   /admin/login → AdminLogin
+   /staff/login → StaffLogin
+   /agent/login → AgentLogin
+   /branch/login → BranchLogin
+
+4. Ensure login routes are declared BEFORE the catch-all 404 route.
+5. Login pages must not be wrapped inside AdminRoute, ProtectedRoute, or authentication-required layouts.
+6. Keep portal isolation:
+   - Customer numbers only on /login
+   - Admin and super_admin numbers only on /admin/login
+   - Staff only on /staff/login
+   - Agent only on /agent/login
+   - Branch only on /branch/login
+
+7. Search for duplicate routers, old route files, lazy imports, missing exports, and case-sensitive path mismatches.
+8. Confirm AdminLogin component exists and its import resolves in the production build.
+9. Build the frontend production bundle.
+10. Confirm the generated JavaScript bundle contains the string:
+    /admin/login
+11. Package the latest frontend artifact.
+12. Provide one exact VPS deployment command that:
+    - downloads the latest frontend bundle,
+    - verifies it is a genuine gzip archive,
+    - extracts it to the actual Nginx frontend root,
+    - restarts alburhan-tours,
+    - clears or versions the service-worker cache.
+13. Do not change the working backend or database.
+
+Acceptance tests:
+- Opening /admin/login directly in a fresh incognito window shows Admin Login.
+- Refreshing /admin/login does not produce 404.
+- /login shows Customer Login.
+- All five login portals open independently.
+- Unknown URLs still show the normal 404 page.

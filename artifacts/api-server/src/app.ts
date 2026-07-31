@@ -343,33 +343,45 @@ app.get("/api/migrate/key-status", (req, res) => {
   });
 });
 
-// GET /api/migrate/server.cjs — serves the built bundle for VPS to download
+// GET /api/migrate/server.cjs — serves the built bundle for VPS to download.
+//
+// SAFETY: ALL error responses use Content-Type text/plain and begin with
+// "// ERROR:" so that if a script accidentally saves an error body as a .cjs
+// file, `node --check` will immediately fail with a clear JS parse error
+// (a top-level comment is valid JS but the rest of the text is not).
+// This prevents the corruption scenario where a 403 JSON body overwrites
+// a working production bundle.
 app.get("/api/migrate/server.cjs", (req, res) => {
   const key = req.query.key as string;
   const configuredKey = process.env.MIGRATION_KEY;
 
+  const plainErr = (status: number, msg: string) => {
+    res.status(status)
+       .setHeader("Content-Type", "text/plain; charset=utf-8")
+       .setHeader("X-Deploy-Error", "true")
+       .send(`// ERROR ${status}: ${msg}\n// This is NOT a valid bundle. Do not save this file as index.cjs.\n`);
+  };
+
   if (!configuredKey) {
-    return void res.status(503).json({
-      error: "MIGRATION_KEY not configured on this server",
-      hint: "Restart the Replit dev workflow after setting the MIGRATION_KEY secret.",
-    });
+    return void plainErr(503, "MIGRATION_KEY not configured on this server. Restart workflow after setting the secret.");
   }
   if (!migrationKeyValid(key)) {
     const providedLen = (key || "").length;
-    return void res.status(403).json({
-      error: "Key mismatch",
-      hint: `Provided key length: ${providedLen}. Expected: ${configuredKey.length} chars. ` +
-        `Run GET /api/migrate/key-status?key=YOUR_KEY for a character-level diff hint.`,
-    });
+    return void plainErr(403,
+      `Key mismatch. Provided length: ${providedLen} chars, expected: ${configuredKey.length} chars. ` +
+      `Check for trailing newlines or quotes in your .env file. ` +
+      `Hint: GET /api/migrate/key-status?key=YOUR_KEY for a diff.`
+    );
   }
   const binPath = path.join(__dirname, "../dist/index.cjs");
   if (!fs.existsSync(binPath)) {
-    return void res.status(404).json({ error: "Bundle not found — run pnpm build first" });
+    return void plainErr(404, "Bundle not found — run pnpm build first on the Replit workspace.");
   }
   const stat = fs.statSync(binPath);
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Disposition", "attachment; filename=index.cjs");
   res.setHeader("X-Bundle-Size-Bytes", String(stat.size));
+  res.setHeader("X-Deploy-Error", "false");
   res.sendFile(binPath);
 });
 
