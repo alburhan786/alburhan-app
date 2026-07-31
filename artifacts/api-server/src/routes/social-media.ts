@@ -2409,12 +2409,38 @@ router.get("/oauth/:provider/start", requireAdmin as any, async (req: any, res: 
 });
 
 // ── GET /oauth/meta/callback — Meta OAuth callback ───────────────────────────
+// Accepts: code, state, error, error_reason, error_description
 router.get("/oauth/meta/callback", async (req: any, res: any) => {
-  const { code, state, error: oauthError } = req.query as any;
+  const {
+    code,
+    state,
+    error: oauthError,
+    error_reason: errorReason,
+    error_description: errorDescription,
+  } = req.query as any;
+
+  // Case 1: Meta sent back an error (user denied, app misconfigured, etc.)
   if (oauthError) {
-    return void res.redirect(`/admin/social-oauth?error=${encodeURIComponent(oauthError)}`);
+    const humanMsg = errorDescription || errorReason || oauthError;
+    console.warn("[OAuth/Meta] Error from Meta:", { oauthError, errorReason, errorDescription });
+    return void res.redirect(
+      `/admin/social-oauth?error=${encodeURIComponent(humanMsg)}`
+    );
   }
-  const [, platform] = (state || "meta::").split(":");
+
+  // Case 2: Missing both code and state — stale or direct browser hit
+  if (!code || !state) {
+    return void res.status(400).json({
+      success: false,
+      error: "Missing Meta OAuth code or state. Start connection from the Social Media OAuth Hub.",
+    });
+  }
+
+  // Parse state: format is "meta:<platform>:<timestamp>"
+  const stateParts = String(state).split(":");
+  const platform = stateParts[1] || "facebook_page";
+
+  // Case 3: Valid code + state — exchange for token
   try {
     const cfgR = await pool.query(
       `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_page' LIMIT 1`
@@ -2422,40 +2448,106 @@ router.get("/oauth/meta/callback", async (req: any, res: any) => {
     const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
     const appId     = extra.app_id     || process.env.META_APP_ID;
     const appSecret = extra.app_secret || process.env.META_APP_SECRET;
+
+    if (!appId || !appSecret) {
+      console.error("[OAuth/Meta] App ID or App Secret not configured");
+      return void res.redirect(
+        `/admin/social-oauth?error=${encodeURIComponent("Meta App ID or App Secret not configured. Set them in Social Media → Facebook settings.")}`
+      );
+    }
+
     const callbackUrl = `${OAUTH_REDIRECT_BASE}/meta/callback`;
 
-    const tokenResp = await fetch(
-      `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(callbackUrl)}&client_secret=${appSecret}&code=${code}`,
-      { signal: AbortSignal.timeout(10000) }
-    );
-    const tokenData = await tokenResp.json() as any;
-    if (!tokenData.access_token) throw new Error(JSON.stringify(tokenData));
+    // Exchange authorization code for short-lived access token
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token` +
+      `?client_id=${encodeURIComponent(appId)}` +
+      `&redirect_uri=${encodeURIComponent(callbackUrl)}` +
+      `&client_secret=${encodeURIComponent(appSecret)}` +
+      `&code=${encodeURIComponent(code)}`;
 
-    // Exchange for long-lived token
+    const tokenResp = await fetch(tokenUrl, { signal: AbortSignal.timeout(12000) });
+    const tokenData = await tokenResp.json() as any;
+
+    if (!tokenData.access_token) {
+      const errMsg = tokenData?.error?.message || JSON.stringify(tokenData);
+      console.error("[OAuth/Meta] Token exchange failed:", errMsg);
+      throw new Error(errMsg);
+    }
+
+    // Exchange short-lived token for long-lived user token (60 days)
     let longToken = tokenData.access_token;
     try {
-      const llR = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${encodeURIComponent(tokenData.access_token)}`, { signal: AbortSignal.timeout(10000) });
+      const llUrl = `https://graph.facebook.com/v19.0/oauth/access_token` +
+        `?grant_type=fb_exchange_token` +
+        `&client_id=${encodeURIComponent(appId)}` +
+        `&client_secret=${encodeURIComponent(appSecret)}` +
+        `&fb_exchange_token=${encodeURIComponent(tokenData.access_token)}`;
+      const llR = await fetch(llUrl, { signal: AbortSignal.timeout(12000) });
       const ll = await llR.json() as any;
       if (ll.access_token) longToken = ll.access_token;
     } catch {}
 
-    // Get account info
-    const meR = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${longToken}`, { signal: AbortSignal.timeout(8000) });
+    // Fetch connected Meta user info
+    const meR = await fetch(
+      `https://graph.facebook.com/v19.0/me?fields=id,name,email&access_token=${encodeURIComponent(longToken)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
     const me = await meR.json() as any;
-    const expiry = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+
+    // Fetch Facebook Pages the user manages
+    let pages: any[] = [];
+    try {
+      const pagesR = await fetch(
+        `https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(longToken)}&fields=id,name,access_token,instagram_business_account`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      const pagesData = await pagesR.json() as any;
+      pages = pagesData.data || [];
+    } catch {}
+
+    // Compute token expiry (long-lived tokens last ~60d)
+    const expiresIn = tokenData.expires_in || 5184000; // 60 days fallback
+    const expiry = new Date(Date.now() + expiresIn * 1000);
+
+    // Store encrypted — never expose raw token in logs or responses
+    const encryptedToken = encrypt(longToken);
+    const scope = [
+      "pages_manage_metadata", "pages_messaging", "instagram_basic",
+      "leads_retrieval", "whatsapp_business_messaging",
+    ].join(",");
 
     await pool.query(
-      `INSERT INTO oauth_connections (provider, platform, account_name, account_id, access_token, token_expiry, scope, connected_at, updated_at)
-       VALUES ('meta', $1, $2, $3, $4, $5, $6, NOW(), NOW())
+      `INSERT INTO oauth_connections
+         (provider, platform, account_name, account_id, access_token, token_expiry, scope, extra, connected_at, updated_at)
+       VALUES ('meta', $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
        ON CONFLICT (provider, platform) DO UPDATE
-         SET account_name=EXCLUDED.account_name, account_id=EXCLUDED.account_id,
-             access_token=EXCLUDED.access_token, token_expiry=EXCLUDED.token_expiry,
-             scope=EXCLUDED.scope, updated_at=NOW()`,
-      [platform || "facebook_page", me.name || "Meta Account", me.id, encrypt(longToken), expiry, "pages_manage_metadata,pages_messaging,instagram_basic"]
+         SET account_name = EXCLUDED.account_name,
+             account_id   = EXCLUDED.account_id,
+             access_token = EXCLUDED.access_token,
+             token_expiry = EXCLUDED.token_expiry,
+             scope        = EXCLUDED.scope,
+             extra        = EXCLUDED.extra,
+             updated_at   = NOW()`,
+      [
+        platform,
+        me.name || "Meta Account",
+        me.id || null,
+        encryptedToken,
+        expiry,
+        scope,
+        JSON.stringify({ pages_count: pages.length, email: me.email || null }),
+      ]
     );
-    res.redirect(`/admin/social-oauth?connected=meta&account=${encodeURIComponent(me.name || "Meta Account")}`);
+
+    console.log(`[OAuth/Meta] Connected: ${me.name} (${me.id}), pages=${pages.length}, platform=${platform}`);
+    res.redirect(
+      `/admin/social-oauth?connected=meta&account=${encodeURIComponent(me.name || "Meta Account")}`
+    );
   } catch (e: any) {
-    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(e.message)}`);
+    // Never include raw secrets in the error message
+    const safeMsg = (e.message || "OAuth connection failed").replace(/client_secret=[^&]+/gi, "client_secret=***").replace(/access_token=[^&\s]+/gi, "access_token=***");
+    console.error("[OAuth/Meta] Callback error:", safeMsg);
+    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(safeMsg)}`);
   }
 });
 

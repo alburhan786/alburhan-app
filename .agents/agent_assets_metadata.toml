@@ -131,3 +131,10 @@ id = "BUjr4v7IVpCrJecUlczKL"
 uri = "file://alburhan-manual-vps-deployment.zip"
 type = "unspecified"
 title = "alburhan-manual-vps-deployment.zip"
+
+[[outputs]]
+id = "1dji5yslqSaQwKfq3r-iC"
+uri = "file://alburhan-meta-oauth-deploy.zip"
+type = "unspecified"
+title = "alburhan-meta-oauth-deploy.zip — v30.1 backend"
+description = "Backend-only deploy package fixing GET /api/social-media/oauth/meta/callback"

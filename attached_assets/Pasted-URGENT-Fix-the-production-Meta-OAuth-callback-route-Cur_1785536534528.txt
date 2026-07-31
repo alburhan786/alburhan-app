@@ -1,0 +1,81 @@
+URGENT: Fix the production Meta OAuth callback route.
+
+Current production error:
+
+Cannot GET /api/social-media/oauth/meta/callback
+
+Production callback URL:
+https://alburhantravels.online/api/social-media/oauth/meta/callback
+
+Meta confirms this is a valid OAuth redirect URI. Therefore, the remaining issue is in our backend deployment/routing.
+
+Please do all of the following:
+
+1. Search the backend for all existing Meta/social-media OAuth routes and controllers.
+
+2. Ensure this exact GET route exists and is registered before the server starts:
+
+GET /api/social-media/oauth/meta/callback
+
+3. The callback must accept these query parameters:
+- code
+- state
+- error
+- error_reason
+- error_description
+
+4. When `error` exists, redirect safely back to the ERP Social Media page with an understandable error message.
+
+5. When `code` and `state` exist:
+- Validate the OAuth state securely.
+- Exchange the authorization code for a Meta access token using the configured Meta App ID and App Secret.
+- Use the exact same redirect URI:
+  https://alburhantravels.online/api/social-media/oauth/meta/callback
+- Fetch the connected Meta user, business, pages, Instagram and WhatsApp assets according to approved permissions.
+- Save tokens encrypted in the production database.
+- Never expose the App Secret or access token in frontend responses or logs.
+- Redirect to the ERP Social Media OAuth Hub with a success or failure status.
+
+6. When someone opens the callback without `code`, `state`, or `error`, return HTTP 400 JSON such as:
+{
+  "success": false,
+  "error": "Missing Meta OAuth code or state. Start connection from the Social Media OAuth Hub."
+}
+
+Do not return “Cannot GET”.
+
+7. Verify the router mounting. For example, if the router contains:
+router.get('/oauth/meta/callback', handler)
+
+it must be mounted using:
+app.use('/api/social-media', router)
+
+Avoid accidentally creating a duplicated path such as:
+/api/social-media/api/social-media/oauth/meta/callback
+
+8. Confirm Nginx forwards `/api/` requests to the backend API process and does not serve frontend index.html for API routes.
+
+9. Add diagnostic endpoints/checks and test:
+
+curl -i "http://127.0.0.1:5000/api/social-media/oauth/meta/callback"
+
+Expected: HTTP 400 controlled JSON, not Cannot GET.
+
+curl -i "https://alburhantravels.online/api/social-media/oauth/meta/callback"
+
+Expected: the same controlled HTTP 400 response.
+
+10. Build and deploy the updated backend to the Hostinger VPS, restart only the correct PM2 API process, reload Nginx if required, and verify PM2 logs.
+
+11. Then test the complete OAuth flow by starting from:
+ERP → Social Media OAuth Hub → Connect Facebook/Instagram
+
+Do not only modify the Replit development version. Confirm the updated backend bundle is actually running on the production VPS.
+
+Return:
+- Exact source file containing the callback route
+- Router mount path
+- Production deployment result
+- PM2 process restarted
+- Both curl test results
+- Final OAuth connection result
