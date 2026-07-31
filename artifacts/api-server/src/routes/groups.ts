@@ -1627,7 +1627,7 @@ router.delete("/:groupId/rooms/:roomId", requireAdmin as any, async (req, res) =
 
 // ======================== FAMILY ENDPOINTS ========================
 
-// GET /:groupId/families/pdf — family list PDF download
+// GET /:groupId/families/pdf — family-wise room list PDF (grouped by room number)
 router.get("/:groupId/families/pdf", requireAdmin as any, async (req, res) => {
   try {
     const groupId = String(req.params.groupId);
@@ -1639,96 +1639,305 @@ router.get("/:groupId/families/pdf", requireAdmin as any, async (req, res) => {
       .where(eq(pilgrimsTable.groupId, groupId))
       .orderBy(asc(pilgrimsTable.serialNumber));
 
+    // Build family map
     const familyMap = new Map<string, typeof pilgrims>();
     for (const p of pilgrims) {
       if (!p.familyId) continue;
       if (!familyMap.has(p.familyId)) familyMap.set(p.familyId, []);
       familyMap.get(p.familyId)!.push(p);
     }
-    const families = Array.from(familyMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([familyId, members]) => ({
-        familyId,
-        members,
-        head: members.find(m => m.familyHead) || members[0] || null,
-      }));
+
+    // Build room → families map keyed by "hotel::roomNumber" to prevent cross-hotel collisions
+    type RoomKey = string; // "${hotel}::${roomNumber}"
+    const roomFamilyMap = new Map<RoomKey, {
+      roomNumber: string;
+      roomHotel: string | null;
+      families: { familyId: string; head: typeof pilgrims[0] | null; members: typeof pilgrims; roomHotel: string | null }[];
+    }>();
+    const unassignedFamilies: { familyId: string; head: typeof pilgrims[0] | null; members: typeof pilgrims }[] = [];
+
+    const HOTEL_ORDER_IDX: Record<string, number> = { makkah: 0, madinah: 1, aziziah: 2 };
+
+    for (const [familyId, members] of familyMap.entries()) {
+      const head = members.find(m => m.familyHead) || members[0] || null;
+      const roomNumber = head?.roomNumber || members.find(m => m.roomNumber)?.roomNumber || null;
+      const roomHotel = head?.roomHotel || members.find(m => m.roomHotel)?.roomHotel || null;
+      if (roomNumber) {
+        // Key combines hotel + room so Makkah-101 and Madinah-101 are distinct sections
+        const key: RoomKey = `${roomHotel || ""}::${roomNumber}`;
+        if (!roomFamilyMap.has(key)) {
+          roomFamilyMap.set(key, { roomNumber, roomHotel, families: [] });
+        }
+        roomFamilyMap.get(key)!.families.push({ familyId, head, members, roomHotel });
+      } else {
+        unassignedFamilies.push({ familyId, head, members });
+      }
+    }
+
+    // Sort by hotel order first, then numerically by room number, then alpha
+    const sortedRooms = Array.from(roomFamilyMap.values())
+      .sort((a, b) => {
+        const hotelA = HOTEL_ORDER_IDX[a.roomHotel || ""] ?? 99;
+        const hotelB = HOTEL_ORDER_IDX[b.roomHotel || ""] ?? 99;
+        if (hotelA !== hotelB) return hotelA - hotelB;
+        const na = parseInt(a.roomNumber, 10), nb = parseInt(b.roomNumber, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.roomNumber.localeCompare(b.roomNumber);
+      });
+
+    const totalFamilies = familyMap.size;
+    const totalRooms = sortedRooms.length;
 
     const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
     const safeName = group.groupName.replace(/[^a-zA-Z0-9]/g, "-");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="family-list-${safeName}-${group.year}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="family-room-list-${safeName}-${group.year}.pdf"`);
     doc.pipe(res);
 
     const PAGE_W = doc.page.width;
+    const PAGE_H = doc.page.height;
     const MARGIN = 28;
     const USABLE_W = PAGE_W - MARGIN * 2;
     const DARK_GREEN = "#0B3D2E";
     const GOLD = "#C9A23F";
-    const LIGHT_ROW = "#f0f7f0";
+    const LIGHT_BG = "#f4f9f5";
+    const MEMBER_ROW_H = 14;
+    const FAMILY_PADDING = 4;
+    const ROOM_HEADER_H = 18;
 
-    // Header
-    doc.rect(MARGIN, MARGIN, USABLE_W, 44).fill(DARK_GREEN);
-    doc.image(LOGO_BUFFER, MARGIN + 4, MARGIN + 2, { width: 40, height: 40 });
-    doc.fill(GOLD).font("Helvetica-Bold").fontSize(14)
-      .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, MARGIN + 5, { width: USABLE_W - 46, align: "center", lineBreak: false });
-    doc.fill("white").font("Helvetica").fontSize(7.5)
-      .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
-        MARGIN + 46, MARGIN + 22, { width: USABLE_W - 46, align: "center", lineBreak: false });
-
-    let y = MARGIN + 48;
-    doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(11)
-      .text(`FAMILY LIST — ${group.groupName.toUpperCase()} (${group.year})`, MARGIN, y + 4,
-        { width: USABLE_W, align: "center", lineBreak: false });
-    const meta = [`Total Families: ${families.length}`, `Total Pilgrims: ${pilgrims.length}`].join("   |   ");
-    doc.fill("#555").font("Helvetica").fontSize(7)
-      .text(meta, MARGIN, y + 18, { width: USABLE_W, align: "center", lineBreak: false });
-    y += 32;
-
-    // Table
-    const colW = [44, 120, 180, 36, 56, 80, 82];
-    const colLabels = ["Fam ID", "Head Name", "Members", "Cnt", "Room", "Hotel", "Mobile"];
-    const totalW = colW.reduce((a, b) => a + b, 0);
-    const tableX = MARGIN + (USABLE_W - totalW) / 2;
-
-    doc.rect(tableX, y, totalW, 17).fill(DARK_GREEN);
-    let cx = tableX;
-    colLabels.forEach((lbl, i) => {
-      doc.fill("white").font("Helvetica-Bold").fontSize(7.5)
-        .text(lbl, cx + 2, y + 5, { width: colW[i] - 4, lineBreak: false });
-      cx += colW[i];
+    const generatedOn = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
     });
-    y += 17;
 
-    for (let idx = 0; idx < families.length; idx++) {
-      const fam = families[idx];
-      const headName = [fam.head?.salutation, fam.head?.fullName].filter(Boolean).join(" ") || fam.familyId;
-      const memberNames = fam.members.map(m => m.fullName).join(", ");
-      const roomNos = [...new Set(fam.members.filter(m => m.roomNumber).map(m => m.roomNumber!))].join(", ") || "—";
-      const hotels = [...new Set(fam.members.filter(m => m.roomHotel).map(m => m.roomHotel!))].join(", ") || "—";
-      const mobile = fam.head?.mobileIndia || fam.head?.mobileSaudi || "—";
-      const rowData = [fam.familyId, headName, memberNames, String(fam.members.length), roomNos, hotels, mobile];
-
-      const ROW_H = 20;
-      if (y + ROW_H > doc.page.height - 28) {
-        doc.addPage();
-        y = MARGIN;
-      }
-      if (idx % 2 === 0) doc.rect(tableX, y, totalW, ROW_H).fill(LIGHT_ROW);
-      doc.moveTo(tableX, y + ROW_H).lineTo(tableX + totalW, y + ROW_H).strokeColor("#ddd").lineWidth(0.5).stroke();
-
-      cx = tableX;
-      rowData.forEach((val, i) => {
-        doc.fill("#111").font("Helvetica").fontSize(7)
-          .text(val, cx + 2, y + 6, { width: colW[i] - 4, lineBreak: false });
-        cx += colW[i];
-      });
-      y += ROW_H;
+    function drawPageHeader(yStart: number): number {
+      doc.rect(MARGIN, yStart, USABLE_W, 44).fill(DARK_GREEN);
+      doc.image(LOGO_BUFFER, MARGIN + 4, yStart + 2, { width: 40, height: 40 });
+      doc.fill(GOLD).font("Helvetica-Bold").fontSize(13)
+        .text("AL BURHAN TOURS & TRAVELS", MARGIN + 46, yStart + 6,
+          { width: USABLE_W - 46, align: "center", lineBreak: false });
+      doc.fill("white").font("Helvetica").fontSize(7)
+        .text("5/8 Khanka Masjid Complex, Shanwara Road, Burhanpur 450331 M.P. | Tel: +91 9893989786 | WhatsApp: +91 8989701701",
+          MARGIN + 46, yStart + 22, { width: USABLE_W - 46, align: "center", lineBreak: false });
+      return yStart + 46;
     }
 
+    function drawSubheader(yStart: number): number {
+      doc.rect(MARGIN, yStart, USABLE_W, 26).fill("#e6f0ea");
+      doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(10)
+        .text(`FAMILY ROOM LIST — ${group.groupName.toUpperCase()} (${group.year})`,
+          MARGIN, yStart + 4, { width: USABLE_W, align: "center", lineBreak: false });
+      const parts = [
+        `Rooms: ${totalRooms}`,
+        `Families: ${totalFamilies}`,
+        `Pilgrims: ${pilgrims.filter(p => p.familyId).length}`,
+        `Generated: ${generatedOn}`,
+      ].filter(Boolean).join("   |   ");
+      doc.fill("#555").font("Helvetica").fontSize(6.5)
+        .text(parts, MARGIN, yStart + 16, { width: USABLE_W, align: "center", lineBreak: false });
+      return yStart + 28;
+    }
+
+    function drawPageFooter(pageNum: number) {
+      doc.fill("#aaa").font("Helvetica").fontSize(6.5)
+        .text(`Page ${pageNum}  —  Al Burhan Tours & Travels  |  Confidential`,
+          MARGIN, PAGE_H - 16, { width: USABLE_W, align: "center", lineBreak: false });
+    }
+
+    let y = drawPageHeader(MARGIN);
+    y = drawSubheader(y + 4);
+    y += 8;
+    let pageNum = 1;
+
+    // Column widths: [FamID, Member Name, Relation, Gender, Room, Hotel]
+    const colW = [46, 180, 80, 44, 50, 62];
+    const totalW = colW.reduce((a, b) => a + b, 0);
+    const tableX = MARGIN + (USABLE_W - totalW) / 2;
+    const COL_LABELS = ["Fam ID", "Member Name", "Relation", "Gender", "Room No.", "Hotel"];
+
+    function drawColumnHeader(yStart: number): number {
+      doc.rect(tableX, yStart, totalW, 15).fill("#1a5c44");
+      let cx = tableX;
+      COL_LABELS.forEach((lbl, i) => {
+        doc.fill("white").font("Helvetica-Bold").fontSize(6.5)
+          .text(lbl, cx + 2, yStart + 4, { width: colW[i] - 4, align: i <= 1 ? "left" : "center", lineBreak: false });
+        cx += colW[i];
+      });
+      return yStart + 15;
+    }
+
+    y = drawColumnHeader(y);
+
+    const HOTEL_LABEL: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
+
+    let globalFamIdx = 0;
+
+    function renderFamilyBlock(
+      roomNumber: string,
+      roomHotel: string | null,
+      familyId: string,
+      head: typeof pilgrims[0] | null,
+      members: typeof pilgrims,
+      isFirst: boolean,
+    ) {
+      // Height: family-id header row + member rows + bottom padding
+      const blockH = MEMBER_ROW_H + members.length * MEMBER_ROW_H + FAMILY_PADDING;
+
+      if (y + blockH > PAGE_H - 22) {
+        drawPageFooter(pageNum);
+        doc.addPage();
+        pageNum++;
+        y = drawPageHeader(MARGIN);
+        y += 4;
+        y = drawColumnHeader(y);
+      }
+
+      const rowBg = globalFamIdx % 2 === 0 ? LIGHT_BG : "white";
+      globalFamIdx++;
+
+      // Family header row (family ID + head name + room info, spans full width)
+      const headName = [head?.salutation, head?.fullName].filter(Boolean).join(" ") || "—";
+      const hotelLabel = roomHotel ? (HOTEL_LABEL[roomHotel] || roomHotel) : "—";
+
+      doc.rect(tableX, y, totalW, MEMBER_ROW_H).fill("#ddeee5");
+      // Left accent bar
+      doc.rect(tableX, y, 3, MEMBER_ROW_H + members.length * MEMBER_ROW_H).fill(DARK_GREEN);
+
+      doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(7)
+        .text(`${familyId}  ·  Head: ${headName}`, tableX + 5, y + 3,
+          { width: colW[0] + colW[1] - 4, lineBreak: false });
+      doc.fill("#555").font("Helvetica").fontSize(6.5)
+        .text(`${members.length} member${members.length !== 1 ? "s" : ""}`, tableX + colW[0] + colW[1] + 2, y + 4,
+          { width: colW[2] - 4, lineBreak: false });
+      // Room + Hotel on right side of family header
+      doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(7)
+        .text(roomNumber || "—", tableX + colW[0] + colW[1] + colW[2] + colW[3] + 2, y + 3,
+          { width: colW[4] - 4, align: "center", lineBreak: false });
+      doc.fill("#555").font("Helvetica").fontSize(6.5)
+        .text(hotelLabel, tableX + colW[0] + colW[1] + colW[2] + colW[3] + colW[4] + 2, y + 4,
+          { width: colW[5] - 4, align: "center", lineBreak: false });
+      y += MEMBER_ROW_H;
+
+      // Member rows
+      for (const m of members) {
+        if (y + MEMBER_ROW_H > PAGE_H - 22) {
+          drawPageFooter(pageNum);
+          doc.addPage();
+          pageNum++;
+          y = drawPageHeader(MARGIN);
+          y += 4;
+          y = drawColumnHeader(y);
+        }
+
+        doc.rect(tableX, y, totalW, MEMBER_ROW_H).fill(rowBg);
+        doc.moveTo(tableX, y + MEMBER_ROW_H).lineTo(tableX + totalW, y + MEMBER_ROW_H)
+          .strokeColor("#ddd").lineWidth(0.4).stroke();
+
+        let cx = tableX + 3; // indent past accent bar
+        // Fam ID (blank — already shown in header)
+        doc.fill("#999").font("Helvetica").fontSize(6)
+          .text(m.familyHead ? "★" : "", cx, y + 3, { width: colW[0] - 5, align: "center", lineBreak: false });
+        cx = tableX + colW[0];
+
+        // Member name (bold for head)
+        const nameFont = m.familyHead ? "Helvetica-Bold" : "Helvetica";
+        doc.fill("#111").font(nameFont).fontSize(7)
+          .text(m.fullName || "—", cx + 2, y + 3, { width: colW[1] - 4, lineBreak: false });
+        cx += colW[1];
+
+        doc.fill("#444").font("Helvetica").fontSize(6.5)
+          .text(m.familyRelation || "—", cx + 2, y + 3, { width: colW[2] - 4, align: "center", lineBreak: false });
+        cx += colW[2];
+
+        const genderShort = m.gender ? (m.gender.toLowerCase() === "male" ? "M" : m.gender.toLowerCase() === "female" ? "F" : m.gender) : "—";
+        doc.fill("#444").font("Helvetica").fontSize(6.5)
+          .text(genderShort, cx + 2, y + 3, { width: colW[3] - 4, align: "center", lineBreak: false });
+        cx += colW[3];
+
+        doc.fill("#444").font("Helvetica").fontSize(6.5)
+          .text(m.roomNumber || roomNumber || "—", cx + 2, y + 3, { width: colW[4] - 4, align: "center", lineBreak: false });
+        cx += colW[4];
+
+        const mHotel = m.roomHotel ? (HOTEL_LABEL[m.roomHotel] || m.roomHotel) : (hotelLabel !== "—" ? hotelLabel : "—");
+        doc.fill("#444").font("Helvetica").fontSize(6.5)
+          .text(mHotel, cx + 2, y + 3, { width: colW[5] - 4, align: "center", lineBreak: false });
+
+        y += MEMBER_ROW_H;
+      }
+      y += FAMILY_PADDING;
+    }
+
+    // Render room sections
+    for (const roomSection of sortedRooms) {
+      const { roomNumber, roomHotel, families: roomFamilies } = roomSection;
+      const hotelLabel = roomHotel ? (HOTEL_LABEL[roomHotel] || roomHotel) : "";
+
+      if (y + ROOM_HEADER_H > PAGE_H - 22) {
+        drawPageFooter(pageNum);
+        doc.addPage();
+        pageNum++;
+        y = drawPageHeader(MARGIN);
+        y += 4;
+        y = drawColumnHeader(y);
+      }
+
+      // Room divider bar
+      doc.rect(tableX, y, totalW, ROOM_HEADER_H).fill("#c5dfd0");
+      doc.fill(DARK_GREEN).font("Helvetica-Bold").fontSize(9)
+        .text(`Room ${roomNumber}`, tableX + 6, y + 4, { width: 120, lineBreak: false });
+      if (hotelLabel) {
+        doc.fill("#1a5c44").font("Helvetica").fontSize(7.5)
+          .text(hotelLabel, tableX + 130, y + 5, { width: 100, lineBreak: false });
+      }
+      const totalInRoom = roomFamilies.reduce((s, f) => s + f.members.length, 0);
+      doc.fill("#555").font("Helvetica").fontSize(7)
+        .text(`${roomFamilies.length} famil${roomFamilies.length !== 1 ? "ies" : "y"} · ${totalInRoom} pilgrim${totalInRoom !== 1 ? "s" : ""}`,
+          tableX + totalW - 150, y + 5, { width: 144, align: "right", lineBreak: false });
+      y += ROOM_HEADER_H;
+
+      for (let fi = 0; fi < roomFamilies.length; fi++) {
+        const { familyId, head, members, roomHotel: rh } = roomFamilies[fi];
+        // Use this room section's hotel as authoritative label, not the family's own (they should match, but be safe)
+        renderFamilyBlock(roomNumber, rh ?? roomHotel, familyId, head, members, fi === 0);
+      }
+    }
+
+    // Unassigned families
+    if (unassignedFamilies.length > 0) {
+      if (y + ROOM_HEADER_H > PAGE_H - 22) {
+        drawPageFooter(pageNum);
+        doc.addPage();
+        pageNum++;
+        y = drawPageHeader(MARGIN);
+        y += 4;
+        y = drawColumnHeader(y);
+      }
+
+      doc.rect(tableX, y, totalW, ROOM_HEADER_H).fill("#f0e6e6");
+      doc.fill("#8B3A00").font("Helvetica-Bold").fontSize(9)
+        .text("No Room Assigned", tableX + 6, y + 4, { width: 200, lineBreak: false });
+      doc.fill("#8B3A00").font("Helvetica").fontSize(7)
+        .text(`${unassignedFamilies.length} famil${unassignedFamilies.length !== 1 ? "ies" : "y"}`,
+          tableX + totalW - 100, y + 5, { width: 94, align: "right", lineBreak: false });
+      y += ROOM_HEADER_H;
+
+      for (let fi = 0; fi < unassignedFamilies.length; fi++) {
+        const { familyId, head, members } = unassignedFamilies[fi];
+        renderFamilyBlock("—", null, familyId, head, members, fi === 0);
+      }
+    }
+
+    if (totalFamilies === 0) {
+      doc.fill("#888").font("Helvetica").fontSize(10)
+        .text("No families registered in this group.", tableX, y + 16,
+          { width: totalW, align: "center", lineBreak: false });
+    }
+
+    drawPageFooter(pageNum);
     doc.end();
   } catch (err: any) {
     console.error("[groups] families/pdf error:", err);
-    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate family list PDF" });
+    if (!res.headersSent) res.status(500).json({ message: err?.message || "Failed to generate family room list PDF" });
   }
 });
 

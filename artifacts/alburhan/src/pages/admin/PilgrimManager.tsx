@@ -1863,7 +1863,7 @@ export default function PilgrimManager() {
                 <div className="absolute left-0 top-full mt-1 bg-white border rounded-xl shadow-lg py-1 z-50 min-w-[190px]"
                   onMouseLeave={() => setReportsOpen(false)}>
                   {([
-                    { key: "pdf", label: "Family List PDF" },
+                    { key: "pdf", label: "Family Room List PDF" },
                     { key: "flight-list", label: "Flight List PDF" },
                     { key: "bus-list", label: "Bus List PDF" },
                     { key: "hotel-list", label: "Hotel List PDF" },
