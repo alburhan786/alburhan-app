@@ -1,0 +1,59 @@
+URGENT: The production website still shows the React “404 Page Not Found” screen at:
+
+https://alburhantravels.com/admin/login
+
+Hard refresh and private browsing do not fix it. Nginx returns HTTP 200, but the loaded frontend JavaScript bundle is still the old build and does not contain the /admin/login route.
+
+Please fix and deploy this completely.
+
+Requirements:
+
+1. Confirm App.tsx contains these exact routes:
+   /admin/login
+   /staff/login
+   /branch/login
+   /agent/login
+   /customer/login
+
+2. Build the frontend again from the latest source.
+
+3. Add a visible unique build marker, for example:
+   BUILD_VERSION=alburhan-v9
+   Display or include this value in sw.js and the compiled bundle so we can verify production is serving the new build.
+
+4. Generate a fresh frontend.tar.gz containing the correct dist/public directory.
+
+5. Do not use an old hardcoded Replit development URL.
+   Create a reliable production deployment method using the current workspace/build artifact.
+
+6. Replace the VPS frontend files at:
+   /var/www/alburhan/artifacts/alburhan/dist/public
+
+7. Confirm Nginx root points to exactly:
+   /var/www/alburhan/artifacts/alburhan/dist/public
+
+8. Confirm Nginx SPA routing contains:
+   location / {
+       try_files $uri $uri/ /index.html;
+   }
+
+9. Reload Nginx and restart only the frontend PM2 process:
+   pm2 restart alburhan-tours --update-env
+
+10. Delete or invalidate the old service worker and browser cache.
+    Update the service worker cache name so users do not receive the old frontend.
+
+11. Verify the actual production HTML references the new JavaScript bundle, not the old bundle.
+
+12. Run these final tests and show the complete output:
+    curl -s https://alburhantravels.com/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
+    curl -s https://alburhantravels.com/sw.js | head
+    curl -I https://alburhantravels.com/admin/login
+    curl -I https://alburhantravels.com/staff/login
+    curl -I https://alburhantravels.com/branch/login
+    curl -I https://alburhantravels.com/agent/login
+    curl -I https://alburhantravels.com/customer/login
+
+13. Also grep the production JavaScript file and prove all five route strings exist.
+
+Do not report success only because HTTP 200 is returned. Open the production page using a browser or verify the served JavaScript contains /admin/login and that the login component renders instead of the 404 component.
