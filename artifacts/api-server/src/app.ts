@@ -503,7 +503,23 @@ app.get("/api/migrate/deploy-frontend",  deployFrontendHandler);
 // GET /api/migrate/frontend.tar.gz — serves updated frontend assets
 app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   const key = req.query.key as string;
-  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+  if (!migrationKeyValid(key)) {
+    // Always text/plain so a saved error body is obviously not a tar.gz
+    const ck = process.env.MIGRATION_KEY || "";
+    const pk = key || "";
+    return void res
+      .status(403)
+      .setHeader("Content-Type", "text/plain; charset=utf-8")
+      .setHeader("X-Deploy-Error", "true")
+      .send(
+        `// ERROR 403: Key mismatch — this is NOT a tar.gz archive.\n` +
+        `// Expected key length: ${ck.length}, provided length: ${pk.length}.\n` +
+        `// From VPS SSH, avoid calling this URL directly. Use the deploy-frontend\n` +
+        `// endpoint on the VPS API server instead (accepts any non-empty local key):\n` +
+        `//   curl -s -X POST "http://localhost:5000/api/migrate/deploy-frontend?key=deploy&extractTo=/root"\n` +
+        `// To diagnose key mismatch: GET /api/migrate/key-status?key=YOUR_KEY\n`
+      );
+  }
 
   const candidates = [
     path.resolve(process.cwd(), "artifacts/alburhan/dist/public"),
