@@ -1,0 +1,189 @@
+URGENT: Create a complete downloadable production deployment package for my Al Burhan Tours & Travels ERP & SRM project.
+
+Current problem:
+The Hostinger VPS cannot download the latest deployment from GitHub because the GitHub token is returning “401 Bad credentials”. I want to bypass GitHub completely and deploy manually from a ZIP file generated directly inside Replit.
+
+IMPORTANT:
+Do not modify or delete any existing application features, database data, credentials, environment variables, routes, notifications, integrations, or business logic.
+
+Please perform the following tasks:
+
+1. BUILD THE LATEST PROJECT
+
+Build the latest production-ready frontend and backend from the current Replit workspace.
+
+Make sure these frontend routes exist and work directly without redirect loops or 404 errors:
+
+- /admin/login
+- /staff/login
+- /branch/login
+- /agent/login
+- /customer/login
+
+Make sure React SPA routing works when any route is opened directly or refreshed.
+
+2. VERIFY THE FRONTEND
+
+Before packaging, verify:
+
+- npm/pnpm build completes successfully
+- index.html exists
+- all JavaScript and CSS assets exist
+- /admin/login is included in the compiled JavaScript bundle
+- service worker does not serve an old cached frontend
+- the latest service worker cache version is used
+- no stale Replit or old deployment URL is hardcoded
+- no development-only URLs remain
+- frontend API base URL is production-safe
+
+3. VERIFY THE BACKEND
+
+Before packaging, verify:
+
+- backend bundle is valid Node.js
+- node --check passes for the final backend file
+- backend starts on port 5000
+- GET /api/health returns HTTP 200 JSON
+- all authentication routes exist
+- OTP routes exist
+- WhatsApp/BotBee template routes exist
+- notification routes exist
+- no JSON error response is accidentally saved as index.cjs
+- no broken migration download logic runs automatically at startup
+
+4. CREATE A SAFE ZIP PACKAGE
+
+Create one ZIP file named:
+
+alburhan-manual-vps-deployment.zip
+
+The ZIP must contain this structure:
+
+alburhan-manual-vps-deployment/
+├── frontend/
+│   ├── index.html
+│   ├── assets/
+│   ├── sw.js
+│   ├── manifest.json
+│   ├── firebase-messaging-sw.js
+│   └── all other required public frontend files
+├── backend/
+│   └── index.cjs
+├── config/
+│   └── ecosystem.config.js
+├── scripts/
+│   └── install-on-vps.sh
+├── nginx/
+│   └── alburhan.conf
+├── checksums.txt
+└── README-DEPLOYMENT.txt
+
+Do not include:
+- node_modules
+- .git
+- local caches
+- temporary build files
+- database passwords
+- API secrets
+- .env file
+- GitHub personal access tokens
+- private keys
+
+5. CREATE install-on-vps.sh
+
+The installation script must:
+
+- use set -euo pipefail
+- validate the ZIP contents
+- validate backend with node --check
+- back up the current frontend and backend
+- install the new frontend to:
+
+/var/www/alburhan/artifacts/alburhan/dist/public
+
+- install the backend to:
+
+/var/www/alburhan/artifacts/api-server/dist/index.cjs
+
+- preserve the existing VPS .env file
+- preserve uploads and database data
+- use the existing PM2 process names:
+  - alburhan-api
+  - alburhan-tours
+- restart both processes using --update-env
+- test:
+  - http://127.0.0.1:5000/api/health
+  - https://alburhantravels.com/
+  - https://alburhantravels.com/admin/login
+  - https://alburhantravels.com/staff/login
+  - https://alburhantravels.com/branch/login
+  - https://alburhantravels.com/agent/login
+  - https://alburhantravels.com/customer/login
+- automatically restore the backup if backend health fails
+- print a clear success or failure report
+
+6. CREATE NGINX CONFIGURATION
+
+The nginx/alburhan.conf file must:
+
+- use this frontend root:
+
+/var/www/alburhan/artifacts/alburhan/dist/public
+
+- support React SPA routing using:
+
+try_files $uri $uri/ /index.html;
+
+- proxy /api/ requests to:
+
+http://127.0.0.1:5000
+
+- preserve required proxy headers
+- prevent caching of index.html, sw.js and firebase-messaging-sw.js
+- allow long-term caching only for hashed files under /assets/
+- support alburhantravels.com and www.alburhantravels.com
+
+7. CREATE README-DEPLOYMENT.txt
+
+Provide exact Mac and Hostinger VPS instructions.
+
+Mac instructions must explain:
+
+- where to download the ZIP from Replit
+- how to upload it through Hostinger File Manager or VPS file upload
+- that no GitHub token is required
+
+VPS instructions must use simple copy-paste commands similar to:
+
+cd /root
+unzip alburhan-manual-vps-deployment.zip
+cd alburhan-manual-vps-deployment
+chmod +x scripts/install-on-vps.sh
+sudo bash scripts/install-on-vps.sh
+
+Also provide rollback instructions.
+
+8. FINAL VERIFICATION
+
+Before giving me the file, show a final verification table containing:
+
+- frontend build result
+- backend build result
+- node --check result
+- bundle size
+- backend size
+- SHA256 checksum
+- /admin/login route found
+- all five login routes found
+- service worker version
+- ZIP filename
+- ZIP location inside Replit
+
+Do not only show code in the chat.
+
+Actually generate the ZIP file inside the Replit workspace and give me a visible downloadable file link/button.
+
+Do not deploy automatically.
+Do not touch the live VPS.
+Do not delete production data.
+Do not expose secrets.

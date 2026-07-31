@@ -125,3 +125,9 @@ id = "5d1kNbSj_IpkBuHpZm3H2"
 uri = "file://screenshots/03-branch-dashboard-unauthenticated.jpg"
 type = "image"
 title = "03 — /branch/dashboard without session (correct auth redirect)"
+
+[[outputs]]
+id = "BUjr4v7IVpCrJecUlczKL"
+uri = "file://alburhan-manual-vps-deployment.zip"
+type = "unspecified"
+title = "alburhan-manual-vps-deployment.zip"
