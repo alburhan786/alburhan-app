@@ -2535,17 +2535,35 @@ export default function PilgrimManager() {
                   size="sm"
                   variant="outline"
                   className="gap-1.5 text-xs text-red-700 border-red-200 hover:bg-red-50"
+                  title="Compact PDF — one row per family, many rooms per page"
                   onClick={() => {
-                    const url = `${API}/api/groups/${groupId}/families/room-summary/pdf`;
+                    const url = `${API}/api/groups/${groupId}/families/room-summary/pdf?layout=compact`;
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = "";
+                    a.download = `room-allocation-compact-${group?.groupName || groupId}.pdf`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                   }}
                 >
-                  <FileDown size={12} /> PDF
+                  <FileDown size={12} /> Compact PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                  title="Detailed PDF — one row per member with name, relation, and passport number"
+                  onClick={() => {
+                    const url = `${API}/api/groups/${groupId}/families/room-summary/pdf?layout=detailed`;
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `room-allocation-detailed-${group?.groupName || groupId}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }}
+                >
+                  <FileDown size={12} /> Detailed PDF
                 </Button>
               </div>
             </DialogTitle>
