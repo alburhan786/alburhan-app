@@ -18,6 +18,22 @@ interface HotelInfo {
   checkOut?: string;
 }
 
+interface FamilyMember {
+  id: string;
+  fullName: string;
+  salutation?: string | null;
+  familyHead?: boolean | null;
+  familyRelation?: string | null;
+  serialNumber: number;
+}
+
+interface FamilyInfo {
+  familyId: string;
+  memberCount: number;
+  headName: string | null;
+  members: FamilyMember[];
+}
+
 interface PilgrimData {
   id: string;
   fullName: string;
@@ -35,6 +51,10 @@ interface PilgrimData {
   roomNumber?: string;
   roomType?: string;
   roomHotel?: string;
+  familyId?: string | null;
+  familyHead?: boolean;
+  familyRelation?: string | null;
+  family?: FamilyInfo | null;
   group: {
     id: string;
     groupName: string;
@@ -200,6 +220,71 @@ export default function VerifyPilgrim() {
           <InfoRow label="Maktab No." value={g?.maktabNumber} />
           {data.roomNumber && <InfoRow label="Room No." value={`${data.roomNumber}${data.roomType ? ` (${data.roomType})` : ""}${data.roomHotel ? ` — ${data.roomHotel}` : ""}`} />}
         </div>
+
+        {/* Family Info */}
+        {data.family && (
+          <div style={{ padding: "0 20px 16px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: GOLD, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "8px" }}>👨‍👩‍👧‍👦 Family Group</div>
+            <div style={{ background: `${DARK}08`, border: `1px solid ${DARK}20`, borderRadius: "12px", padding: "14px" }}>
+              {/* Family ID badge + head */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
+                <span style={{ background: DARK, color: "#fff", borderRadius: "20px", padding: "3px 12px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.5px" }}>
+                  Family {data.family.familyId}
+                </span>
+                {data.familyHead && (
+                  <span style={{ background: `${GOLD}20`, border: `1px solid ${GOLD}`, color: DARK, borderRadius: "20px", padding: "3px 10px", fontSize: "11px", fontWeight: 700 }}>
+                    ⭐ Head
+                  </span>
+                )}
+              </div>
+              {data.family.headName && (
+                <div style={{ fontSize: "12px", color: "#555", marginBottom: "8px" }}>
+                  <span style={{ fontWeight: 600, color: "#333" }}>Head: </span>{data.family.headName}
+                </div>
+              )}
+              {/* Member list */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "10px" }}>
+                {data.family.members.map(m => {
+                  const isCurrentPilgrim = m.id === data.id;
+                  const memberName = [m.salutation, m.fullName].filter(Boolean).join(" ");
+                  return (
+                    <div
+                      key={m.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        background: isCurrentPilgrim ? `${DARK}15` : "#fff",
+                        border: `1px solid ${isCurrentPilgrim ? DARK + "40" : "#f0f0f0"}`,
+                      }}
+                    >
+                      <span style={{ fontSize: "12px", color: "#888", minWidth: "28px" }}>#{String(m.serialNumber).padStart(3, "0")}</span>
+                      <span style={{ fontSize: "13px", fontWeight: isCurrentPilgrim ? 700 : 500, color: isCurrentPilgrim ? DARK : "#333", flex: 1 }}>{memberName}</span>
+                      {m.familyHead && <span style={{ fontSize: "10px", color: GOLD, fontWeight: 700 }}>HEAD</span>}
+                      {m.familyRelation && !m.familyHead && <span style={{ fontSize: "10px", color: "#888" }}>{m.familyRelation}</span>}
+                      {isCurrentPilgrim && <span style={{ fontSize: "10px", color: DARK, fontWeight: 700 }}>YOU</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* View Family button */}
+              {data.group && (
+                <a
+                  href={`${BASE}verify/family/${data.group.id}/${encodeURIComponent(data.family.familyId)}`}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                    background: DARK, color: "#fff", borderRadius: "10px", padding: "10px 14px",
+                    textDecoration: "none", fontWeight: 700, fontSize: "13px",
+                  }}
+                >
+                  👨‍👩‍👧‍👦 View Full Family Page
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Flight Details */}
         {g && (g.flightNumber || g.departureDate || g.returnDate) && (

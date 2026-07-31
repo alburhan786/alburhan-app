@@ -29,6 +29,37 @@ router.get("/:id", async (req, res) => {
       .where(eq(hajjGroupsTable.id, pilgrim.groupId))
       .limit(1);
 
+    // Fetch family members if pilgrim belongs to a family
+    let familyInfo: {
+      familyId: string;
+      memberCount: number;
+      headName: string | null;
+      members: Array<{ id: string; fullName: string; salutation?: string | null; familyHead?: boolean | null; familyRelation?: string | null; serialNumber: number }>;
+    } | null = null;
+
+    if (pilgrim.familyId && pilgrim.groupId) {
+      const familyMembers = await db
+        .select({
+          id: pilgrimsTable.id,
+          fullName: pilgrimsTable.fullName,
+          salutation: pilgrimsTable.salutation,
+          familyHead: pilgrimsTable.familyHead,
+          familyRelation: pilgrimsTable.familyRelation,
+          serialNumber: pilgrimsTable.serialNumber,
+        })
+        .from(pilgrimsTable)
+        .where(and(eq(pilgrimsTable.groupId, pilgrim.groupId), eq(pilgrimsTable.familyId, pilgrim.familyId)))
+        .orderBy(asc(pilgrimsTable.serialNumber));
+
+      const head = familyMembers.find(m => m.familyHead) || familyMembers[0];
+      familyInfo = {
+        familyId: pilgrim.familyId,
+        memberCount: familyMembers.length,
+        headName: head ? [head.salutation, head.fullName].filter(Boolean).join(" ") : null,
+        members: familyMembers,
+      };
+    }
+
     res.json({
       id: pilgrim.id,
       fullName: pilgrim.fullName,
@@ -46,6 +77,10 @@ router.get("/:id", async (req, res) => {
       roomNumber: pilgrim.roomNumber,
       roomType: pilgrim.roomType,
       roomHotel: pilgrim.roomHotel,
+      familyId: pilgrim.familyId || null,
+      familyHead: pilgrim.familyHead || false,
+      familyRelation: pilgrim.familyRelation || null,
+      family: familyInfo,
       group: group
         ? {
             id: group.id,
