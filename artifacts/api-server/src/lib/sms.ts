@@ -42,6 +42,8 @@ function getConfig() {
       return_reminder:       ex.return_reminder_tid       || ex.notify_template_id || "",
       eid_greeting:          ex.eid_greeting_tid          || ex.notify_template_id || "",
       custom:                ex.custom_tid                || ex.notify_template_id || "",
+      orientation_invitation: ex.orientation_invitation_tid || ex.notify_template_id || "",
+      booking_update:         ex.booking_update_tid         || ex.notify_template_id || "",
     },
     // Per-event sender IDs — fall back to global sender_id
     senders: {
@@ -68,6 +70,8 @@ function getConfig() {
       custom:                ex.custom_sender                || globalSender,
       otp:                   ex.otp_sender                   || globalSender,
       forgot_password_otp:   ex.forgot_password_otp_sender   || ex.otp_sender || globalSender,
+      orientation_invitation: ex.orientation_invitation_sender || globalSender,
+      booking_update:         ex.booking_update_sender         || globalSender,
     },
   };
 }
@@ -157,6 +161,8 @@ async function resolveConfig() {
       custom:             t("custom",             "custom"),
       custom_sms:         t("custom_sms",         "custom"),
       custom_admin:       t("custom_admin",        "custom"),
+      orientation_invitation: db["orientation_invitation"]?.tid || (base.tids as any).orientation_invitation || "",
+      booking_update:         db["booking_update"]?.tid         || (base.tids as any).booking_update         || "",
     },
     senders: {
       ...base.senders,
@@ -179,6 +185,8 @@ async function resolveConfig() {
       custom:             s("custom",             "custom"),
       custom_sms:         s("custom_sms",         "custom"),
       custom_admin:       s("custom_admin",        "custom"),
+      orientation_invitation: db["orientation_invitation"]?.sender || (base.senders as any).orientation_invitation || gs,
+      booking_update:         db["booking_update"]?.sender         || (base.senders as any).booking_update         || gs,
     },
   };
 }
@@ -565,11 +573,11 @@ export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
   );
 }
 
-export async function sendBookingConfirmed(ctx: BookingCtx): Promise<SMSResult> {
+export async function sendBookingConfirmed(ctx: BookingCtx & { totalAmount?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.booking_confirmed,
-    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
+    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah", ctx.totalAmount || ""],
     { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_confirmed }
   );
 }
@@ -609,7 +617,7 @@ export async function sendPendingPaymentReminder(ctx: BookingCtx & { balance: st
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.pending_payment,
-    [ctx.customerName, ctx.balance, ctx.bookingNumber],
+    [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj Package", ctx.balance],
     { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.pending_payment }
   );
 }
@@ -632,38 +640,38 @@ export async function sendFlightAssigned(ctx: BookingCtx & { flightNumber: strin
   );
 }
 
-export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: string; amount?: string }): Promise<SMSResult> {
+export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: string; amount?: string; downloadUrl?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.invoice_created,
-    [ctx.customerName, ctx.invoiceNumber || ctx.bookingNumber, ctx.amount || ""],
+    [ctx.customerName, ctx.bookingNumber, ctx.invoiceNumber || ctx.bookingNumber, ctx.amount || "", ctx.downloadUrl || ""],
     { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.invoice_created }
   );
 }
 
-export async function sendFlightTicketIssued(ctx: BookingCtx & { flightNumber?: string; departureDate?: string }): Promise<SMSResult> {
+export async function sendFlightTicketIssued(ctx: BookingCtx & { flightNumber?: string; departureDate?: string; ticketDownloadUrl?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.ticket_issued,
-    [ctx.customerName],
+    [ctx.customerName, ctx.bookingNumber, ctx.flightNumber || "", ctx.ticketDownloadUrl || ""],
     { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.ticket_issued }
   );
 }
 
-export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string }): Promise<SMSResult> {
+export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string; visaDownloadUrl?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.visa_issued,
-    [ctx.customerName, ctx.bookingNumber, ctx.visaNumber || "Approved"],
+    [ctx.customerName, ctx.bookingNumber, ctx.visaNumber || "Approved", ctx.visaDownloadUrl || ""],
     { eventType: "visa_ready", message: `Visa approved for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.visa_issued }
   );
 }
 
-export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: string; flightNumber?: string; daysRemaining?: string }): Promise<SMSResult> {
+export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: string; flightNumber?: string; daysRemaining?: string; reportingTime?: string; airportName?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.departure_reminder,
-    [ctx.customerName, ctx.daysRemaining || ctx.departureDate],
+    [ctx.customerName, ctx.bookingNumber, ctx.departureDate, ctx.reportingTime || "As scheduled", ctx.airportName || "Your departure airport"],
     { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.departure_reminder }
   );
 }
@@ -695,11 +703,11 @@ export async function sendEidGreeting(ctx: { mobile: string; customerName: strin
   );
 }
 
-export async function sendAgreementReadySMS(ctx: BookingCtx & { agreementNumber?: string; agreementUrl?: string }): Promise<SMSResult> {
+export async function sendAgreementReadySMS(ctx: BookingCtx & { agreementNumber?: string; agreementUrl?: string; agreementDownloadUrl?: string }): Promise<SMSResult> {
   const { tids, senders } = await resolveConfig();
   return sendDLT(
     ctx.mobile, tids.agreement_ready,
-    [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber],
+    [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber, ctx.agreementDownloadUrl || ctx.agreementUrl || ""],
     { eventType: "agreement_ready", message: `Agreement ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_ready }
   );
 }
@@ -719,6 +727,36 @@ export async function sendRoomAllocationSMS(ctx: BookingCtx & { hotelName?: stri
     ctx.mobile, tids.room_allocation,
     [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel", ctx.roomNumber || "-"],
     { eventType: "room_allocation", message: `Room allocated for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.room_allocation }
+  );
+}
+
+export async function sendOrientationInvitation(ctx: {
+  mobile: string;
+  customerName: string;
+  bookingId?: string;
+  customerId?: string;
+  orientationDate: string;
+  orientationTime: string;
+  orientationLocation: string;
+}): Promise<SMSResult> {
+  const cfg = await resolveConfig();
+  const tids = cfg.tids as any;
+  const senders = cfg.senders as any;
+  return sendDLT(
+    ctx.mobile, tids.orientation_invitation || "",
+    [ctx.customerName, ctx.orientationDate, ctx.orientationTime, ctx.orientationLocation],
+    { eventType: "orientation_invitation", message: `Orientation on ${ctx.orientationDate}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.orientation_invitation }
+  );
+}
+
+export async function sendBookingUpdateSMS(ctx: BookingCtx & { updateMessage: string }): Promise<SMSResult> {
+  const cfg = await resolveConfig();
+  const tids = cfg.tids as any;
+  const senders = cfg.senders as any;
+  return sendDLT(
+    ctx.mobile, tids.booking_update || "",
+    [ctx.customerName, ctx.updateMessage],
+    { eventType: "booking_update", message: `Booking update for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_update }
   );
 }
 

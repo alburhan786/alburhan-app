@@ -1,0 +1,481 @@
+URGENT — ADD ALL APPROVED FAST2SMS DLT TEMPLATES TO AL BURHAN ERP
+
+Add the following approved Fast2SMS templates inside:
+
+Admin Dashboard
+→ Communication Center
+→ SMS Templates
+→ Fast2SMS DLT Template Mapping
+
+Sender ID: ALBURH
+Entity ID: 1701164759668728160
+Category: SERVICE IMPLICIT
+Provider: Fast2SMS
+Route: DLT
+Status: Active
+
+IMPORTANT DLT RULES
+
+1. Preserve the approved SMS wording, spacing, punctuation and variable order.
+2. Never send variable names such as {#VAR#} to customers.
+3. Replace every variable with actual ERP/database data.
+4. Do not reorder variables.
+5. Do not send blank, null, undefined or [object Object].
+6. Create a preview showing the final message before sending.
+7. Store Fast2SMS request, response, message ID, recipient and delivery status in notification_logs.
+8. Show Test SMS, Enable/Disable, Edit Mapping and View Logs buttons.
+9. Automatically normalize Indian mobile numbers to 10 digits for Fast2SMS.
+10. Do not include +91 in the API recipient unless Fast2SMS requires it.
+
+==================================================
+1. FLIGHT TICKET ISSUED
+==================================================
+
+ERP event:
+flight_ticket_issued
+
+Fast2SMS Message ID:
+222047
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = flight_number
+VAR 4 = ticket_download_url
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+Your flight ticket has been issued.
+
+Booking ID: {booking_id}
+Flightnumber: {flight_number}
+
+Download Ticket: {ticket_download_url}
+
+Safe Travels.
+
+Trigger:
+When flight ticket status changes to Issued/Ready or when the ticket PDF is uploaded.
+
+==================================================
+2. DEPARTURE REMINDER
+==================================================
+
+ERP event:
+departure_reminder
+
+Fast2SMS Message ID:
+222046
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = departure_date
+VAR 4 = reporting_time
+VAR 5 = airport_name
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+Your departure date is approaching.
+
+Booking ID: {booking_id}
+Departure: {departure_date}
+Reporting Time: {reporting_time}
+Airport: {airport_name}
+
+Please carry your Passport, Visa, Flight Ticket, ID Card, and other required documents.
+
+Trigger:
+Automatically according to the configured reminder schedule, for example 7 days, 3 days and 1 day before departure. Prevent duplicate sends for the same reminder stage.
+
+==================================================
+3. GENERAL BOOKING UPDATE
+==================================================
+
+ERP event:
+booking_update
+
+Fast2SMS Message ID:
+222045
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_update_message
+
+Approved structure:
+
+Assalamu Alaikum {customer_name}
+
+Important update regarding your booking {booking_update_message}
+
+Jazak Allah Khair!
+Al Burhan Tours & Travels
+
+Use:
+For admin-entered booking updates only.
+
+Add a safe text field in the booking page:
+“Send important booking update”
+
+==================================================
+4. ORIENTATION PROGRAM INVITATION
+==================================================
+
+ERP event:
+orientation_invitation
+
+Fast2SMS Message ID:
+222044
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = orientation_date
+VAR 3 = orientation_time
+VAR 4 = orientation_location
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+You are invited to attend the Hajj/Umrah Orientation Programme.
+
+Date: {orientation_date}
+Time: {orientation_time}
+Location: {orientation_location}
+
+Trigger:
+When an orientation programme is created and customers/bookings are selected.
+
+==================================================
+5. VISA ISSUED
+==================================================
+
+ERP event:
+visa_issued
+
+Fast2SMS Message ID:
+222043
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = visa_number
+VAR 4 = visa_download_url
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+Congratulations!
+
+Your visa has been issued successfully.
+
+Booking ID: {booking_id}
+Visa Number: {visa_number}
+Download Visa: {visa_download_url}
+
+Trigger:
+When visa status becomes Issued/Approved or the visa document is uploaded.
+
+==================================================
+6. AGREEMENT READY
+==================================================
+
+ERP event:
+agreement_ready
+
+Fast2SMS Message ID:
+222042
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = agreement_number
+VAR 4 = agreement_download_url
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+Your Hajj/Umrah Agreement is ready.
+
+Booking ID: {booking_id}
+Agreement No: {agreement_number}
+
+Download Agreement: {agreement_download_url}
+
+Please review and complete the digital signature if required.
+
+Trigger:
+When the agreement PDF is generated and ready.
+
+==================================================
+7. INVOICE GENERATED
+==================================================
+
+ERP event:
+invoice_generated
+
+Fast2SMS Message ID:
+222041
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = invoice_number
+VAR 4 = invoice_amount
+VAR 5 = invoice_download_url
+
+Approved structure:
+
+Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}
+
+Your invoice has been generated.
+
+Booking ID: {booking_id}
+Invoice No: {invoice_number}
+Amount: ₹ {invoice_amount}
+
+Download your invoice below.
+
+{invoice_download_url}
+
+Trigger:
+Immediately after invoice generation.
+
+==================================================
+8. PAYMENT RECEIVED
+==================================================
+
+ERP event:
+payment_received
+
+Fast2SMS Message ID:
+222040
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = invoice_number
+VAR 4 = payment_amount
+
+Approved structure:
+
+Assalamu Alaikum {customer_name}
+
+Payment Received Successfully!
+
+Booking ID: {booking_id}
+Invoice No: {invoice_number}
+Amount: ₹ {payment_amount}
+
+Jazak Allah Khair for your payment.
+Al Burhan Tours & Travels
++91 9893225590
+
+Trigger:
+Only after payment is verified/approved, not when payment is merely submitted.
+
+==================================================
+9. BOOKING APPROVED
+==================================================
+
+ERP event:
+booking_approved
+
+Fast2SMS Message ID:
+222039
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = package_name
+VAR 4 = total_amount
+
+Approved structure:
+
+Assalamu Alaikum {customer_name}
+
+Alhamdulillah! Your booking is APPROVED.
+
+Booking ID: {booking_id}
+Package: {package_name}
+Amount: ₹ {total_amount}
+
+Please complete your payment to confirm your seat.
+Call us: +91 9893225590
+
+Jazak Allah Khair!
+Al Burhan Tours & Travels
+
+Trigger:
+When an administrator approves the booking.
+
+==================================================
+10. PAYMENT PENDING REMINDER
+==================================================
+
+ERP event:
+payment_pending
+
+Fast2SMS Message ID:
+222038
+
+Variable order:
+
+VAR 1 = customer_name
+VAR 2 = booking_id
+VAR 3 = package_name
+VAR 4 = outstanding_amount
+
+Approved structure:
+
+Assalamu Alaikum {customer_name}
+
+Friendly Reminder – Payment Pending
+
+Booking ID: {booking_id}
+Package: {package_name}
+Outstanding: ₹ {outstanding_amount}
+
+Please complete payment to secure your seat.
+Contact +91 9893225590
+
+Jazak Allah Khair!
+Al Burhan Tours & Travels
+
+Trigger:
+Manual send and automatic scheduled reminder for customers with an outstanding balance.
+
+==================================================
+DATABASE AND ADMIN REQUIREMENTS
+==================================================
+
+Create or update a table such as:
+
+sms_template_mappings
+
+Required fields:
+
+- id
+- event_key
+- provider
+- dlt_message_id
+- sender_id
+- entity_id
+- category
+- language
+- template_body
+- variable_mapping JSON
+- is_active
+- trigger_mode
+- created_at
+- updated_at
+
+Example variable_mapping JSON:
+
+[
+  {
+    "position": 1,
+    "field": "customer_name",
+    "fallback": "Customer"
+  },
+  {
+    "position": 2,
+    "field": "booking_id",
+    "required": true
+  }
+]
+
+Create a Template Mapping interface with:
+
+- Event name
+- Fast2SMS Message ID
+- Approved template preview
+- Numbered variable mapping
+- Test recipient
+- Test Send button
+- Enable/Disable toggle
+- Last test response
+- Delivery status
+- View Notification Logs
+
+==================================================
+DOCUMENT DOWNLOAD LINK REQUIREMENTS
+==================================================
+
+For invoice, agreement, visa and ticket:
+
+1. Generate a secure HTTPS public URL.
+2. The URL must open on a mobile browser without admin login.
+3. Use a signed or tokenized link.
+4. The token should expire according to system settings.
+5. Do not send localhost, Replit development URLs, internal file paths or private storage URLs.
+6. Prefer short URLs on the Al Burhan domain, such as:
+
+https://alburhantravels.com/d/i/secure-token
+https://alburhantravels.com/d/a/secure-token
+https://alburhantravels.com/d/v/secure-token
+https://alburhantravels.com/d/t/secure-token
+
+7. Verify that every URL downloads or opens the correct PDF.
+
+==================================================
+NOTIFICATION FALLBACK
+==================================================
+
+For transactional notifications:
+
+Primary: SMS via Fast2SMS DLT
+Secondary: WhatsApp
+Third: Email
+
+Do not mark an SMS as delivered merely because the provider API returns success.
+
+Use statuses:
+
+- queued
+- submitted
+- sent
+- delivered
+- failed
+- rejected
+- expired
+
+Store the provider request ID and periodically check delivery status.
+
+==================================================
+FINAL TEST MATRIX
+==================================================
+
+Send one production test for every template using real sample data.
+
+Verify:
+
+- Correct Message ID
+- Correct sender ID ALBURH
+- Correct variable count
+- Correct variable sequence
+- No blank values
+- ₹ amount formatted correctly
+- Download link clickable
+- Link opens correct PDF
+- notification_logs row created
+- Provider response stored
+- No duplicate SMS
+- No old/unapproved template used
+
+Do not declare completion until all 10 templates appear in the ERP and each Test SMS returns a valid Fast2SMS response.

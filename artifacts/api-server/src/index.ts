@@ -1116,6 +1116,46 @@ async function runMigrations() {
     console.error("[Migration] notification_templates extended columns failed:", err);
   }
   try {
+    // Ensure variable_count column exists (used by DLT manager UI)
+    await pool.query(`ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS variable_count INTEGER DEFAULT 0`);
+  } catch (_) { /* ignore */ }
+  try {
+    // Upsert 10 TRAI-approved Fast2SMS DLT templates (seeded at startup; won't overwrite if admin changed body)
+    const ENTITY_ID = "1701164759668728160";
+    const SENDER    = "ALBURH";
+    const DLT_SEED = [
+      { id: "dlt-booking-approved-222039",  event_type: "booking_approved",      name: "Booking Approved",              dlt_template_id: "222039", variable_count: 4, body: "Assalamu Alaikum {customer_name}\n\nAlhamdulillah! Your booking is APPROVED.\n\nBooking ID: {booking_id}\nPackage: {package_name}\nAmount: Rs {total_amount}\n\nPlease complete your payment to confirm your seat.\nCall us: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels" },
+      { id: "dlt-payment-received-222040",  event_type: "payment_received",      name: "Payment Received",              dlt_template_id: "222040", variable_count: 4, body: "Assalamu Alaikum {customer_name}\n\nPayment Received Successfully!\n\nBooking ID: {booking_id}\nInvoice No: {invoice_number}\nAmount: Rs {payment_amount}\n\nJazak Allah Khair for your payment.\nAl Burhan Tours & Travels\n+91 9893225590" },
+      { id: "dlt-invoice-generated-222041", event_type: "invoice_generated",     name: "Invoice Generated",             dlt_template_id: "222041", variable_count: 5, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nYour invoice has been generated.\n\nBooking ID: {booking_id}\nInvoice No: {invoice_number}\nAmount: Rs {invoice_amount}\n\nDownload your invoice below.\n\n{invoice_download_url}" },
+      { id: "dlt-agreement-ready-222042",   event_type: "agreement_ready",       name: "Agreement Ready",               dlt_template_id: "222042", variable_count: 4, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nYour Hajj/Umrah Agreement is ready.\n\nBooking ID: {booking_id}\nAgreement No: {agreement_number}\n\nDownload Agreement: {agreement_download_url}\n\nPlease review and complete the digital signature if required." },
+      { id: "dlt-visa-issued-222043",       event_type: "visa_approved",         name: "Visa Issued",                   dlt_template_id: "222043", variable_count: 4, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nCongratulations!\n\nYour visa has been issued successfully.\n\nBooking ID: {booking_id}\nVisa Number: {visa_number}\nDownload Visa: {visa_download_url}" },
+      { id: "dlt-orientation-inv-222044",   event_type: "orientation_invitation", name: "Orientation Invitation",       dlt_template_id: "222044", variable_count: 4, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nYou are invited to attend the Hajj/Umrah Orientation Programme.\n\nDate: {orientation_date}\nTime: {orientation_time}\nLocation: {orientation_location}" },
+      { id: "dlt-booking-update-222045",    event_type: "booking_update",        name: "Booking Update",                dlt_template_id: "222045", variable_count: 2, body: "Assalamu Alaikum {customer_name}\n\nImportant update regarding your booking {booking_update_message}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels" },
+      { id: "dlt-departure-rem-222046",     event_type: "departure_reminder",    name: "Departure Reminder",            dlt_template_id: "222046", variable_count: 5, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nYour departure date is approaching.\n\nBooking ID: {booking_id}\nDeparture: {departure_date}\nReporting Time: {reporting_time}\nAirport: {airport_name}\n\nPlease carry your Passport, Visa, Flight Ticket, ID Card, and other required documents." },
+      { id: "dlt-ticket-issued-222047",     event_type: "ticket_issued",         name: "Flight Ticket Issued",          dlt_template_id: "222047", variable_count: 4, body: "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {customer_name}\n\nYour flight ticket has been issued.\n\nBooking ID: {booking_id}\nFlightnumber: {flight_number}\n\nDownload Ticket: {ticket_download_url}\n\nSafe Travels." },
+      { id: "dlt-payment-pending-222038",   event_type: "pending_payment",       name: "Payment Pending Reminder",      dlt_template_id: "222038", variable_count: 4, body: "Assalamu Alaikum {customer_name}\n\nFriendly Reminder - Payment Pending\n\nBooking ID: {booking_id}\nPackage: {package_name}\nOutstanding: Rs {outstanding_amount}\n\nPlease complete payment to secure your seat.\nContact +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels" },
+    ];
+    for (const t of DLT_SEED) {
+      await pool.query(
+        `INSERT INTO notification_templates
+           (id, name, event_type, channel, dlt_template_id, dlt_entity_id, sender_id,
+            body, provider, priority, enabled, is_default, variable_count, variables)
+         VALUES ($1,$2,$3,'sms',$4,$5,$6,$7,'fast2sms',10,true,true,$8,'[]')
+         ON CONFLICT (id) DO UPDATE SET
+           dlt_template_id = EXCLUDED.dlt_template_id,
+           dlt_entity_id   = EXCLUDED.dlt_entity_id,
+           sender_id       = EXCLUDED.sender_id,
+           name            = EXCLUDED.name,
+           variable_count  = EXCLUDED.variable_count,
+           updated_at      = NOW()`,
+        [t.id, t.name, t.event_type, t.dlt_template_id, ENTITY_ID, SENDER, t.body, t.variable_count]
+      );
+    }
+    console.log("[Migration] 10 approved DLT Fast2SMS templates seeded");
+  } catch (err) {
+    console.error("[Migration] DLT template seed failed:", err);
+  }
+  try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS scheduled_notifications (
         id TEXT PRIMARY KEY,
