@@ -3140,111 +3140,148 @@ router.get("/:groupId/families/hotel-list/pdf", requireAdmin as any, async (req,
 });
 
 // Helper: draw a single family luggage-tag badge at (bx, by, bw, bh)
-function drawFamilyBadge(doc: any, p: any, group: any, bx: number, by: number, bw: number, bh: number) {
+function drawFamilyBadge(doc: any, p: any, group: any, bx: number, by: number, bw: number, bh: number, qrBuf?: Buffer) {
   const DARK = "#0B3D2E";
   const GOLD = "#C9A23F";
   const HOTEL_L: Record<string, string> = { makkah: "Makkah", madinah: "Madinah", aziziah: "Aziziah" };
 
   // Background + border
   doc.rect(bx + 1, by + 1, bw - 2, bh - 2).fill("#FFFEF8");
-  doc.rect(bx, by, bw, bh).strokeColor(GOLD).lineWidth(1).stroke();
+  doc.rect(bx, by, bw, bh).strokeColor(GOLD).lineWidth(1.2).stroke();
 
   // Header bar
-  const HDR_H = 26;
+  const HDR_H = 30;
   doc.rect(bx, by, bw, HDR_H).fill(DARK);
-  try { doc.image(LOGO_BUFFER, bx + 4, by + 7, { width: 12, height: 12 }); } catch {}
-  doc.fill(GOLD).font("Helvetica-Bold").fontSize(12)
-    .text(p.familyId || "—", bx + 18, by + 7, { width: 56, lineBreak: false });
-  const role = p.familyHead ? "HEAD" : (p.familyRelation || p.relation || "Member").toUpperCase().slice(0, 12);
-  doc.fill("#C9A23F").font("Helvetica").fontSize(7)
-    .text(role, bx + 78, by + 10, { lineBreak: false });
+  try { doc.image(LOGO_BUFFER, bx + 5, by + 9, { width: 13, height: 13 }); } catch {}
+  // Family ID — large and prominent
+  doc.fill(GOLD).font("Helvetica-Bold").fontSize(14)
+    .text(p.familyId || "—", bx + 21, by + 7, { width: 70, lineBreak: false });
+  const roleLabel = p.familyHead ? "HEAD" : (p.familyRelation || p.relation || "Member").toUpperCase().slice(0, 12);
+  doc.fill("#C9A23F").font("Helvetica").fontSize(7.5)
+    .text(roleLabel, bx + 95, by + 11, { lineBreak: false });
   doc.fill("white").font("Helvetica").fontSize(6.5)
-    .text(`${group.groupName}  ${group.year}`, bx + bw - 130, by + 9, { width: 126, align: "right", lineBreak: false });
+    .text(`${group.groupName}  ${group.year}`, bx + bw - 140, by + 11, { width: 135, align: "right", lineBreak: false });
 
-  // Photo box
-  const PHOTO_SZ = 54;
+  // QR code (top-right area)
+  const QR_SZ = 64;
+  const QRX = bx + bw - QR_SZ - 7;
+  const QRY = by + HDR_H + 7;
+  if (qrBuf) {
+    try {
+      doc.rect(QRX - 2, QRY - 2, QR_SZ + 4, QR_SZ + 4).fill("white").strokeColor(GOLD).lineWidth(0.6).stroke();
+      doc.image(qrBuf, QRX, QRY, { width: QR_SZ, height: QR_SZ });
+    } catch {}
+  }
+
+  // Photo box (left side)
+  const PHOTO_SZ = 60;
   const PX = bx + 7;
-  const PY = by + HDR_H + 8;
+  const PY = by + HDR_H + 10;
   doc.rect(PX, PY, PHOTO_SZ, PHOTO_SZ).fill("#E8E8E8").strokeColor(GOLD).lineWidth(0.8).stroke();
   const glyph = p.gender?.toLowerCase() === "female" ? "F" : "M";
-  doc.fill("#AAA").font("Helvetica-Bold").fontSize(18)
-    .text(glyph, PX, PY + 14, { width: PHOTO_SZ, align: "center", lineBreak: false });
+  doc.fill("#AAA").font("Helvetica-Bold").fontSize(22)
+    .text(glyph, PX, PY + 16, { width: PHOTO_SZ, align: "center", lineBreak: false });
   // Serial under photo
   doc.fill(DARK).font("Helvetica-Bold").fontSize(8)
     .text(`#${String(p.serialNumber).padStart(3, "0")}`, PX, PY + PHOTO_SZ + 4, { width: PHOTO_SZ, align: "center", lineBreak: false });
 
-  // Content area
+  // Content area (between photo and QR code)
   const CX = PX + PHOTO_SZ + 8;
-  const CW = bx + bw - CX - 7;
+  const CW = QRX - CX - 6;
   let cy = PY;
 
-  // Name
+  // Name — single line, truncated with ellipsis to prevent overlap with role pill
   const name = [p.salutation, p.fullName].filter(Boolean).join(" ");
-  doc.fill(DARK).font("Helvetica-Bold").fontSize(9)
-    .text(name, CX, cy, { width: CW, lineBreak: false });
-  cy += 13;
+  // Measure approximate char limit: CW points / ~5.6 pt per char at 10pt font
+  const maxNameChars = Math.floor(CW / 5.6);
+  const displayName = name.length > maxNameChars ? name.slice(0, maxNameChars - 1) + "…" : name;
+  doc.fill(DARK).font("Helvetica-Bold").fontSize(10)
+    .text(displayName, CX, cy, { width: CW, lineBreak: false });
+  cy += 16;
 
   // Role pill
-  const pillW = Math.min(CW, 70);
+  const pillW = Math.min(CW, 80);
   const pillBg = p.familyHead ? GOLD : "#D4EDDA";
   const pillFg = p.familyHead ? DARK : "#155724";
-  doc.rect(CX, cy, pillW, 11).fill(pillBg);
-  doc.fill(pillFg).font("Helvetica-Bold").fontSize(6.5)
-    .text((p.familyHead ? "★ HEAD" : (p.familyRelation || p.relation || "MEMBER")).toUpperCase(), CX + 2, cy + 2, { width: pillW - 4, align: "center", lineBreak: false });
-  cy += 14;
+  doc.rect(CX, cy, pillW, 12).fill(pillBg);
+  doc.fill(pillFg).font("Helvetica-Bold").fontSize(7)
+    .text((p.familyHead ? "★ HEAD" : (p.familyRelation || p.relation || "MEMBER")).toUpperCase(), CX + 2, cy + 3, { width: pillW - 4, align: "center", lineBreak: false });
+  cy += 16;
 
   // Passport
   if (p.passportNumber) {
-    doc.fill("#555").font("Helvetica").fontSize(7.5)
+    doc.fill("#555").font("Helvetica").fontSize(8)
       .text("Passport  ", CX, cy, { continued: true, lineBreak: false });
     doc.fill(DARK).font("Helvetica-Bold").text(p.passportNumber, { lineBreak: false });
-    cy += 11;
+    cy += 13;
   }
 
   // Room + Hotel
   if (p.roomNumber) {
     const hotel = p.roomHotel ? (HOTEL_L[p.roomHotel] || p.roomHotel) : "";
-    doc.fill("#555").font("Helvetica").fontSize(7.5)
+    doc.fill("#555").font("Helvetica").fontSize(8)
       .text("Room  ", CX, cy, { continued: true, lineBreak: false });
     doc.fill(DARK).font("Helvetica-Bold").text(`${p.roomNumber}${hotel ? `  (${hotel})` : ""}`, { lineBreak: false });
-    cy += 11;
+    cy += 13;
   }
 
   // Bus
   if (p.busNumber) {
-    doc.fill("#555").font("Helvetica").fontSize(7.5)
+    doc.fill("#555").font("Helvetica").fontSize(8)
       .text("Bus  ", CX, cy, { continued: true, lineBreak: false });
     doc.fill(DARK).font("Helvetica-Bold").text(p.busNumber, { lineBreak: false });
-    cy += 11;
+    cy += 13;
   }
 
   // Flight
   if (group.flightNumber) {
-    doc.fill("#555").font("Helvetica").fontSize(7.5)
+    doc.fill("#555").font("Helvetica").fontSize(8)
       .text("Flight  ", CX, cy, { continued: true, lineBreak: false });
     doc.fill(DARK).font("Helvetica-Bold").text(group.flightNumber, { lineBreak: false });
-    cy += 11;
+    cy += 13;
   }
 
-  // Mobile
+  // Mobile (below QR if space allows)
   if (p.mobileIndia) {
-    doc.fill("#666").font("Helvetica").fontSize(7)
-      .text(`Mob: ${p.mobileIndia}`, CX, cy, { width: CW, lineBreak: false });
+    const mobY = QRY + QR_SZ + 6;
+    if (mobY + 10 < by + bh - 16) {
+      doc.fill("#666").font("Helvetica").fontSize(7)
+        .text(`Mob: ${p.mobileIndia}`, QRX - QR_SZ + 4, mobY, { width: QR_SZ + QR_SZ - 8, align: "center", lineBreak: false });
+    }
   }
+
+  // Divider line above footer
+  const FY = by + bh - 16;
+  doc.moveTo(bx + 4, FY).lineTo(bx + bw - 4, FY).strokeColor(GOLD).lineWidth(0.5).stroke();
 
   // Footer bar
-  const FY = by + bh - 15;
-  doc.rect(bx, FY, bw, 15).fill(GOLD + "44");
-  doc.moveTo(bx, FY).lineTo(bx + bw, FY).strokeColor(GOLD).lineWidth(0.5).stroke();
-  doc.fill(DARK).font("Helvetica-Bold").fontSize(6.5)
+  doc.rect(bx, FY + 0.5, bw, 15.5).fill(GOLD + "33");
+  doc.fill(DARK).font("Helvetica-Bold").fontSize(7)
     .text("AL BURHAN TOURS & TRAVELS  |  HAJJ " + group.year, bx + 4, FY + 4, { width: bw - 8, align: "center", lineBreak: false });
 }
 
-// Helper: layout a list of pilgrims as 2-col x 3-row badges on A4 pages
-function layoutBadgeGrid(doc: any, pilgrims: any[], group: any) {
-  const COLS = 2, ROWS = 3, MARGIN = 18, GAP = 8;
+// Helper: layout a list of pilgrims as 2-col x 2-row badges on A4 pages (4 per page)
+async function layoutBadgeGrid(doc: any, pilgrims: any[], group: any) {
+  const COLS = 2, ROWS = 2, MARGIN = 18, GAP = 10;
   const BW = (doc.page.width - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
   const BH = (doc.page.height - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
+
+  // Pre-generate QR codes for all pilgrims
+  const qrMap = new Map<string, Buffer>();
+  await Promise.all(pilgrims.map(async (p) => {
+    try {
+      const qrData = [
+        `FAM:${p.familyId || ""}`,
+        `NAME:${p.fullName || ""}`,
+        p.passportNumber ? `PP:${p.passportNumber}` : null,
+        p.roomNumber ? `RM:${p.roomNumber}` : null,
+        p.busNumber ? `BUS:${p.busNumber}` : null,
+      ].filter(Boolean).join("|");
+      const buf = await QRCode.toBuffer(qrData, { type: "png", width: 96, margin: 1, color: { dark: "#0B3D2E", light: "#FFFEF8" } });
+      qrMap.set(p.id, buf);
+    } catch {}
+  }));
+
   pilgrims.forEach((p, idx) => {
     if (idx > 0 && idx % (COLS * ROWS) === 0) doc.addPage();
     const pos = idx % (COLS * ROWS);
@@ -3252,7 +3289,7 @@ function layoutBadgeGrid(doc: any, pilgrims: any[], group: any) {
     const row = Math.floor(pos / COLS);
     const bx = MARGIN + col * (BW + GAP);
     const by = MARGIN + row * (BH + GAP);
-    drawFamilyBadge(doc, p, group, bx, by, BW, BH);
+    drawFamilyBadge(doc, p, group, bx, by, BW, BH, qrMap.get(p.id));
   });
 }
 
@@ -3273,7 +3310,7 @@ router.get("/:groupId/families/badges/pdf", requireAdmin as any, async (req, res
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="family-badges-all-${safeName}-${group.year}.pdf"`);
     doc.pipe(res);
-    layoutBadgeGrid(doc, pilgrims, group);
+    await layoutBadgeGrid(doc, pilgrims, group);
     doc.end();
   } catch (err: any) {
     console.error("[groups] families/badges/pdf error:", err);
@@ -3298,7 +3335,7 @@ router.get("/:groupId/families/:familyId/badges/pdf", requireAdmin as any, async
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="family-badges-${safeName}-${group.year}.pdf"`);
     doc.pipe(res);
-    layoutBadgeGrid(doc, pilgrims, group);
+    await layoutBadgeGrid(doc, pilgrims, group);
     doc.end();
   } catch (err: any) {
     console.error("[groups] families/:familyId/badges/pdf error:", err);
