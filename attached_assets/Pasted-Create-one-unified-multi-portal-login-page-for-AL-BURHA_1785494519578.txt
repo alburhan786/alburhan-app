@@ -1,0 +1,185 @@
+Create one unified multi-portal login page for AL BURHAN TOURS & TRAVELS ERP & CRM.
+
+Main URL:
+https://alburhantravels.com/login
+
+The page must first show five clear account-type options:
+
+1. Customer
+2. Admin
+3. Staff
+4. Agent
+5. Branch
+
+DESIGN
+
+Use a premium responsive card design matching the existing Al Burhan black, green, white and gold branding.
+
+At the top display:
+
+“Welcome to Al Burhan”
+“Choose your account type to continue”
+
+Show five selectable cards or tabs with suitable icons:
+
+Customer Login
+Admin Login
+Staff Login
+Agent Login
+Branch Login
+
+The selected option must be clearly highlighted.
+
+After selecting an account type, show the mobile number and OTP form on the same page without reloading.
+
+Display the selected portal heading clearly, for example:
+
+“Customer Login”
+“Admin Login”
+“Staff Login”
+“Agent Login”
+“Branch Login”
+
+Add a “Change Account Type” button on the OTP screen.
+
+PORTAL VALIDATION
+
+Each portal must use completely separate account validation.
+
+Customer:
+- portal value: customer
+- validate only active customer accounts
+- successful login redirects to Customer Dashboard
+- error: “No customer account found for this mobile number.”
+
+Admin:
+- portal value: admin
+- validate only active admin and super_admin accounts
+- successful super_admin login redirects to Super Admin Dashboard
+- successful admin login redirects to Admin Dashboard
+- error: “This mobile number does not have admin access.”
+
+Staff:
+- portal value: staff
+- validate only active staff accounts
+- check staff role and permissions
+- successful login redirects to Staff Dashboard
+- error: “No active staff account found for this mobile number.”
+
+Agent:
+- portal value: agent
+- validate only approved and active agent accounts
+- successful login redirects to Agent Dashboard
+- error: “This mobile number is not registered as an active agent.”
+
+Branch:
+- portal value: branch
+- validate only active branch accounts
+- successful login redirects to Branch Dashboard
+- error: “No active branch account found for this mobile number.”
+
+SECURITY AND ISOLATION
+
+Never automatically detect another role and open the wrong dashboard.
+
+An admin number entered under Customer Login must show the customer account error and must not open the admin dashboard.
+
+A customer number entered under Admin Login must show the admin access error.
+
+Apply the same strict isolation to staff, agent and branch portals.
+
+Every OTP request must send the selected portal value to the backend.
+
+Use one secure endpoint structure such as:
+
+POST /api/auth/send-otp
+{
+  "mobile": "9893989786",
+  "portal": "admin"
+}
+
+POST /api/auth/verify-otp
+{
+  "mobile": "9893989786",
+  "otp": "123456",
+  "portal": "admin"
+}
+
+The backend must verify:
+- account exists in the selected portal
+- account is active
+- role matches selected portal
+- user has permission to access that dashboard
+
+OTP REQUIREMENTS
+
+Use DLT SMS as the primary OTP channel.
+
+Allow secure fallback only according to configured notification rules.
+
+OTP expiry: 5 minutes.
+Maximum verification attempts: 5.
+Resend cooldown: 30 seconds.
+Rate-limit OTP requests by mobile number, IP address and device.
+Never return OTP, debugOtp, testOtp or code in any API response.
+Never display OTP on the website.
+Write all OTP attempts to audit and notification logs without storing the plain OTP.
+
+USER EXPERIENCE
+
+Remember the last selected account type only on that device, but always allow the user to change it.
+
+Show masked mobile number on the OTP verification screen.
+
+Add:
+- Resend OTP
+- Change Mobile Number
+- Change Account Type
+- Contact Support
+
+Support number:
++91 9893225590
+
+Make the page fully responsive for:
+- iPhone Safari
+- Android Chrome
+- Desktop browsers
+- Installed PWA
+
+ROUTING COMPATIBILITY
+
+Keep these direct routes working:
+
+/login?portal=customer
+/login?portal=admin
+/login?portal=staff
+/login?portal=agent
+/login?portal=branch
+
+Also redirect old routes safely:
+
+/admin/login → /login?portal=admin
+/staff/login → /login?portal=staff
+/agent/login → /login?portal=agent
+/branch/login → /login?portal=branch
+
+Do not redirect all portals to customer mode.
+
+TESTING
+
+Test the complete login flow for all five portals.
+
+Specifically verify admin number 9893989786:
+
+- Customer selected → blocked with customer account error
+- Admin selected → OTP sent successfully
+- OTP verified → correct Admin or Super Admin Dashboard opens
+
+Also verify:
+- customer cannot enter admin dashboard
+- staff cannot enter admin dashboard
+- agent cannot enter branch dashboard
+- branch cannot enter customer dashboard
+- logout returns to the unified login page
+
+Deploy the frontend and backend changes to VPS, update the service-worker cache version, and provide a final portal-by-portal test report.
