@@ -163,21 +163,28 @@ function getPortalFromUrl(): PortalType | null {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Login() {
+interface LoginProps {
+  /** When rendered at a portal-specific path (/admin/login etc.) this prop
+   *  pre-selects the portal and skips the selector screen entirely.
+   *  The portal is locked — the user cannot switch to another portal. */
+  defaultPortal?: PortalType;
+}
+
+export default function Login({ defaultPortal }: LoginProps = {}) {
   const { updateProfile, isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Portal & step state
-  const urlPortal = getPortalFromUrl();
-  const lastPortal = getSavedPortal();
-  const [portal, setPortal] = useState<PortalType | null>(urlPortal ?? lastPortal);
+  // Portal & step state.
+  // Priority: defaultPortal (from route path) > ?portal= query param > localStorage
+  const urlPortal   = getPortalFromUrl();
+  const lastPortal  = getSavedPortal();
+  const initialPortal = defaultPortal ?? urlPortal ?? lastPortal;
+  const [portal, setPortal] = useState<PortalType | null>(initialPortal);
   const [step, setStep] = useState<Step>(() => {
-    // If URL has ?portal=X, jump straight to mobile step
-    if (urlPortal) return 1;
-    // If returning user with saved portal, jump to mobile step
-    if (lastPortal) return 1;
+    // Skip portal-selector if a specific portal is already known
+    if (defaultPortal || urlPortal || lastPortal) return 1;
     return 0;
   });
 

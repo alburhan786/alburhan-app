@@ -285,14 +285,15 @@ function Router() {
       <Route path="/terms" component={TermsAndConditions} />
       <Route path="/cancellation" component={CancellationPolicy} />
       <Route path="/refund" component={RefundPolicy} />
-      {/* Unified multi-portal login — ?portal=customer|admin|staff|agent|branch pre-selects the portal */}
-      <Route path="/login" component={Login} />
-      {/* Legacy portal-specific login routes — redirect to unified page with portal pre-selected */}
-      <Route path="/admin/login"    component={() => <Redirect to="/login?portal=admin" />} />
-      <Route path="/agent/login"    component={() => <Redirect to="/login?portal=agent" />} />
-      <Route path="/branch/login"   component={() => <Redirect to="/login?portal=branch" />} />
-      <Route path="/staff/login"    component={() => <Redirect to="/login?portal=staff" />} />
-      <Route path="/customer/login" component={() => <Redirect to="/login?portal=customer" />} />
+      {/* ── Login routes — each portal path renders Login directly (no redirect hop) ── */}
+      {/* /login with no ?portal= shows the portal selector card grid               */}
+      <Route path="/login"          component={Login} />
+      {/* Portal-specific paths lock the portal without a redirect                  */}
+      <Route path="/admin/login"    component={() => <Login defaultPortal="admin"    />} />
+      <Route path="/agent/login"    component={() => <Login defaultPortal="agent"    />} />
+      <Route path="/branch/login"   component={() => <Login defaultPortal="branch"   />} />
+      <Route path="/staff/login"    component={() => <Login defaultPortal="staff"    />} />
+      <Route path="/customer/login" component={() => <Login defaultPortal="customer" />} />
       <Route path="/invoice/:bookingNumber" component={Invoice} />
       <Route path="/pay/:bookingNumber" component={PaymentPage} />
       <Route path="/feedback" component={FeedbackPage} />
