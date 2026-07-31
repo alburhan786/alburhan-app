@@ -6203,7 +6203,10 @@ if (process.env.NODE_ENV === 'production') {
       res.status(404).json({ error: 'API route not found', method: req.method, path: req.originalUrl });
     });
 
-    app.get('{*path}', (_req, res) => {
+    // SPA catch-all — any GET that isn't a static file or /api/* returns index.html
+    // so React Router handles client-side navigation.
+    // Use RegExp to be unambiguous across Express 4 and Express 5.
+    app.get(/.*/, (_req, res) => {
       res.sendFile(path.join(staticDir, 'index.html'));
     });
   }
