@@ -389,11 +389,24 @@ app.get("/api/migrate/vps-update.sql", (req, res) => {
   res.sendFile(sqlPath);
 });
 
-// POST /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
+// POST/GET /api/migrate/deploy-frontend — VPS pulls latest frontend from dev server and extracts it
+// Key accepted via ?key=, body.key, or Authorization: Bearer <key>
+// requireLocalhost removed — MIGRATION_KEY alone is sufficient security for this endpoint.
 // Add ?async=true to respond immediately (avoids nginx proxy timeout for large tarballs)
-app.post("/api/migrate/deploy-frontend", requireLocalhost, async (req, res) => {
-  const key = (req.query.key || req.body?.key) as string;
-  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+async function deployFrontendHandler(req: any, res: any) {
+  const bearerKey = (req.headers["authorization"] as string | undefined)
+    ?.replace(/^Bearer\s+/i, "").trim();
+  const key = (bearerKey || req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) {
+    const hasEnvKey = !!process.env.MIGRATION_KEY;
+    console.warn(`[deploy-frontend] Forbidden — key present=${!!key} envKeySet=${hasEnvKey} ip=${req.ip}`);
+    return void res.status(403).json({
+      error: "Forbidden",
+      hint: hasEnvKey
+        ? "Key mismatch. Pass ?key=<MIGRATION_KEY> or Authorization: Bearer <MIGRATION_KEY>."
+        : "MIGRATION_KEY env var is not set on this server.",
+    });
+  }
 
   const DEV_URL = getDeploySourceUrl();
   if (!DEV_URL) return void res.status(503).json({ error: "DEPLOY_SOURCE_URL not configured", hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js env, then run: pm2 reload ecosystem.config.js --update-env" });
@@ -440,7 +453,9 @@ app.post("/api/migrate/deploy-frontend", requireLocalhost, async (req, res) => {
   } catch (err: any) {
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-});
+}
+app.post("/api/migrate/deploy-frontend", deployFrontendHandler);
+app.get("/api/migrate/deploy-frontend", deployFrontendHandler);  // GET so it works from browser/curl without POST body
 
 // GET /api/migrate/frontend.tar.gz — serves updated frontend assets
 app.get("/api/migrate/frontend.tar.gz", (req, res) => {
