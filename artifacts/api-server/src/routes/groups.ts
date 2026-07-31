@@ -74,6 +74,39 @@ function fmtPilgrim(p: any) {
   return { ...p, createdAt: p.createdAt?.toISOString?.(), updatedAt: p.updatedAt?.toISOString?.() };
 }
 
+// GET /api/groups/company-label-defaults — returns {[companyId]: serviceLabel}
+router.get("/company-label-defaults", requireAdmin as any, async (_req, res) => {
+  try {
+    const rows = await pool.query(`SELECT key, value FROM api_settings WHERE key LIKE 'company_service_label_%'`);
+    const result: Record<string, string> = {};
+    for (const row of rows.rows) {
+      const cid = (row.key as string).replace("company_service_label_", "");
+      result[cid] = row.value || "";
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to load company label defaults" });
+  }
+});
+
+// PUT /api/groups/company-label-defaults/:companyId — upsert label into api_settings
+router.put("/company-label-defaults/:companyId", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { companyId } = req.params;
+  const { serviceLabel } = req.body;
+  const key = `company_service_label_${companyId}`;
+  try {
+    await pool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at, updated_by)
+       VALUES ($1, $2, $3, true, NOW(), $4)
+       ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW(), updated_by=$4`,
+      [key, serviceLabel || "", `company_label_${companyId}`, req.user?.id || "admin"]
+    );
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ message: err?.message || "Failed to save company label default" });
+  }
+});
+
 router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     // pool.query() directly — avoids drizzle wrapper bundling quirks on VPS
@@ -81,7 +114,7 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
       pool.query(`
         SELECT id, group_name, year, company_id, departure_date, return_date,
                flight_number, maktab_number, COALESCE(starting_serial_number, 1) AS starting_serial_number,
-               COALESCE(hotels, '{}') AS hotels, notes, created_at, updated_at
+               COALESCE(hotels, '{}') AS hotels, service_label, notes, created_at, updated_at
         FROM hajj_groups ORDER BY created_at DESC
       `),
       pool.query(`SELECT group_id, COUNT(*)::int AS cnt FROM pilgrims GROUP BY group_id`),
@@ -105,6 +138,7 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
       maktabNumber: g.maktab_number,
       startingSerialNumber: g.starting_serial_number ?? 1,
       hotels: g.hotels ?? {},
+      serviceLabel: g.service_label ?? null,
       notes: g.notes,
       createdAt: g.created_at,
       updatedAt: g.updated_at,
@@ -124,7 +158,7 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
 });
 
 router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
+  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber, serviceLabel } = req.body;
   if (!groupName || !year) {
     res.status(400).json({ message: "groupName and year are required" });
     return;
@@ -140,6 +174,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
       maktabNumber: maktabNumber || null,
       startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
       hotels: hotels || {},
+      serviceLabel: serviceLabel || null,
       notes: notes || null,
     }).returning();
     auditLog({ req, action: "created", entityTable: "groups", entityId: group.id, newValue: { groupName: group.groupName, year: group.year } }).catch(() => {});
@@ -164,14 +199,14 @@ router.get("/:id", requireAdmin as any, async (req, res) => {
 
 router.put("/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const id = String(req.params.id);
-  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber } = req.body;
+  const { groupName, year, companyId, departureDate, returnDate, flightNumber, maktabNumber, hotels, notes, startingSerialNumber, serviceLabel } = req.body;
   try {
     const [before] = await db.select().from(hajjGroupsTable).where(eq(hajjGroupsTable.id, id)).limit(1);
     const [updated] = await db.update(hajjGroupsTable).set({
       groupName, year: Number(year), companyId: companyId || null,
       departureDate, returnDate, flightNumber, maktabNumber,
       startingSerialNumber: startingSerialNumber ? Number(startingSerialNumber) : 1,
-      hotels: hotels || {}, notes, updatedAt: new Date(),
+      hotels: hotels || {}, serviceLabel: serviceLabel || null, notes, updatedAt: new Date(),
     }).where(eq(hajjGroupsTable.id, id)).returning();
     if (!updated) { res.status(404).json({ message: "Group not found" }); return; }
     auditLog({ req, action: "updated", entityTable: "groups", entityId: id, oldValue: before ? { groupName: before.groupName, year: before.year, departureDate: before.departureDate } : null, newValue: { groupName: updated.groupName, year: updated.year, departureDate: updated.departureDate } }).catch(() => {});

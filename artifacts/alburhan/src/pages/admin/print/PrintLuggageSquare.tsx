@@ -20,7 +20,7 @@ interface Pilgrim {
 }
 interface Group {
   id: string; groupName: string; year: number; maktabNumber?: string;
-  startingSerialNumber?: number; companyId?: string;
+  startingSerialNumber?: number; companyId?: string; serviceLabel?: string;
   hotels?: {
     makkah?:  { name?: string; address?: string; nameAr?: string; addressAr?: string };
     madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string };
@@ -483,11 +483,15 @@ export default function PrintLuggageSquare() {
   const [companyId, setCompanyId] = useState("alburhan");
   const [view, setView]         = useState<"front" | "back" | "both">("both");
   const company = getCompanyById(companyId);
-  const [serviceLabel, setServiceLabel] = useState<string>(company.serviceLabel ?? "");
+  const [serviceLabel, setServiceLabel] = useState<string>("");
   const [downloading, setDownloading] = useState<string | null>(null);
   const [photoDataUrls, setPhotoDataUrls] = useState<Record<string, string>>({});
   const [logoDataUrl, setLogoDataUrl] = useState<string>("");
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Tracks group's own stored label (empty string = no override)
+  const groupLabelRef = useRef<string>("");
+  // Tracks admin-configured company defaults fetched from API
+  const companyLabelsRef = useRef<Record<string, string>>({});
 
   const dl = async (fmt: "pdf" | "jpg" | "png") => {
     const pages = Array.from(containerRef.current?.querySelectorAll(".sq-page-single") ?? []) as HTMLElement[];
@@ -507,8 +511,11 @@ export default function PrintLuggageSquare() {
     if (!company.logoUrl) { setLogoDataUrl(""); return; }
     if (company.logoUrl.startsWith("data:")) { setLogoDataUrl(company.logoUrl); return; }
     fetchAsDataUrl(company.logoUrl).then(d => setLogoDataUrl(d || company.logoUrl!));
-    // Reset service label to the newly selected company's default
-    setServiceLabel(company.serviceLabel ?? "");
+    // When the admin changes company in the toolbar, update the service label only if
+    // the group has no stored override — so group labels always win.
+    if (!groupLabelRef.current) {
+      setServiceLabel(companyLabelsRef.current[companyId] ?? company.serviceLabel ?? "");
+    }
   }, [companyId]);
 
   useEffect(() => {
@@ -516,9 +523,20 @@ export default function PrintLuggageSquare() {
     Promise.all([
       fetch(`${API}/api/groups/${groupId}`, { credentials: "include" }).then(r => r.json()),
       fetch(`${API}/api/groups/${groupId}/pilgrims`, { credentials: "include" }).then(r => r.json()),
-    ]).then(async ([g, p]) => {
+      fetch(`${API}/api/groups/company-label-defaults`, { credentials: "include" }).then(r => r.json()).catch(() => ({})),
+    ]).then(async ([g, p, companyDefaults]) => {
+      companyLabelsRef.current = companyDefaults || {};
+      groupLabelRef.current = g.serviceLabel || "";
       setGroup(g);
+      const resolvedCompanyId = g.companyId || "alburhan";
       if (g.companyId) setCompanyId(g.companyId);
+      // Priority: group override → admin-configured company default → static company default
+      const effective =
+        g.serviceLabel ||
+        (companyDefaults || {})[resolvedCompanyId] ||
+        getCompanyById(resolvedCompanyId).serviceLabel ||
+        "";
+      setServiceLabel(effective);
       const list: Pilgrim[] = Array.isArray(p) ? p : [];
       setPilgrims(list);
       const entries = await Promise.all(

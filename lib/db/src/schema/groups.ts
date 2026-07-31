@@ -16,6 +16,7 @@ export const hajjGroupsTable = pgTable("hajj_groups", {
     madinah?: { name?: string; address?: string; nameAr?: string; addressAr?: string; checkIn?: string; checkOut?: string; googleMapsLink?: string };
     aziziah?: { name?: string; address?: string; nameAr?: string; addressAr?: string; checkIn?: string; checkOut?: string; googleMapsLink?: string };
   }>().default({}),
+  serviceLabel: text("service_label"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -154,6 +154,12 @@ async function runMigrations() {
     console.error("[Migration] room_notes failed:", err);
   }
   try {
+    await db.execute(sql`ALTER TABLE hajj_groups ADD COLUMN IF NOT EXISTS service_label TEXT`);
+    console.log("[Migration] hajj_groups.service_label column ensured");
+  } catch (err) {
+    console.error("[Migration] hajj_groups.service_label failed:", err);
+  }
+  try {
     await db.execute(sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS last_payment_date TIMESTAMPTZ`);
     console.log("[Migration] bookings.last_payment_date column ensured");
   } catch (err) {

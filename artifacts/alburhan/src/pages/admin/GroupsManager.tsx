@@ -24,6 +24,7 @@ interface HajjGroup {
   returnDate?: string;
   flightNumber?: string;
   maktabNumber?: string;
+  serviceLabel?: string;
   hotels?: any;
   notes?: string;
   pilgrimCount: number;
@@ -32,7 +33,7 @@ interface HajjGroup {
 
 const emptyForm = {
   groupName: "", year: new Date().getFullYear(), companyId: "alburhan", departureDate: "", returnDate: "",
-  flightNumber: "", maktabNumber: "", notes: "", groupLeader: "",
+  flightNumber: "", maktabNumber: "", serviceLabel: "", notes: "", groupLeader: "",
   startingSerialNumber: 1,
   hotelMakkahName: "", hotelMakkahAddress: "", hotelMakkahNameAr: "", hotelMakkahAddressAr: "", hotelMakkahCheckIn: "", hotelMakkahCheckOut: "", hotelMakkahGoogleMaps: "",
   hotelMadinahName: "", hotelMadinahAddress: "", hotelMadinahNameAr: "", hotelMadinahAddressAr: "", hotelMadinahCheckIn: "", hotelMadinahCheckOut: "", hotelMadinahGoogleMaps: "",
@@ -105,6 +106,41 @@ export default function GroupsManager() {
   const [serialSaving, setSerialSaving] = useState(false);
   const [showSerialManager, setShowSerialManager] = useState(false);
 
+  // Company service label defaults (admin-editable, stored in api_settings)
+  const [companyLabelDefaults, setCompanyLabelDefaults] = useState<Record<string, string>>({});
+  const [companyLabelSaving, setCompanyLabelSaving] = useState<Record<string, boolean>>({});
+
+  const fetchCompanyLabelDefaults = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/groups/company-label-defaults`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        // Seed with static defaults for any company not yet in DB
+        const merged: Record<string, string> = {};
+        COMPANIES.forEach(c => { merged[c.id] = c.serviceLabel || ""; });
+        Object.assign(merged, data);
+        setCompanyLabelDefaults(merged);
+      }
+    } catch {}
+  }, []);
+
+  const saveCompanyLabel = async (companyId: string) => {
+    setCompanyLabelSaving(s => ({ ...s, [companyId]: true }));
+    try {
+      const res = await fetch(`${API}/api/groups/company-label-defaults/${companyId}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceLabel: companyLabelDefaults[companyId] || "" }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      toast({ title: "Company label saved" });
+    } catch {
+      toast({ title: "Failed to save label", variant: "destructive" });
+    } finally {
+      setCompanyLabelSaving(s => ({ ...s, [companyId]: false }));
+    }
+  };
+
   const fetchGroups = useCallback(async () => {
     try {
       const res = await fetch(`${API}/api/groups`, { credentials: "include" });
@@ -128,7 +164,7 @@ export default function GroupsManager() {
     setSerialOrder(newOrder);
   };
 
-  useEffect(() => { fetchGroups(); }, [fetchGroups]);
+  useEffect(() => { fetchGroups(); fetchCompanyLabelDefaults(); }, [fetchGroups, fetchCompanyLabelDefaults]);
 
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setDialogOpen(true); };
 
@@ -140,6 +176,7 @@ export default function GroupsManager() {
       returnDate: g.returnDate || "", flightNumber: g.flightNumber || "",
       maktabNumber: g.maktabNumber || "", notes: g.notes || "",
       startingSerialNumber: g.startingSerialNumber || 1,
+      serviceLabel: g.serviceLabel || "",
       groupLeader: g.hotels?.groupLeader || "",
       hotelMakkahName: g.hotels?.makkah?.name || "",
       hotelMakkahAddress: g.hotels?.makkah?.address || "",
@@ -172,7 +209,7 @@ export default function GroupsManager() {
       groupName: form.groupName, year: form.year, companyId: form.companyId || "alburhan",
       departureDate: form.departureDate || null,
       returnDate: form.returnDate || null, flightNumber: form.flightNumber || null,
-      maktabNumber: form.maktabNumber || null, notes: form.notes || null,
+      maktabNumber: form.maktabNumber || null, serviceLabel: form.serviceLabel || null, notes: form.notes || null,
       startingSerialNumber: Number(form.startingSerialNumber) || 1,
       hotels: {
         groupLeader: form.groupLeader || null,
@@ -279,6 +316,34 @@ export default function GroupsManager() {
           </PermissionGuard>
         </div>
       </div>
+
+      {/* ── Company Service Label Defaults ── */}
+      <Card className="mb-6 p-5 rounded-2xl border-green-200 bg-green-50">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-green-800 mb-1">Company Label Defaults</h2>
+        <p className="text-xs text-green-700 mb-4">Default service label printed on the back sticker for each company. Groups can override this per-group in the group edit form.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {COMPANIES.map(c => (
+            <div key={c.id} className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-green-900 w-28 shrink-0">{c.nameShort}</span>
+              <Input
+                value={companyLabelDefaults[c.id] ?? c.serviceLabel ?? ""}
+                onChange={e => setCompanyLabelDefaults(prev => ({ ...prev, [c.id]: e.target.value }))}
+                placeholder="e.g. Rehmat E Haram CHGO"
+                className="h-8 text-sm"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 h-8 px-3 border-green-400 text-green-800 hover:bg-green-100"
+                disabled={!!companyLabelSaving[c.id]}
+                onClick={() => saveCompanyLabel(c.id)}
+              >
+                {companyLabelSaving[c.id] ? "…" : <Save size={13} />}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* ── Serial Number Manager Panel ── */}
       {showSerialManager && groups.length > 0 && (
@@ -457,6 +522,10 @@ export default function GroupsManager() {
                 <div className="space-y-1"><label className="text-sm font-medium">Maktab Number</label><Input value={form.maktabNumber} onChange={e => f("maktabNumber", e.target.value)} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Starting Serial No. <span className="text-xs text-muted-foreground">(e.g. 79 if prev group ended at 78)</span></label><Input type="number" min="1" value={form.startingSerialNumber} onChange={e => f("startingSerialNumber", Number(e.target.value))} /></div>
                 <div className="space-y-1"><label className="text-sm font-medium">Group Leader</label><Input value={form.groupLeader} onChange={e => f("groupLeader", e.target.value)} placeholder="e.g. Mohammed Altaf" /></div>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-sm font-medium">Service Label <span className="text-xs text-muted-foreground">(printed on back sticker, e.g. "Rehmat E Haram CHGO")</span></label>
+                  <Input value={form.serviceLabel} onChange={e => f("serviceLabel", e.target.value)} placeholder="e.g. Rehmat E Haram CHGO" />
+                </div>
                 <div className="space-y-1 col-span-2">
                   <label className="text-sm font-medium">Company</label>
                   <select
