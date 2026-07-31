@@ -1,0 +1,43 @@
+URGENT: The production frontend is showing “404 Page Not Found” for /admin/login.
+
+The VPS deployment is working and the service worker shows alburhan-v8, but the generated production JavaScript bundle does not contain the string “admin/login”. Therefore, the admin and other portal routes are missing from the actual production build.
+
+Please inspect the real frontend entry files and fix this completely.
+
+Required routes:
+
+/admin/login
+/staff/login
+/branch/login
+/agent/login
+/customer/login
+
+Requirements:
+
+1. In the actual App.tsx used by the Vite production build, import the Login component.
+2. Register all five routes directly in the main router.
+3. Each route must render the correct portal login without redirecting to the public website.
+4. Ensure the catch-all 404 route comes after these portal routes.
+5. Confirm there is no second/old App.tsx or alternate frontend entry being built.
+6. Remove stale compiled build folders before rebuilding.
+7. Run a clean production build.
+8. Verify the final generated assets contain all five route strings by running:
+   grep -Rao "admin/login" dist/public/assets
+   grep -Rao "staff/login" dist/public/assets
+   grep -Rao "branch/login" dist/public/assets
+   grep -Rao "agent/login" dist/public/assets
+   grep -Rao "customer/login" dist/public/assets
+9. Do not only edit source files. Confirm the routes exist inside the final production JS bundle.
+10. Generate a fresh frontend deployment archive for VPS and provide the exact safe deployment command.
+11. Do not modify or redeploy the backend API.
+12. Increase the service-worker cache version from alburhan-v8 to alburhan-v9 so browsers discard the old frontend.
+
+Final acceptance checks:
+
+- All five route strings exist in the generated production JS.
+- /admin/login loads the Admin login screen directly.
+- /staff/login loads Staff login.
+- /branch/login loads Branch login.
+- /agent/login loads Agent login.
+- /customer/login loads Customer login.
+- No portal route displays the generic 404 page.
