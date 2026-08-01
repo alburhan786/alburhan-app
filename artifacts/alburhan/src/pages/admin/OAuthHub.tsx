@@ -132,17 +132,17 @@ export default function OAuthHub() {
     setSavingCreds(true);
     try {
       const fields = provider === "meta" ? metaCreds : googleCreds;
-      const r = await fetch(`${API}/api/social-media/platforms/${provider === "meta" ? "facebook_page" : "google"}`, {
-        method: "PUT", credentials: "include",
+      const r = await fetch(`${API}/api/social-media/settings`, {
+        method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ extra_fields: fields }),
+        body: JSON.stringify({ provider, fields }),
       });
       if (r.ok) {
         toast({ title: "Credentials saved", description: "You can now click Connect" });
         setConfigPlatform(null);
       } else {
-        const d = await r.json();
-        toast({ title: "Save failed", description: d.error || "Unknown error", variant: "destructive" });
+        const d = await r.json().catch(() => ({}));
+        toast({ title: "Save failed", description: d.error || d.message || "Unknown error", variant: "destructive" });
       }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -289,8 +289,8 @@ export default function OAuthHub() {
         {/* Callback URL info */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 space-y-1">
           <div className="font-semibold text-gray-700 mb-2">OAuth Callback URLs (add to your app settings)</div>
-          <div><strong>Meta:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.online/api/social-media/oauth/meta/callback</code></div>
-          <div><strong>Google:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.online/api/social-media/oauth/google/callback</code></div>
+          <div><strong>Meta:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.com/api/social-media/oauth/meta/callback</code></div>
+          <div><strong>Google:</strong> <code className="bg-white border rounded px-1">https://alburhantravels.com/api/social-media/oauth/google/callback</code></div>
         </div>
       </div>
     </AdminLayout>

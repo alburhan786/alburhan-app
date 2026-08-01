@@ -320,6 +320,37 @@ const PLATFORM_META = {
     sensitiveFields: ["server_key", "vapid_key"],
     webhookPath: null,
   },
+  // Google OAuth platforms — store client_id + client_secret per platform
+  google: {
+    group: "Google", name: "Google OAuth",
+    fields: ["client_id", "client_secret"],
+    sensitiveFields: ["client_secret"],
+    webhookPath: null,
+  },
+  google_business: {
+    group: "Google", name: "Google Business Profile",
+    fields: ["client_id", "client_secret"],
+    sensitiveFields: ["client_secret"],
+    webhookPath: null,
+  },
+  google_calendar: {
+    group: "Google", name: "Google Calendar",
+    fields: ["client_id", "client_secret"],
+    sensitiveFields: ["client_secret"],
+    webhookPath: null,
+  },
+  google_drive: {
+    group: "Google", name: "Google Drive",
+    fields: ["client_id", "client_secret"],
+    sensitiveFields: ["client_secret"],
+    webhookPath: null,
+  },
+  youtube: {
+    group: "Google", name: "YouTube",
+    fields: ["client_id", "client_secret"],
+    sensitiveFields: ["client_secret"],
+    webhookPath: null,
+  },
 };
 
 // ── GET /api/social-media/platforms ─────────────────────────────────────────
@@ -459,7 +490,7 @@ router.put("/platforms/:platform", requireAdmin as any, async (req, res) => {
     const encExtra = encrypt(JSON.stringify(newExtra));
     const apiKey = newExtra.bot_token || newExtra.access_token || newExtra.page_access_token || newExtra.api_key;
     const encKey = apiKey ? encrypt(apiKey) : existingRow?.api_key_encrypted ?? null;
-    const webhookBase = `https://alburhantravels.online`;
+    const webhookBase = `https://alburhantravels.com`;
     const meta = PLATFORM_META[platform as keyof typeof PLATFORM_META];
     const webhookUrl = meta?.webhookPath ? `${webhookBase}${meta.webhookPath}` : null;
     const isEnabled = enabled !== undefined ? Boolean(enabled) : (existingRow?.enabled ?? false);
@@ -476,6 +507,94 @@ router.put("/platforms/:platform", requireAdmin as any, async (req, res) => {
     }
     res.json({ ok: true, message: `${meta.name} configuration saved.` });
   } catch (err: any) { res.status(500).json({ message: err.message }); }
+});
+
+// ── GET /api/social-media/settings — return provider credentials (masked) ─────
+// Returns Google + Meta app-level credentials so the OAuthHub can show
+// whether credentials are already configured.
+router.get("/settings", requireAdmin as any, async (_req, res) => {
+  try {
+    const [googleRow, metaRow] = await Promise.all([
+      pool.query(`SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='google' LIMIT 1`).catch(() => ({ rows: [] })),
+      pool.query(`SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='facebook_page' LIMIT 1`).catch(() => ({ rows: [] })),
+    ]);
+    const googleExtra = googleRow.rows[0] ? decryptExtra(googleRow.rows[0].extra_fields_encrypted) : {};
+    const metaExtra   = metaRow.rows[0]   ? decryptExtra(metaRow.rows[0].extra_fields_encrypted)   : {};
+
+    res.json({
+      google: {
+        client_id:     googleExtra.client_id     ? maskVal(String(googleExtra.client_id))     : null,
+        client_secret: googleExtra.client_secret ? maskVal(String(googleExtra.client_secret)) : null,
+        configured:    !!(googleExtra.client_id && googleExtra.client_secret),
+      },
+      meta: {
+        app_id:     metaExtra.app_id     ? maskVal(String(metaExtra.app_id))     : null,
+        app_secret: metaExtra.app_secret ? maskVal(String(metaExtra.app_secret)) : null,
+        configured: !!(metaExtra.app_id && metaExtra.app_secret),
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/social-media/settings — save provider app-level credentials ─────
+// Body: { provider: "google"|"meta", fields: { client_id, client_secret } |
+//                                             { app_id, app_secret } }
+// Saves into social_platform_configs using the same encrypt/upsert logic as
+// PUT /platforms/:platform so the OAuth start endpoints can find them.
+router.post("/settings", requireAdmin as any, async (req, res) => {
+  try {
+    const { provider, fields } = req.body || {};
+    if (!provider || !fields || typeof fields !== "object") {
+      return void res.status(400).json({ error: "provider and fields are required" });
+    }
+
+    // Map provider → the platform row that stores app-level creds
+    const platformKey = provider === "meta" ? "facebook_page" : "google";
+    const meta = PLATFORM_META[platformKey as keyof typeof PLATFORM_META];
+    if (!meta) {
+      return void res.status(400).json({ error: `Unknown provider: ${provider}` });
+    }
+
+    // Load existing extra fields and merge (don't overwrite already-saved values
+    // with empty/masked inputs, matching PUT /platforms/:platform behaviour)
+    const existingR = await pool.query(
+      `SELECT * FROM social_platform_configs WHERE platform=$1 LIMIT 1`, [platformKey]
+    ).catch(() => ({ rows: [] }));
+    const existingRow = existingR.rows[0];
+    const existingExtra: Record<string, any> = decryptExtra(existingRow?.extra_fields_encrypted);
+    const newExtra: Record<string, any> = { ...existingExtra };
+
+    for (const [k, v] of Object.entries(fields as Record<string, string>)) {
+      const val = String(v ?? "").trim();
+      if (val && !val.startsWith("••")) newExtra[k] = val;
+    }
+
+    if (Object.keys(newExtra).length === 0) {
+      return void res.status(400).json({ error: "No valid field values provided" });
+    }
+
+    const encExtra = encrypt(JSON.stringify(newExtra));
+    const webhookUrl = meta.webhookPath ? `https://alburhantravels.com${meta.webhookPath}` : null;
+
+    if (existingRow) {
+      await pool.query(
+        `UPDATE social_platform_configs SET extra_fields_encrypted=$1, webhook_url=$2, status='configured', updated_at=NOW() WHERE platform=$3`,
+        [encExtra, webhookUrl, platformKey]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO social_platform_configs (platform, enabled, extra_fields_encrypted, webhook_url, status)
+         VALUES ($1, true, $2, $3, 'configured')`,
+        [platformKey, encExtra, webhookUrl]
+      );
+    }
+
+    res.json({ ok: true, message: `${meta.name} credentials saved successfully.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── POST /api/social-media/platforms/:platform/test ──────────────────────────
@@ -1087,7 +1206,7 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
     const extra = decryptExtra(r.rows[0].extra_fields_encrypted);
     const token = extra.bot_token;
     if (!token) return void res.status(400).json({ ok: false, message: "Bot token not configured" });
-    const webhookUrl = "https://alburhantravels.online/api/social-media/webhook/telegram";
+    const webhookUrl = "https://alburhantravels.com/api/social-media/webhook/telegram";
     const resp = await axios.post(`https://api.telegram.org/bot${token}/setWebhook`, {
       url: webhookUrl,
       secret_token: extra.webhook_secret || undefined,
@@ -1107,7 +1226,7 @@ router.post("/telegram/set-webhook", requireAdmin as any, async (req, res) => {
 // and returns status_code, raw_response, error_code, error_type, and a fix hint.
 router.get("/meta/health", requireAdmin as any, async (_req, res) => {
   const GRAPH = "https://graph.facebook.com/v19.0";
-  const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
+  const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
   const TO = 10000;
 
   // ── Load all Meta platform configs ─────────────────────────────────────────
@@ -1633,7 +1752,7 @@ router.post("/meta/quick-configure", requireAdmin as any, async (req, res) => {
     next_steps: [
       `✅ Token saved to ${PLATFORMS_TO_UPDATE.length} platforms`,
       `Set verify token "${verTok}" in: Meta App Dashboard → Products → Webhooks → Edit Subscription → Verify Token`,
-      `Webhook URL to register: https://alburhantravels.online/api/social-media/webhook/meta`,
+      `Webhook URL to register: https://alburhantravels.com/api/social-media/webhook/meta`,
       `Then click "Subscribe All Webhook Fields" on this page`,
       !igId ? "Instagram not linked — in Instagram app: Settings → Account → Switch to Professional, then link to your Facebook Page" : `Instagram Account ID ${igId} saved`,
     ],
@@ -1684,7 +1803,7 @@ router.post("/meta/test-message", requireAdmin as any, async (req, res) => {
 // webhook re-subscription, challenge verification. Returns a full repair log.
 router.post("/meta/auto-repair", requireAdmin as any, async (_req, res) => {
   const GRAPH = "https://graph.facebook.com/v19.0";
-  const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
+  const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
   const TO = 10000;
   const repairs: any[] = [];
 
@@ -2106,7 +2225,7 @@ router.get("/meta/platform/:platform", requireAdmin as any, async (req, res) => 
     } else if (platform === "webhooks") {
       // Challenge self-test
       const verifyOk = !!webhookVerifyToken && !webhookVerifyToken.startsWith("http");
-      const WEBHOOK_URL = "https://alburhantravels.online/api/social-media/webhook/meta";
+      const WEBHOOK_URL = "https://alburhantravels.com/api/social-media/webhook/meta";
       if (verifyOk) {
         const r = await gfetch(`${WEBHOOK_URL}?hub.mode=subscribe&hub.verify_token=${encodeURIComponent(webhookVerifyToken!)}&hub.challenge=platform_test_99887`);
         const raw = r.data?._raw ?? "";
@@ -2297,7 +2416,7 @@ router.post("/website-inquiry", async (req, res) => {
 // OAUTH HUB — Real OAuth flows for Meta, Google, Telegram
 // ═══════════════════════════════════════════════════════════════════════════
 
-const OAUTH_REDIRECT_BASE = "https://alburhantravels.online/api/social-media/oauth";
+const OAUTH_REDIRECT_BASE = "https://alburhantravels.com/api/social-media/oauth";
 
 // ── Ensure oauth_connections table ───────────────────────────────────────────
 async function ensureOAuthTable() {
