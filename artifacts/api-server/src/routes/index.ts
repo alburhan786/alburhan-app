@@ -93,7 +93,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-08-01-v30.3-domain-com-only";
+const BUILD_STAMP = "2026-08-01-v30.3b-domain-com-db-patch";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});

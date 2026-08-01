@@ -2555,6 +2555,35 @@ async function runMigrations() {
         AND (provider_response::text LIKE '%333473%' OR provider_response::text LIKE '%conformation%')
         AND retry_count < 10`);
   } catch (_) {}
+
+  // v30.3 — Replace any legacy alburhantravels.online references stored in DB
+  //          with the canonical alburhantravels.com domain. Idempotent UPDATE.
+  try {
+    const { rowCount: wcRows } = await pool.query(`
+      UPDATE social_platform_configs
+      SET webhook_url = REPLACE(webhook_url, 'alburhantravels.online', 'alburhantravels.com')
+      WHERE webhook_url LIKE '%alburhantravels.online%'`);
+    if (wcRows && wcRows > 0)
+      console.log(`[Migration] v30.3 updated ${wcRows} social_platform_configs webhook_url row(s) to .com`);
+  } catch (_) {}
+
+  try {
+    const { rowCount: asRows } = await pool.query(`
+      UPDATE api_settings
+      SET value = REPLACE(value, 'alburhantravels.online', 'alburhantravels.com')
+      WHERE value LIKE '%alburhantravels.online%'`);
+    if (asRows && asRows > 0)
+      console.log(`[Migration] v30.3 updated ${asRows} api_settings value row(s) to .com`);
+  } catch (_) {}
+
+  try {
+    const { rowCount: nbRows } = await pool.query(`
+      UPDATE notifications
+      SET message = REPLACE(message, 'alburhantravels.online', 'alburhantravels.com')
+      WHERE message LIKE '%alburhantravels.online%' AND created_at > NOW() - INTERVAL '90 days'`);
+    if (nbRows && nbRows > 0)
+      console.log(`[Migration] v30.3 updated ${nbRows} recent notification message(s) to .com`);
+  } catch (_) {}
 }
 
 const rawPort = process.env["PORT"];
