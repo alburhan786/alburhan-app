@@ -76,7 +76,7 @@ function CertificatePreview({
             🕌
           </div>
           <p className="text-amber-300 text-xs font-bold tracking-[0.2em] uppercase">Al Burhan Tours & Travels</p>
-          <p className="text-white/50 text-[10px] tracking-wider">Bhopal, India • alburhantravels.online</p>
+          <p className="text-white/50 text-[10px] tracking-wider">Bhopal, India • alburhantravels.com</p>
         </div>
 
         {/* Certificate Header */}

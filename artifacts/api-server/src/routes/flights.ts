@@ -158,7 +158,7 @@ router.post("/:id/confirm", requireAdmin as any, async (req: AuthenticatedReques
         sendEmail(
           p.customer_email,
           `✈️ Flight Confirmed — Booking #${p.booking_number}`,
-          `As-salamu Alaykum ${p.full_name},\n\nYour flight details have been confirmed for Booking #${p.booking_number}.\n\nAirline: ${flight.airline || "Any Airline"}\nFlight No: ${flight.flightNumber || "To Be Confirmed"}\nPNR: ${flight.pnr || "To Be Confirmed"}\nDeparture: ${depStr}\nArrival: ${arrStr}\nBaggage: ${flight.baggageAllowance || "25 KG"}\n\nPlease log in to alburhantravels.online to download your updated agreement.\n\nJazakAllah Khair,\nAl Burhan Tours & Travels`,
+          `As-salamu Alaykum ${p.full_name},\n\nYour flight details have been confirmed for Booking #${p.booking_number}.\n\nAirline: ${flight.airline || "Any Airline"}\nFlight No: ${flight.flightNumber || "To Be Confirmed"}\nPNR: ${flight.pnr || "To Be Confirmed"}\nDeparture: ${depStr}\nArrival: ${arrStr}\nBaggage: ${flight.baggageAllowance || "25 KG"}\n\nPlease log in to alburhantravels.com to download your updated agreement.\n\nJazakAllah Khair,\nAl Burhan Tours & Travels`,
           `<p>As-salamu Alaykum <strong>${p.full_name}</strong>,</p>
            <p>Your flight details have been <strong>confirmed</strong> for Booking <strong>#${p.booking_number}</strong>.</p>
            <table style="border-collapse:collapse;margin:16px 0">
@@ -169,7 +169,7 @@ router.post("/:id/confirm", requireAdmin as any, async (req: AuthenticatedReques
              <tr><td style="padding:6px 12px;background:#f0fdf4;font-weight:bold">Arrival</td><td style="padding:6px 12px">${arrStr}</td></tr>
              <tr><td style="padding:6px 12px;background:#f0fdf4;font-weight:bold">Baggage</td><td style="padding:6px 12px">${flight.baggageAllowance || "25 KG"}</td></tr>
            </table>
-           <p>Please <a href="https://alburhantravels.online">log in</a> to download your updated Agreement PDF with confirmed flight details.</p>
+           <p>Please <a href="https://alburhantravels.com">log in</a> to download your updated Agreement PDF with confirmed flight details.</p>
            <p>Jazakallah Khair,<br>Al Burhan Tours & Travels</p>`
         ).catch(e => console.error("[flights/confirm] email failed:", e));
       }

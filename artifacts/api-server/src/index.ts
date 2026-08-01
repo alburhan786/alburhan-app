@@ -1653,12 +1653,12 @@ async function runMigrations() {
       },
       {
         name: "hajj_promotion", display_name: "Hajj Promotion", category: "MARKETING", event_type: "custom_admin",
-        body_text: "Assalamu Alaikum {{customer_name}},\n\n🕌 Hajj 2025 — Limited Seats Available!\n\nAl Burhan Tours & Travels is pleased to announce our Hajj packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nEarly registration ensures your seat. Book now!\n\nContact: +91 9893225590\nVisit: alburhantravels.online\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🕌 Hajj 2025 — Limited Seats Available!\n\nAl Burhan Tours & Travels is pleased to announce our Hajj packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nEarly registration ensures your seat. Book now!\n\nContact: +91 9893225590\nVisit: alburhantravels.com\n\nJazak Allah Khair!\nAl Burhan Tours & Travels",
         variables: ["customer_name","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
       },
       {
         name: "umrah_promotion", display_name: "Umrah Promotion", category: "MARKETING", event_type: "custom_admin",
-        body_text: "Assalamu Alaikum {{customer_name}},\n\n🌙 Umrah Packages — Al Burhan Tours & Travels\n\nFulfill your spiritual journey with our blessed Umrah packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nIncludes: Visa, Flights, Hotel & Ziyarat\n\nBook Now: +91 9893225590\nVisit: alburhantravels.online\n\nMay Allah accept your Umrah. Ameen!\nAl Burhan Tours & Travels",
+        body_text: "Assalamu Alaikum {{customer_name}},\n\n🌙 Umrah Packages — Al Burhan Tours & Travels\n\nFulfill your spiritual journey with our blessed Umrah packages.\n\n📦 Package: {{package_name}}\n💰 Starting from: ₹{{amount}}\n\nIncludes: Visa, Flights, Hotel & Ziyarat\n\nBook Now: +91 9893225590\nVisit: alburhantravels.com\n\nMay Allah accept your Umrah. Ameen!\nAl Burhan Tours & Travels",
         variables: ["customer_name","package_name","amount"], footer_text: "Al Burhan Tours & Travels",
       },
     ];
@@ -3135,7 +3135,7 @@ async function start() {
                 const pushResult = await sendPushToCustomer(item.customer_id, {
                   title: "Al Burhan Tours & Travels",
                   body: item.message?.substring(0, 200) || "Update from Al Burhan Tours & Travels",
-                  url: "https://alburhantravels.online/customer/dashboard",
+                  url: "https://alburhantravels.com/customer/dashboard",
                 });
                 ok = pushResult.ok;
                 errorMessage = pushResult.ok ? undefined : "Push delivery failed (no active subscriptions)";

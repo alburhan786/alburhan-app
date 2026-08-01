@@ -43,7 +43,7 @@ const DEFAULTS = {
   company_address: "",
   company_phone: "",
   company_email: "",
-  company_website: "https://alburhantravels.online",
+  company_website: "https://alburhantravels.com",
   gst_number: "",
   pan_number: "",
   currency: "INR",
@@ -142,8 +142,8 @@ export default function BusinessSettings() {
             <Field label="Company Name" name="company_name" value={settings.company_name} onChange={handleChange} placeholder="Al Burhan Tours & Travels" />
             <Field label="Tagline" name="company_tagline" value={settings.company_tagline} onChange={handleChange} placeholder="Your Trusted Partner" />
             <Field label="Phone" name="company_phone" value={settings.company_phone} onChange={handleChange} placeholder="+91 XXXXX XXXXX" />
-            <Field label="Email" name="company_email" value={settings.company_email} onChange={handleChange} type="email" placeholder="info@alburhantravels.online" />
-            <Field label="Website" name="company_website" value={settings.company_website} onChange={handleChange} placeholder="https://alburhantravels.online" />
+            <Field label="Email" name="company_email" value={settings.company_email} onChange={handleChange} type="email" placeholder="info@alburhantravels.com" />
+            <Field label="Website" name="company_website" value={settings.company_website} onChange={handleChange} placeholder="https://alburhantravels.com" />
             <Field label="GST Number" name="gst_number" value={settings.gst_number} onChange={handleChange} placeholder="29ABCDE1234F1Z5" />
             <Field label="PAN Number" name="pan_number" value={settings.pan_number} onChange={handleChange} placeholder="ABCDE1234F" />
           </div>

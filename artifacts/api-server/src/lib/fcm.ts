@@ -74,7 +74,7 @@ export async function sendFCMToToken(
   const projectId = process.env.FIREBASE_PROJECT_ID;
   try {
     const accessToken = await getAccessToken();
-    const url = payload.url || "https://alburhantravels.online/customer/dashboard";
+    const url = payload.url || "https://alburhantravels.com/customer/dashboard";
     const msg: any = {
       token,
       notification: { title: payload.title, body: payload.body },

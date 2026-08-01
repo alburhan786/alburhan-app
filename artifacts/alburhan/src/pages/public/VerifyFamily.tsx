@@ -292,7 +292,7 @@ export default function VerifyFamily() {
         {/* Footer */}
         <div style={{ background: `${DARK}08`, borderTop: `1px solid ${DARK}15`, padding: "12px 20px", textAlign: "center" }}>
           <div style={{ fontSize: "11px", color: "#888" }}>Al Burhan Tours & Travels</div>
-          <div style={{ fontSize: "10px", color: "#aaa", marginTop: "2px" }}>www.alburhantravels.online</div>
+          <div style={{ fontSize: "10px", color: "#aaa", marginTop: "2px" }}>www.alburhantravels.com</div>
         </div>
       </div>
     </div>

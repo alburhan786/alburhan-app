@@ -382,7 +382,7 @@ router.post("/:bookingId/send-whatsapp", requireAdmin, async (req: Authenticated
     if (!b) return void res.status(404).json({ message: "Booking not found" });
 
     const inv = await upsertInvoiceForBooking(bookingId);
-    const invoiceUrl = `https://alburhantravels.online/invoice/${b.booking_number}`;
+    const invoiceUrl = `https://alburhantravels.com/invoice/${b.booking_number}`;
 
     await triggerWorkflow("invoice_generated", {
       customerName: b.customer_name,

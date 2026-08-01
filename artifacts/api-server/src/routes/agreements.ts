@@ -222,7 +222,7 @@ function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfO
 function getSiteBase(): string {
   return process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.online");
+    : (process.env.SITE_URL || "https://alburhantravels.com");
 }
 
 // ── Fetch an image from storage/disk/URL into a Buffer (for PDF embedding) ───
@@ -303,7 +303,7 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
     console.log(`[Agreement] Auto-generated ${agreementNumber} for booking ${booking.booking_number}`);
 
     // Notify customer via WhatsApp — agreement_ready template (fire-and-forget)
-    const signingUrl = `https://alburhantravels.online/sign-agreement/${verificationToken}`;
+    const signingUrl = `https://alburhantravels.com/sign-agreement/${verificationToken}`;
     const notifyMobile = booking.customer_mobile || booking.whatsapp_number || booking.mobile_india;
     console.log(`[Agreement] Triggering agreement_generated workflow for ${booking.booking_number} | mobile=${notifyMobile ? notifyMobile.slice(-4).padStart(notifyMobile.length, "*") : "MISSING"}`);
     triggerWorkflow("agreement_generated", {

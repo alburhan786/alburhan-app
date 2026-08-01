@@ -29,7 +29,7 @@ module.exports = {
       env: {
         NODE_ENV:            "production",
         PORT:                "3000",
-        SITE_BASE:           "https://alburhantravels.online",
+        SITE_BASE:           "https://alburhantravels.com",
         REPLIT_DEV_URL:      "",      // leave blank — not needed once fully on VPS
         // These will be overridden by your .env file:
         // DATABASE_URL, SESSION_SECRET, RAZORPAY_KEY_ID, RAZORPAY_SECRET,
@@ -62,7 +62,7 @@ module.exports = {
       env: {
         NODE_ENV:  "production",
         PORT:      "3001",
-        SITE_BASE: "https://alburhantravels.online",
+        SITE_BASE: "https://alburhantravels.com",
       },
       env_file:        ENV_FILE,
       error_file:      "/var/log/pm2/pdf-enterprise-error.log",

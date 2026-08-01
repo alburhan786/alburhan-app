@@ -449,7 +449,7 @@ function MyAgreementsSection({
 
   const handleShare = (ag: any) => {
     const verifyToken = ag.verification_token || ag.agreement_number;
-    const url = `https://alburhantravels.online/verify-agreement/${verifyToken}`;
+    const url = `https://alburhantravels.com/verify-agreement/${verifyToken}`;
     if (navigator.share) {
       navigator.share({ title: `Hajj Agreement ${ag.agreement_number}`, text: `Al Burhan Tours & Travels — ${ag.agreement_number}`, url }).catch(() => {});
     } else {
@@ -637,7 +637,7 @@ function MyAgreementsSection({
                     className="font-semibold text-xs border-gray-300 text-gray-600 hover:bg-gray-50"
                     onClick={() => {
                       const tok = ag.verification_token || ag.agreement_number;
-                      const verifyUrl = `https://alburhantravels.online/verify-agreement/${tok}`;
+                      const verifyUrl = `https://alburhantravels.com/verify-agreement/${tok}`;
                       window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(verifyUrl)}`, "_blank");
                     }}
                   >
@@ -3501,7 +3501,7 @@ export default function CustomerDashboard() {
                                 style={{ borderColor: "#9ca3af", color: "#4b5563" }}
                                 onClick={() => {
                                   const tok = ag.verification_token || ag.agreement_number;
-                                  const verifyUrl = `https://alburhantravels.online/verify-agreement/${tok}`;
+                                  const verifyUrl = `https://alburhantravels.com/verify-agreement/${tok}`;
                                   window.open(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(verifyUrl)}`, "_blank");
                                 }}
                               >
@@ -3513,7 +3513,7 @@ export default function CustomerDashboard() {
                                 className="font-semibold text-xs"
                                 style={{ borderColor: "#9ca3af", color: "#4b5563" }}
                                 onClick={() => {
-                                  const url = `https://alburhantravels.online/verify-agreement/${ag.verification_token || ag.agreement_number}`;
+                                  const url = `https://alburhantravels.com/verify-agreement/${ag.verification_token || ag.agreement_number}`;
                                   navigator.clipboard?.writeText(url).catch(() => {});
                                 }}
                               >
@@ -3606,7 +3606,7 @@ export default function CustomerDashboard() {
                               size="sm"
                               variant="outline"
                               className="border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
-                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.online/invoice/${booking.bookingNumber}`)}`, "_blank")}
+                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Assalamu Alaikum! My Hajj/Umrah booking with Al Burhan Tours & Travels.\n\nInvoice No: ${booking.invoiceNumber}\nBooking: #${booking.bookingNumber}\n\nView Invoice: https://alburhantravels.com/invoice/${booking.bookingNumber}`)}`, "_blank")}
                             >
                               <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
                             </Button>

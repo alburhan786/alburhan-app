@@ -141,7 +141,7 @@ export async function resolveVariables(
       const pa = Number(b.paid_amount) || 0;
       if (!vars.balance_amount) vars.balance_amount = String(Math.round(fa - pa));
       if (!vars.payment_status) vars.payment_status = pa >= fa ? "Paid" : pa > 0 ? "Partial" : "Pending";
-      if (!vars.dashboard_url)  vars.dashboard_url  = "https://alburhantravels.online/my-bookings";
+      if (!vars.dashboard_url)  vars.dashboard_url  = "https://alburhantravels.com/my-bookings";
       if (!vars.support_phone)  vars.support_phone  = "7045009898";
       // Use invoice_number from bookings row as fallback before hitting invoices table
       if (!vars.invoice_number && b.booking_invoice_number) vars.invoice_number = b.booking_invoice_number;
@@ -183,7 +183,7 @@ export async function resolveVariables(
         const agr = agrRow.rows[0];
         if (!vars.agreement_number) vars.agreement_number = agr.agreement_number || agr.id?.slice(0,8).toUpperCase() || "";
         // agreements table has no document_url column — use the public signing link
-        if (!vars.document_url) vars.document_url = `https://alburhantravels.online/sign-agreement/${agr.id}`;
+        if (!vars.document_url) vars.document_url = `https://alburhantravels.com/sign-agreement/${agr.id}`;
       }
     }
 
@@ -242,7 +242,7 @@ export async function resolveVariables(
   // Type C — hash-bang format (template 3661)
   if (!vars["#!name!#"])        vars["#!name!#"]        = cn;
   if (!vars[": #!agreement!#"]) vars[": #!agreement!#"] = vars.agreement_number || "";
-  if (!vars["🔗 #!download!#"]) vars["🔗 #!download!#"] = vars.document_url    || "https://alburhantravels.online/my-bookings";
+  if (!vars["🔗 #!download!#"]) vars["🔗 #!download!#"] = vars.document_url    || "https://alburhantravels.com/my-bookings";
   if (!vars["#!bookingid!#"])   vars["#!bookingid!#"]   = bid;
 
   return vars;

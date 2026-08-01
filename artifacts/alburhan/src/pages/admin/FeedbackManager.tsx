@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
 import { COMPANIES } from "@/lib/companies";
 
-const PROD_DOMAIN = "https://alburhantravels.online";
+const PROD_DOMAIN = "https://alburhantravels.com";
 
 const API = import.meta.env.VITE_API_URL || "";
 

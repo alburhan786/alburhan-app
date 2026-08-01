@@ -408,7 +408,7 @@ Please log in to your Al Burhan Tours & Travels Dashboard
 to download or view your document.
 
 Dashboard:
-https://alburhantravels.online/dashboard
+https://alburhantravels.com/dashboard
 
 For assistance:
 +91 9893225590

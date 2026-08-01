@@ -376,7 +376,7 @@ export default function SocialIntegrationHub() {
           </ol>
           <div className="mt-3 p-2 bg-blue-100 rounded-lg">
             <span className="text-xs text-blue-700 font-medium">Webhook endpoint: </span>
-            <code className="text-xs text-blue-900 font-mono">https://alburhantravels.online/api/social-media/webhook/meta</code>
+            <code className="text-xs text-blue-900 font-mono">https://alburhantravels.com/api/social-media/webhook/meta</code>
           </div>
         </div>
 

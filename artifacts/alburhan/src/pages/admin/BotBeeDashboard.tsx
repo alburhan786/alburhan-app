@@ -344,7 +344,7 @@ export default function BotBeeDashboard() {
                       <span className="text-xs text-gray-600">{w.label}</span>
                       <div className="flex items-center gap-1">
                         <code className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded font-mono">{w.path}</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => { navigator.clipboard.writeText(`https://alburhantravels.online${w.path}`); toast({ title: "Copied!" }); }}>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => { navigator.clipboard.writeText(`https://alburhantravels.com${w.path}`); toast({ title: "Copied!" }); }}>
                           <Copy size={10} />
                         </Button>
                       </div>
@@ -581,7 +581,7 @@ export default function BotBeeDashboard() {
                 </tbody>
               </table>
             </div>
-            <p className="text-[10px] text-muted-foreground">Auto-syncs from BotBee every 10 minutes. Webhook URL for BotBee: <code className="bg-gray-100 px-1 rounded">https://alburhantravels.online/api/webhook/botbee</code></p>
+            <p className="text-[10px] text-muted-foreground">Auto-syncs from BotBee every 10 minutes. Webhook URL for BotBee: <code className="bg-gray-100 px-1 rounded">https://alburhantravels.com/api/webhook/botbee</code></p>
           </div>
         )}
 

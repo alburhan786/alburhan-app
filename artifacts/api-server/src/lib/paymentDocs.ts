@@ -137,7 +137,7 @@ export async function generateInvoicePdfBuffer(opts: DocOpts): Promise<Buffer> {
     ["Status",       statusLabel],
   ]);
   doc.fontSize(9).fill("#888").text(
-    "This is a system-generated Tax Invoice. For queries, contact +91 9893989786 / info@alburhantravels.online",
+    "This is a system-generated Tax Invoice. For queries, contact +91 9893989786 / info@alburhantravels.com",
     MARGIN, doc.page.height - 60, { width: PAGE_W - MARGIN * 2, align: "center" }
   );
   return pdfToBuffer(doc);
@@ -212,7 +212,7 @@ export async function generateReceiptPdfBuffer(opts: DocOpts): Promise<Buffer> {
 
   doc.fontSize(8).fill("#666").text(
     "This is a computer-generated payment receipt and does not require a signature.\n" +
-    "For queries: +91 9893989786 | info@alburhantravels.online | alburhantravels.online",
+    "For queries: +91 9893989786 | info@alburhantravels.com | alburhantravels.com",
     MARGIN, doc.page.height - 65, { width: PAGE_W - MARGIN * 2, align: "center" }
   );
   doc.fill("#999").fontSize(7).text(

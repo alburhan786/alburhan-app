@@ -187,8 +187,8 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
   const booking = ctx.bookingNumber ? `#${ctx.bookingNumber}` : "";
   const pkg = ctx.packageName || "your package";
   const invUrl = ctx.bookingNumber
-    ? `https://alburhantravels.online/invoice/${ctx.bookingNumber}`
-    : "https://alburhantravels.online";
+    ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}`
+    : "https://alburhantravels.com";
 
   switch (eventType) {
     case "customer_registration":
@@ -299,7 +299,7 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
     case "medical_emergency":
       return `Assalamu Alaikum ${name},\n\nA medical case has been recorded${ctx.severity ? ` (${ctx.severity})` : ""}${ctx.description ? `: ${ctx.description}` : ""}. Our team is providing assistance.\n\nEmergency: +91 9893225590\n\nAl Burhan Tours & Travels`;
     case "feedback_request":
-      return `Assalamu Alaikum ${name},\n\nJazakAllah for choosing Al Burhan Tours & Travels for ${pkg}! We'd love your feedback.\n\nRate us: https://alburhantravels.online/feedback/${ctx.bookingNumber || ""}\n\nAl Burhan Tours & Travels`;
+      return `Assalamu Alaikum ${name},\n\nJazakAllah for choosing Al Burhan Tours & Travels for ${pkg}! We'd love your feedback.\n\nRate us: https://alburhantravels.com/feedback/${ctx.bookingNumber || ""}\n\nAl Burhan Tours & Travels`;
     case "journey_status_changed": {
       const statusLabels: Record<string, string> = {
         documents_pending:  "Documents Required — Please submit your passport and required documents.",
@@ -514,7 +514,7 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
       if (!pushCustomerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
-        const pushResult = await sendPushToCustomer(pushCustomerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
+        const pushResult = await sendPushToCustomer(pushCustomerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
@@ -579,7 +579,7 @@ export async function sendBotBeeEventTemplate(
     sendHajjPackageLaunchTemplate,
   } = await import("./botbee.js");
 
-  const siteBase = "https://alburhantravels.online";
+  const siteBase = "https://alburhantravels.com";
   const bookingRef = ctx.bookingNumber || bookingId || "-";
   const invoiceUrl = (ctx.invoiceUrl as string | undefined) ||
     (ctx.bookingNumber ? `${siteBase}/invoice/${ctx.bookingNumber}` : `${siteBase}`);
@@ -841,7 +841,7 @@ async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationConte
         hotel_name:     ctx.hotelName,
         room_number:    ctx.roomNumber,
         invoice_url:    (ctx.invoiceUrl as string | undefined) ||
-                        (ctx.bookingNumber ? `https://alburhantravels.online/invoice/${ctx.bookingNumber}` : undefined),
+                        (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
       };
       // Build named-variable object — BotBee substitutes #!Key!# ONLY when variables are sent as a
       // named object { "Name":"val", "BookingID":"val2" } whose keys match the template variable_map.
@@ -932,7 +932,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
             result = await smsLib.sendPaymentReceived({
               ...smsCtx,
               amount: ctx.amount != null ? String(Math.round(Number(ctx.amount))) : "0",
-              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.online/invoice/${ctx.bookingNumber}` : undefined),
+              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           case "partial_payment":
@@ -940,7 +940,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
               ...smsCtx,
               paidAmount: ctx.paidAmount != null ? String(Math.round(Number(ctx.paidAmount))) : "0",
               balanceAmount: ctx.balanceAmount != null ? String(Math.round(Number(ctx.balanceAmount))) : "0",
-              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.online/invoice/${ctx.bookingNumber}` : undefined),
+              invoiceUrl: (ctx.invoiceUrl as string | undefined) || (ctx.bookingNumber ? `https://alburhantravels.com/invoice/${ctx.bookingNumber}` : undefined),
             });
             break;
           case "balance_reminder":
@@ -1079,7 +1079,7 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushTitle = buildEmailSubject(eventType, ctx) || "Al Burhan Tours & Travels";
-        const pushResult = await sendPushToCustomer(pushCustomerId2, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.online/customer/dashboard" });
+        const pushResult = await sendPushToCustomer(pushCustomerId2, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };

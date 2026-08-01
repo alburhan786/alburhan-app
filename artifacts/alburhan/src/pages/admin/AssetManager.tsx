@@ -10,7 +10,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const COMPANY = "Al Burhan Tours & Travels";
-const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.online";
+const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.com";
 
 const API = import.meta.env.VITE_API_URL || "";
 

@@ -3,7 +3,7 @@ import webPush from "web-push";
 import { pool } from "@workspace/db";
 import crypto from "crypto";
 
-const VAPID_SUBJECT = "mailto:admin@alburhantravels.online";
+const VAPID_SUBJECT = "mailto:admin@alburhantravels.com";
 
 let _vapidKeys: { publicKey: string; privateKey: string } | null = null;
 
@@ -64,7 +64,7 @@ export async function sendPushToCustomer(
     const payloadStr = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      url: payload.url || "https://alburhantravels.online/customer/dashboard",
+      url: payload.url || "https://alburhantravels.com/customer/dashboard",
       icon: payload.icon || "/opengraph.jpg",
       tag: payload.tag || "alburhan-notification",
     });
@@ -114,7 +114,7 @@ export async function sendPushToAllCustomers(
     const payloadStr = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      url: payload.url || "https://alburhantravels.online/customer/dashboard",
+      url: payload.url || "https://alburhantravels.com/customer/dashboard",
       icon: "/opengraph.jpg",
       tag: "alburhan-broadcast",
     });

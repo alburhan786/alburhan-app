@@ -981,7 +981,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
   const finalAmount = Number(booking.final_amount  || booking.total_amount || 0);
   const hasPayment  = paidAmount > 0;
   const email       = booking.customer_email || null;
-  const siteBase    = process.env.SITE_BASE || "https://alburhantravels.online";
+  const siteBase    = process.env.SITE_BASE || "https://alburhantravels.com";
   const invoiceLink = `${siteBase}/invoice/${booking.booking_number}`;
 
   type R = { status: "ok" | "fail" | "skip"; detail?: string; ms?: number };
@@ -1475,11 +1475,11 @@ DB_OK=\$(curl -sf --max-time 15 "http://127.0.0.1:\$PORT/api/migrate/db-check?ke
   | python3 -c "import sys,json; d=json.load(sys.stdin); ok=sum(1 for v in d['checks'].values() if v.startswith('OK')); tot=len(d['checks']); print(f'{ok}/{tot} tables OK')" 2>/dev/null || echo "check failed")
 echo "    DB tables: \$DB_OK"
 
-OTP=\$(curl -s --max-time 10 -X POST "https://alburhantravels.online/api/auth/send-otp" \\
+OTP=\$(curl -s --max-time 10 -X POST "https://alburhantravels.com/api/auth/send-otp" \\
   -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 120 || echo "no-response")
 echo "    OTP test: \$OTP"
 
-PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.online/api/health" 2>/dev/null || echo "FAIL")
+PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "FAIL")
 echo "    Public health: \$PUBLIC"
 
 echo ""
@@ -1655,7 +1655,7 @@ app.post("/api/migrate/botbee-diag", async (req, res) => {
         packageName: "Hajj Package 2026",
         bookingId: "BKG-DIAG-001",
         amount: 50000,
-        invoiceUrl: "https://alburhantravels.online/invoice/diag",
+        invoiceUrl: "https://alburhantravels.com/invoice/diag",
       }, {}),
       sendPaymentReceivedTemplate(testPhone, {
         customerName: "Test User",
@@ -2370,7 +2370,7 @@ app.post("/api/migrate/botbee-format-test", async (req, res) => {
   // Use booking_approved (409950) — 5 vars: name, bookingId, package, amount, invoiceUrl
   const phone = (req.body?.phone as string) || "919867114562";
   const TEMPLATE_ID = 409950;
-  const VALS = ["Mohammed Altaf TEST", "ABT26582778", "Ramadan Umrah Package", "189000", "https://alburhantravels.online/invoice/ABT26582778"];
+  const VALS = ["Mohammed Altaf TEST", "ABT26582778", "Ramadan Umrah Package", "189000", "https://alburhantravels.com/invoice/ABT26582778"];
 
   // Known variable names from user report (#!Name!# #!BookingID!# #!Package!# #!Amount!# #!Paymenturllink!#)
   const NAMED: Record<string, string> = {
@@ -2454,7 +2454,7 @@ app.post("/api/migrate/wa-approval-test", async (req, res) => {
     bookingId = row.booking_number || row.id;
     packageName = row.package_name || "Package";
     amount = Number(row.final_amount || row.paid_amount || 0);
-    invoiceUrl = row.invoice_number ? `https://alburhantravels.online/invoice/${row.invoice_number}` : `https://alburhantravels.online`;
+    invoiceUrl = row.invoice_number ? `https://alburhantravels.com/invoice/${row.invoice_number}` : `https://alburhantravels.com`;
   } else {
     mobile = ((req.body?.mobile || req.query.mobile || "") as string).replace(/\D/g, "");
     if (!mobile) return void res.status(400).json({ error: "Provide bookingId or mobile" });
@@ -2462,7 +2462,7 @@ app.post("/api/migrate/wa-approval-test", async (req, res) => {
     bookingId = (req.body?.bookingId || "TEST-001") as string;
     packageName = (req.body?.packageName || "Hajj Package 2026") as string;
     amount = Number(req.body?.amount || 50000);
-    invoiceUrl = (req.body?.invoiceUrl || "https://alburhantravels.online/invoice/TEST-001") as string;
+    invoiceUrl = (req.body?.invoiceUrl || "https://alburhantravels.com/invoice/TEST-001") as string;
   }
 
   console.log(`[wa-approval-test] Sending booking_approved to ${mobile} (${name})`);
@@ -2538,7 +2538,7 @@ app.post("/api/migrate/wa-fullpipeline-test", async (req, res) => {
     customerEmail: row.customer_email,
     packageName: row.package_name || row.package_name || "Hajj/Umrah Package",
     finalAmount: row.final_amount ? Number(row.final_amount) : undefined,
-    invoiceUrl: `https://alburhantravels.online/invoice/${row.booking_number}`,
+    invoiceUrl: `https://alburhantravels.com/invoice/${row.booking_number}`,
   };
 
   const beforeMs = Date.now();
@@ -2603,7 +2603,7 @@ app.post("/api/migrate/wa-real-approve-test", async (req, res) => {
       `INSERT INTO bookings (id, booking_number, customer_name, customer_mobile, customer_email,
         package_name, final_amount, number_of_pilgrims, status, is_offline, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,1,'pending',true,NOW(),NOW())`,
-      [testId, testNum, testName, testPhone, "test@alburhantravels.online",
+      [testId, testNum, testName, testPhone, "test@alburhantravels.com",
        "Economy Umrah Package", "75000"]
     );
     step("booking_created", {
@@ -2660,10 +2660,10 @@ app.post("/api/migrate/wa-real-approve-test", async (req, res) => {
       bookingNumber:  testNum,
       customerName:   testName.trim(),
       customerMobile: testPhone,
-      customerEmail:  "test@alburhantravels.online",
+      customerEmail:  "test@alburhantravels.com",
       packageName:    "Economy Umrah Package",
       finalAmount:    75000,
-      invoiceUrl:     `https://alburhantravels.online/invoice/${testNum}`,
+      invoiceUrl:     `https://alburhantravels.com/invoice/${testNum}`,
     };
     step("triggerWorkflow_called", {
       trigger: "booking_approved",
@@ -2937,7 +2937,7 @@ app.post("/api/migrate/botbee-send-test", async (req, res) => {
   const total = Number(bRow.final_amount || bRow.total_amount || 0);
   const paid = Number(bRow.paid_amount || 0);
   const invoiceNo = invoiceRow?.invoice_number || bookingNum;
-  const invoiceUrl = `https://alburhantravels.online/invoice/${bookingNum}`;
+  const invoiceUrl = `https://alburhantravels.com/invoice/${bookingNum}`;
 
   let result: any;
   if (templateKey === "invoice_ready") {
@@ -2971,7 +2971,7 @@ app.get("/api/migrate/payload-audit", async (req, res) => {
   const bookingNum = ((req.query.booking as string) || "ABT26582778").trim().toUpperCase();
   const { pool: p } = await import("@workspace/db");
   const { TEMPLATE_BODIES } = await import("./lib/botbee.js");
-  const SITE = process.env.SITE_BASE || "https://alburhantravels.online";
+  const SITE = process.env.SITE_BASE || "https://alburhantravels.com";
 
   // ── Load all relevant booking data from DB ──────────────────────────────────
   // Each query is wrapped individually so a missing column/table never aborts the whole audit.
@@ -3376,8 +3376,8 @@ app.get("/api/migrate/botbee-audit", async (req, res) => {
     Name: "Mohammed Altaf", BookingID: "ABT26582778",
     PackageContent: "Ramadan Umrah Full Month Package", Amount: "1,89,000",
     Invoice: "INV-26582778",
-    Paymenturllink: "https://alburhantravels.online/invoice/ABT26582778",
-    Agreement: "AGR-26582778", Download: "https://alburhantravels.online/agreement/ABT26582778",
+    Paymenturllink: "https://alburhantravels.com/invoice/ABT26582778",
+    Agreement: "AGR-26582778", Download: "https://alburhantravels.com/agreement/ABT26582778",
     Visano: "SA-VIS-12345", Flightnumber: "IX-141",
     Departuredate: "2027-01-15", Reportingtime: "04:00 AM",
     Airport: "CSIA Terminal 2, Mumbai", T2: "CSIA Terminal 2, Mumbai",
@@ -3552,7 +3552,7 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     total:        Number(bRow.final_amount || bRow.total_amount || 0),
     status:       bRow.status,
   };
-  const invoiceUrl = `https://alburhantravels.online/invoice/${booking.num}`;
+  const invoiceUrl = `https://alburhantravels.com/invoice/${booking.num}`;
 
   step(0, "Booking selected", true,
     `${booking.num} · ${booking.name} · ${booking.mobile} · status=${booking.status}`);
@@ -3729,7 +3729,7 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
   // ── STEP 9: agreement_ready WhatsApp ─────────────────────────────────────────
   if (agreement) {
     const t0 = Date.now();
-    const agUrl = `https://alburhantravels.online/agreement/${agreement.agreement_number}`;
+    const agUrl = `https://alburhantravels.com/agreement/${agreement.agreement_number}`;
     const r = await sendAgreementReadyTemplate(booking.mobile, {
       customerName:    booking.name,
       bookingId:       booking.num,
@@ -3996,7 +3996,7 @@ app.get("/api/migrate/botbee-discovery", async (req, res) => {
     // F6: bookingsubmitted with F1 format (to confirm if this template also fails)
     { label: "F6:bookingsubmitted-meta", payload: {
         apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
-        template: { name: "bookingsubmitted", language: { code: "en" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"https://alburhantravels.online" }] }] } } },
+        template: { name: "bookingsubmitted", language: { code: "en" }, components: [{ type: "body", parameters: [{ type:"text",text:"Test" },{ type:"text",text:"ABT001" },{ type:"text",text:"Hajj 2026" },{ type:"text",text:"https://alburhantravels.com" }] }] } } },
     // F7: business_account_id from DB extra fields (this is what BOTBEE_BUSINESS_ID maps to)
     { label: "F7:business_account_id", payload: {
         apiToken: sendApiToken, phone_number_id: sendPid, phone_number: "919867114562",
@@ -4222,16 +4222,16 @@ sleep 5
 
 # 7. Health check
 echo ""
-HEALTH=\$(curl -sf --max-time 8 "https://alburhantravels.online/api/health" 2>/dev/null || echo "timeout")
+HEALTH=\$(curl -sf --max-time 8 "https://alburhantravels.com/api/health" 2>/dev/null || echo "timeout")
 echo "Health: $HEALTH"
-DB_CHK=\$(curl -sf --max-time 10 "https://alburhantravels.online/api/migrate/db-check?key=$KEY" 2>/dev/null | head -c 200 || echo "not ready yet")
+DB_CHK=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/migrate/db-check?key=$KEY" 2>/dev/null | head -c 200 || echo "not ready yet")
 echo "DB:     $DB_CHK"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
 echo "║  ✅ DEPLOY COMPLETE                                  ║"
 echo "║  Future deploys (no SSH):                            ║"
-echo "║  curl -X POST 'https://alburhantravels.online/api/      ║"
+echo "║  curl -X POST 'https://alburhantravels.com/api/      ║"
 echo "║    migrate/self-update?key=$KEY'                     ║"
 echo "╚══════════════════════════════════════════════════════╝"
 `;
@@ -4386,7 +4386,7 @@ else
   echo "    Version: \$VER"
 
   # Public via Nginx
-  PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.online/api/health" 2>/dev/null || echo "FAIL")
+  PUBLIC=\$(curl -sf --max-time 10 "https://alburhantravels.com/api/health" 2>/dev/null || echo "FAIL")
   echo "    Public (nginx) → \$PUBLIC"
 
   if [ "\$PUBLIC" = "FAIL" ]; then
@@ -4402,10 +4402,10 @@ else
     echo "    nginx -t && systemctl reload nginx"
   else
     echo "  ✓ Public domain is UP"
-    PUBVER=\$(curl -sf --max-time 5 "https://alburhantravels.online/api/version" 2>/dev/null | grep -o '"build":"[^"]*"' | head -1 || echo "n/a")
+    PUBVER=\$(curl -sf --max-time 5 "https://alburhantravels.com/api/version" 2>/dev/null | grep -o '"build":"[^"]*"' | head -1 || echo "n/a")
     echo "    Public version: \$PUBVER"
 
-    OTP=\$(curl -s -X POST --max-time 8 "https://alburhantravels.online/api/auth/send-otp" \\
+    OTP=\$(curl -s -X POST --max-time 8 "https://alburhantravels.com/api/auth/send-otp" \\
       -H "Content-Type: application/json" -d '{"mobile":"0000000000"}' 2>/dev/null | head -c 120 || echo "no-response")
     echo "    OTP test (dummy): \$OTP"
 
@@ -4465,7 +4465,7 @@ pm2 status "\$PM2_APP"
 echo ""
 echo "Checking health..."
 sleep 3
-curl -sf --max-time 10 "https://alburhantravels.online/api/health" && echo "" || echo "Health check timeout — check: pm2 logs \$PM2_APP --lines 50"
+curl -sf --max-time 10 "https://alburhantravels.com/api/health" && echo "" || echo "Health check timeout — check: pm2 logs \$PM2_APP --lines 50"
 `;
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -4556,8 +4556,8 @@ curl -sf --max-time 8 "http://127.0.0.1:\$TARGET_PORT/api/health" \\
   && echo "" || echo "FAIL — check: pm2 logs \$PM2_APP --lines 50"
 
 echo ""
-echo "Testing https://alburhantravels.online/api/health ..."
-curl -sf --max-time 10 "https://alburhantravels.online/api/health" \\
+echo "Testing https://alburhantravels.com/api/health ..."
+curl -sf --max-time 10 "https://alburhantravels.com/api/health" \\
   && echo "" || echo "FAIL — Nginx still cannot reach Node on port \$TARGET_PORT"
 echo ""
 echo "=== Done. If still 502: paste the Nginx config block so the correct port can be confirmed ==="
@@ -5102,7 +5102,7 @@ app.post("/api/migrate/payment-pipeline-e2e", async (req, res) => {
          (id, booking_number, customer_name, customer_mobile, customer_email, package_name,
           number_of_pilgrims, total_amount, final_amount, paid_amount, status, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,1,$7,$7,0,'approved',NOW(),NOW())`,
-      [bId, bookingNumber, customerName, customerMobile, "test@alburhantravels.online",
+      [bId, bookingNumber, customerName, customerMobile, "test@alburhantravels.com",
        "Economy Umrah Package", String(finalAmount)]
     );
     t("booking_created", { booking_id: bId, booking_number: bookingNumber, final_amount: finalAmount, status: "approved" });
@@ -5143,7 +5143,7 @@ app.post("/api/migrate/payment-pipeline-e2e", async (req, res) => {
       await processPaymentSuccessNotifications({
         booking: {
           id: bId, bookingNumber, customerName, customerMobile,
-          customerEmail: "test@alburhantravels.online",
+          customerEmail: "test@alburhantravels.com",
           packageName: "Economy Umrah Package",
           finalAmount: String(finalAmount),
         },
@@ -5451,7 +5451,7 @@ app.get("/api/debug/notifications/:bookingId", async (req: any, res: any) => {
       return res.status(404).json({ ok: false, error: `Booking not found: ${bookingId}` });
     }
     const bk = bkRes.rows[0];
-    const SITE = process.env.SITE_URL || "https://alburhantravels.online";
+    const SITE = process.env.SITE_URL || "https://alburhantravels.com";
 
     // ── 2. Build variable map for each template ───────────────────────────────
     const fmtAmt = (v: any) => {
@@ -6082,7 +6082,7 @@ app.post("/api/migrate/agreement-acceptance-test", async (req, res) => {
     let pdfDlOk = false; let pdfDlStatus = 0;
     if (invoice?.pdf_path) {
       try {
-        const r = await fetch(`https://alburhantravels.online${invoice.pdf_path}`, { method: "HEAD" });
+        const r = await fetch(`https://alburhantravels.com${invoice.pdf_path}`, { method: "HEAD" });
         pdfDlStatus = r.status; pdfDlOk = r.status === 200;
       } catch { pdfDlStatus = -1; }
     }
@@ -6137,7 +6137,7 @@ app.post("/api/migrate/agreement-acceptance-test", async (req, res) => {
     }
 
     const agId      = ag.id as string;
-    const siteBase  = "https://alburhantravels.online";
+    const siteBase  = "https://alburhantravels.com";
     const verUrl    = `${siteBase}/verify-agreement/${ag.verification_token}`;
     const custName  = ag.customer_name || ag.user_name || "Valued Customer";
     const custMob   = ag.customer_mobile || "";

@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { pool } from "@workspace/db";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 
-const PROD_DOMAIN = "https://alburhantravels.online";
+const PROD_DOMAIN = "https://alburhantravels.com";
 const SETTINGS_KEY = "payment_reminders_enabled";
 
 let remindersEnabled: boolean = process.env.PAYMENT_REMINDERS_ENABLED !== "false";

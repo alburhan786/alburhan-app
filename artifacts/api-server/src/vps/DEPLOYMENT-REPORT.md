@@ -1,13 +1,13 @@
 # Al Burhan Tours & Travels — VPS Deployment Report
 **Date:** 2026-07-26  
-**Domain:** https://alburhantravels.online  
+**Domain:** https://alburhantravels.com  
 **Status:** ✅ All changes applied — ready to deploy
 
 ---
 
 ## 1. Code Changes Applied
 
-### 1.1 Domain Migration: `alburhantravels.com` → `alburhantravels.online`
+### 1.1 Domain Migration: `alburhantravels.com` → `alburhantravels.com`
 **64 files patched** (272+ URL replacements):
 - All invoice/agreement URLs in customer messages and emails
 - All WhatsApp message links  
@@ -24,14 +24,14 @@
 | Constant | Old | New | Env Var |
 |---|---|---|---|
 | `REPLIT_DEV_URL` | Hardcoded spock.replit.dev | `process.env.REPLIT_DEV_URL \|\| fallback` | `REPLIT_DEV_URL=` (blank on VPS) |
-| `siteBase` | `"https://alburhantravels.com"` | `process.env.SITE_BASE \|\| "https://alburhantravels.online"` | `SITE_BASE=https://alburhantravels.online` |
-| `SITE` | `"https://alburhantravels.com"` | `process.env.SITE_BASE \|\| "https://alburhantravels.online"` | same |
+| `siteBase` | `"https://alburhantravels.com"` | `process.env.SITE_BASE \|\| "https://alburhantravels.com"` | `SITE_BASE=https://alburhantravels.com` |
+| `SITE` | `"https://alburhantravels.com"` | `process.env.SITE_BASE \|\| "https://alburhantravels.com"` | same |
 
 ### 1.3 API Server CORS (`artifacts/api-server/src/app.ts`)
 Already reads from `process.env.CORS_ORIGIN` (comma-separated list).  
 **Set in .env:**
 ```
-CORS_ORIGIN=https://alburhantravels.online,https://www.alburhantravels.online
+CORS_ORIGIN=https://alburhantravels.com,https://www.alburhantravels.com
 ```
 
 ### 1.4 PDF Enterprise Server (`artifacts/pdf-enterprise/server.ts`)
@@ -52,7 +52,7 @@ No WebSocket URLs found in the codebase (HMR only used in Vite dev mode).
 Internet (HTTPS :443)
         │
         ▼
-   Nginx (alburhantravels.online)
+   Nginx (alburhantravels.com)
         │
         ├─ /pdf/*   →  PDF Enterprise   (port 3001)
         │               └─ Node.js (tsx server.ts)
@@ -69,7 +69,7 @@ Internet (HTTPS :443)
 
 | File | Purpose |
 |------|---------|
-| `artifacts/api-server/src/vps/nginx-alburhantravels.online.conf` | Nginx server block for production |
+| `artifacts/api-server/src/vps/nginx-alburhantravels.com.conf` | Nginx server block for production |
 | `artifacts/api-server/src/vps/pm2.ecosystem.config.cjs` | PM2 process manager config |
 | `artifacts/api-server/src/vps/.env.production.example` | Environment variable template |
 | `artifacts/api-server/src/vps/vps-deploy.sh` | Full automated deploy script |
@@ -101,7 +101,7 @@ rsync -avz --exclude='node_modules' --exclude='.git' \
   root@YOUR_VPS_IP:/var/www/alburhan/
 
 # Or use the built-in no-SSH deploy (once first bundle is on VPS):
-# curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=<set-from-replit-secrets>"
+# curl -X POST "https://alburhantravels.com/api/migrate/self-update?key=<set-from-replit-secrets>"
 ```
 
 ### Step 3: Configure Environment on VPS
@@ -139,22 +139,22 @@ The script will:
 
 ```bash
 # Install Nginx config without SSL first:
-cp /var/www/alburhan/artifacts/api-server/src/vps/nginx-alburhantravels.online.conf \
-   /etc/nginx/sites-available/alburhantravels.online
+cp /var/www/alburhan/artifacts/api-server/src/vps/nginx-alburhantravels.com.conf \
+   /etc/nginx/sites-available/alburhantravels.com
 
 # Edit the config: comment out all ssl_ lines, change 443 → 80
 # Enable and test:
-ln -s /etc/nginx/sites-available/alburhantravels.online /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/alburhantravels.com /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
 # Then get SSL cert:
 apt-get install -y certbot python3-certbot-nginx
-certbot --nginx -d alburhantravels.online -d www.alburhantravels.online \
-  --email admin@alburhantravels.online --agree-tos
+certbot --nginx -d alburhantravels.com -d www.alburhantravels.com \
+  --email admin@alburhantravels.com --agree-tos
 
 # Re-deploy config with SSL:
-cp /var/www/alburhan/artifacts/api-server/src/vps/nginx-alburhantravels.online.conf \
-   /etc/nginx/sites-available/alburhantravels.online
+cp /var/www/alburhan/artifacts/api-server/src/vps/nginx-alburhantravels.com.conf \
+   /etc/nginx/sites-available/alburhantravels.com
 nginx -t && systemctl reload nginx
 ```
 
@@ -166,15 +166,15 @@ Once deployed, register these webhook URLs in each platform dashboard:
 
 | Platform | Webhook URL |
 |----------|-------------|
-| **Razorpay** | `https://alburhantravels.online/api/webhook/razorpay` |
-| **BotBee WhatsApp** | `https://alburhantravels.online/api/webhook/botbee` |
-| **Meta (WhatsApp/FB/IG)** | `https://alburhantravels.online/api/social-media/webhook/meta` |
-| **Telegram** | `https://alburhantravels.online/api/social-media/webhook/telegram` |
+| **Razorpay** | `https://alburhantravels.com/api/webhook/razorpay` |
+| **BotBee WhatsApp** | `https://alburhantravels.com/api/webhook/botbee` |
+| **Meta (WhatsApp/FB/IG)** | `https://alburhantravels.com/api/social-media/webhook/meta` |
+| **Telegram** | `https://alburhantravels.com/api/social-media/webhook/telegram` |
 
 ### OAuth Callback URLs (Meta App Settings):
 ```
-https://alburhantravels.online/api/social-media/oauth/meta/callback
-https://alburhantravels.online/api/social-media/oauth/google/callback
+https://alburhantravels.com/api/social-media/oauth/meta/callback
+https://alburhantravels.com/api/social-media/oauth/google/callback
 ```
 
 ---
@@ -188,7 +188,7 @@ Once the VPS is running, update the app without SSH access:
 pnpm --filter @workspace/api-server run build
 
 # 2. Trigger VPS to pull the new bundle from Replit:
-curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=<set-from-replit-secrets>"
+curl -X POST "https://alburhantravels.com/api/migrate/self-update?key=<set-from-replit-secrets>"
 
 # The VPS will download the new bundle from Replit and restart PM2 automatically.
 ```
@@ -197,7 +197,7 @@ curl -X POST "https://alburhantravels.online/api/migrate/self-update?key=<set-fr
 
 ## 7. Module Verification Checklist
 
-After deployment, verify each module at `https://alburhantravels.online`:
+After deployment, verify each module at `https://alburhantravels.com`:
 
 | Module | URL | Status |
 |--------|-----|--------|
@@ -215,14 +215,14 @@ After deployment, verify each module at `https://alburhantravels.online`:
 **Upload test:**
 ```bash
 # Verify file upload works end-to-end
-curl -X POST "https://alburhantravels.online/pdf/api/files/upload" \
+curl -X POST "https://alburhantravels.com/pdf/api/files/upload" \
   -H "Cookie: YOUR_SESSION_COOKIE" \
   -F "file=@test.pdf"
 ```
 
 **Download test:**
 ```bash
-curl -o downloaded.pdf "https://alburhantravels.online/pdf/api/files/FILE_ID/download" \
+curl -o downloaded.pdf "https://alburhantravels.com/pdf/api/files/FILE_ID/download" \
   -H "Cookie: YOUR_SESSION_COOKIE"
 ```
 
@@ -235,8 +235,8 @@ Set these in `/var/www/alburhan/.env`:
 ```env
 NODE_ENV=production
 PORT=3000
-SITE_BASE=https://alburhantravels.online
-CORS_ORIGIN=https://alburhantravels.online,https://www.alburhantravels.online
+SITE_BASE=https://alburhantravels.com
+CORS_ORIGIN=https://alburhantravels.com,https://www.alburhantravels.com
 DATABASE_URL=postgresql://alburhan:PASSWORD@localhost:5432/alburhan_db
 SESSION_SECRET=<openssl rand -hex 32>
 PDF_SESSION_SECRET=<openssl rand -hex 32>
@@ -248,9 +248,9 @@ BOTBEE_PHONE_NUMBER_ID=965912196611113
 FAST2SMS_API_KEY=XXXX
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=info@alburhantravels.online
+SMTP_USER=info@alburhantravels.com
 SMTP_PASS=XXXX
-SMTP_FROM=Al Burhan Tours <info@alburhantravels.online>
+SMTP_FROM=Al Burhan Tours <info@alburhantravels.com>
 MIGRATION_KEY=<set-from-replit-secrets>
 REPLIT_DEV_URL=                    # blank = VPS is fully independent
 DELETE_ADMIN_PASSWORD=XXXX

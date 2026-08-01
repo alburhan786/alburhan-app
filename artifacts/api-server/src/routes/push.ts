@@ -324,7 +324,7 @@ router.post("/send-all", requireAdmin as any, async (req, res) => {
         const tokens = recipients.map(r => r.token);
         const result = await sendFCMBatch(tokens, {
           title, body,
-          url: url || "https://alburhantravels.online/customer/dashboard",
+          url: url || "https://alburhantravels.com/customer/dashboard",
           data: data || {},
         });
         sent   = result.sent;
@@ -400,7 +400,7 @@ router.post("/retry/:id", requireAdmin as any, async (req, res) => {
         totalTokens = recipients.length;
         const result = await sendFCMBatch(recipients.map(r => r.token), {
           title: camp.title, body: camp.body,
-          url: camp.url || "https://alburhantravels.online/customer/dashboard",
+          url: camp.url || "https://alburhantravels.com/customer/dashboard",
         });
         sent = result.sent; failed = result.failed;
         await cleanupInvalidTokens(result.invalidTokens);

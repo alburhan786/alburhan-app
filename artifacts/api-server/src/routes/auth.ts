@@ -425,14 +425,14 @@ router.post("/verify-otp", async (req, res) => {
             <li>Track your booking and journey status</li>
           </ul>
           <p style="margin-top:24px;">
-            <a href="https://alburhantravels.online/dashboard"
+            <a href="https://alburhantravels.com/dashboard"
                style="background:#0B5D3B;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">
               Go to Your Dashboard
             </a>
           </p>
           <p style="margin-top:24px;font-size:13px;color:#6b7280;">
             Need help? Call us on <strong>+91 9893225590</strong> or email
-            <a href="mailto:info@alburhantravels.online" style="color:#0B5D3B;">info@alburhantravels.online</a>
+            <a href="mailto:info@alburhantravels.com" style="color:#0B5D3B;">info@alburhantravels.com</a>
           </p>
           <p style="font-size:13px;color:#6b7280;">Jazak Allah Khair! — Al Burhan Tours &amp; Travels</p>
         `,

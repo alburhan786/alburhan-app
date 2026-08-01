@@ -7,7 +7,7 @@ import { getCompanyById, type CompanyInfo } from "@/lib/companies";
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
 const API         = import.meta.env.VITE_API_URL || "";
-const PROD_DOMAIN = "https://alburhantravels.online";
+const PROD_DOMAIN = "https://alburhantravels.com";
 
 const DARK            = "#0d5040";
 const GOLD            = "#C9A23F";

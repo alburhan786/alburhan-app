@@ -38,8 +38,8 @@ export function MainLayout({ children }: { children: ReactNode }) {
             <a href="tel:+919893989786" className="flex items-center gap-1.5 hover:text-gold transition-colors">
               <Phone size={12} /> +91 9893989786
             </a>
-            <a href="mailto:info@alburhantravels.online" className="flex items-center gap-1.5 hover:text-gold transition-colors">
-              <Mail size={12} /> info@alburhantravels.online
+            <a href="mailto:info@alburhantravels.com" className="flex items-center gap-1.5 hover:text-gold transition-colors">
+              <Mail size={12} /> info@alburhantravels.com
             </a>
           </div>
         </div>
@@ -233,11 +233,11 @@ export function MainLayout({ children }: { children: ReactNode }) {
                   </li>
                   <li className="flex items-start gap-3 text-white/50 text-sm">
                     <Mail size={16} className="text-gold shrink-0 mt-0.5" />
-                    <span>info@alburhantravels.online</span>
+                    <span>info@alburhantravels.com</span>
                   </li>
                   <li className="flex items-start gap-3 text-white/50 text-sm">
                     <Globe size={16} className="text-gold shrink-0 mt-0.5" />
-                    <span>www.alburhantravels.online</span>
+                    <span>www.alburhantravels.com</span>
                   </li>
                 </ul>
                 <div>

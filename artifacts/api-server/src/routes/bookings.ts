@@ -486,7 +486,7 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
 
   // ── Customer notifications: WhatsApp → SMS → Email via notification engine ─
   // triggerWorkflow → fireNotificationEvent logs to notification_logs (admin-visible)
-  const siteBase = process.env.SITE_URL || "https://alburhantravels.online";
+  const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
   triggerWorkflow("new_booking", {
     bookingId:      booking.id,
     bookingNumber:  booking.bookingNumber,
@@ -556,7 +556,7 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
         totalAmount:   booking.finalAmount     || undefined,
         status:        "pending",
         submittedAt:   new Date(),
-        dashboardUrl:  `${process.env.SITE_URL || "https://alburhantravels.online"}/customer/dashboard`,
+        dashboardUrl:  `${process.env.SITE_URL || "https://alburhantravels.com"}/customer/dashboard`,
       });
       const confName = `Booking-Confirmation-${booking.bookingNumber}.pdf`;
       const confUrl  = await uploadToGCS(confBuf, confName, "application/pdf", "booking_confirmations");
@@ -624,7 +624,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         customerEmail:  updated.customerEmail ?? undefined,
         packageName:    (updated as any).packageName ?? undefined,
         finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
-        invoiceUrl:     `https://alburhantravels.online/invoice/${updated.bookingNumber}`,
+        invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
       };
       console.log(`[PIPELINE:approve-route] ▶ booking_approved triggered | bookingId=${ctx.bookingId} | bookingNumber=${ctx.bookingNumber} | mobile=${ctx.customerMobile} | name="${ctx.customerName}" | package="${ctx.packageName}" | finalAmount=${ctx.finalAmount} | invoiceUrl=${ctx.invoiceUrl}`);
       await triggerWorkflow("booking_approved", ctx);
@@ -761,7 +761,7 @@ router.post("/:id/resend-whatsapp", requireAdmin as any, async (req: Authenticat
     try {
       const { sendConfirmationTemplate } = await import("../lib/botbee.js");
       const { sendWhatsApp } = await import("../lib/botbee.js");
-      const siteBase = "https://alburhantravels.online";
+      const siteBase = "https://alburhantravels.com";
       const invoiceLink = b.bookingNumber ? `${siteBase}/invoice/${b.bookingNumber}` : siteBase;
       const bookingRef = b.bookingNumber || "-";
       const pkg = (b as any).packageName || "Hajj / Umrah Package";
@@ -823,7 +823,7 @@ router.post("/:id/resend-sms", requireAdmin as any, async (req: AuthenticatedReq
       const { sendPaymentReceived, sendBookingConfirmed } = await import("../lib/sms.js");
       const { randomUUID } = await import("crypto");
       const paidAmt = Number(b.paid_amount || 0);
-      const siteBase = "https://alburhantravels.online";
+      const siteBase = "https://alburhantravels.com";
       const invoiceLink = b.booking_number ? `${siteBase}/invoice/${b.booking_number}` : siteBase;
       const smsCtx = { mobile: b.customer_mobile, customerName: b.customer_name, bookingNumber: b.booking_number, bookingId: b.id, customerId: b.customer_id ?? undefined };
       const result = paidAmt > 0
@@ -1056,7 +1056,7 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
     b = { ...b, invoiceNumber: invNum };
   }
 
-  const baseUrl = `https://alburhantravels.online`;
+  const baseUrl = `https://alburhantravels.com`;
   const invoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
   const message = `Assalamu Alaikum ${b.customerName},\n\nYour invoice #${b.invoiceNumber} for booking #${b.bookingNumber} is ready.\n\nView/Download:\n${invoiceUrl}\n\nTotal: INR ${b.finalAmount ? Number(b.finalAmount).toLocaleString("en-IN") : "N/A"}\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
 

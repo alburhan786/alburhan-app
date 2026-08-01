@@ -80,7 +80,7 @@ router.get("/health", async (req, res) => {
     configured,
     connection: waHealth.status,
     connectionDetail: waHealth.detail,
-    webhook: "https://alburhantravels.online/api/social-media/webhook/meta",
+    webhook: "https://alburhantravels.com/api/social-media/webhook/meta",
     phoneNumber: tokenStatus?.phone_number || null,
     verifiedName: tokenStatus?.verified_name || null,
     business: {

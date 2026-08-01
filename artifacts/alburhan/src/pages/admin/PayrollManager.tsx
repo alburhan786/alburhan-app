@@ -12,7 +12,7 @@ import autoTable from "jspdf-autotable";
 
 const API = import.meta.env.VITE_API_URL || "";
 const COMPANY = "Al Burhan Tours & Travels";
-const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.online";
+const COMPANY_ADDRESS = "Contact: +91 98939 89786 | alburhantravels.com";
 
 function fmt(n: number) {
   return "₹" + (n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });

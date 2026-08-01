@@ -1,16 +1,16 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════════════════════
 #  Al Burhan Tours & Travels — Complete VPS Deploy Script
-#  Target domain: https://alburhantravels.online
+#  Target domain: https://alburhantravels.com
 #
 #  Run on VPS as root (or with sudo):
-#    curl -fsSL "https://alburhantravels.online/api/migrate/vps-deploy.sh?key=$MIGRATION_KEY" | bash
+#    curl -fsSL "https://alburhantravels.com/api/migrate/vps-deploy.sh?key=$MIGRATION_KEY" | bash
 #  Or copy this file to VPS and run:
 #    chmod +x vps-deploy.sh && sudo bash vps-deploy.sh
 # ══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-DOMAIN="alburhantravels.online"
+DOMAIN="alburhantravels.com"
 VPS_DIR="/var/www/alburhan"
 ENV_FILE="$VPS_DIR/.env"
 PM2_API_APP="alburhan-api"
@@ -30,7 +30,7 @@ step() { echo ""; echo -e "${YELLOW}[$(date +%H:%M:%S)] $*${NC}"; }
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║  Al Burhan Tours & Travels — VPS Full Deploy                    ║"
-echo "║  Domain: https://alburhantravels.online                         ║"
+echo "║  Domain: https://alburhantravels.com                         ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -112,7 +112,7 @@ cd "$VPS_DIR"
 
 # ── [6] Install / configure Nginx ────────────────────────────────────────────
 step "[6/9] Configuring Nginx..."
-NGINX_SRC="$VPS_DIR/artifacts/api-server/src/vps/nginx-alburhantravels.online.conf"
+NGINX_SRC="$VPS_DIR/artifacts/api-server/src/vps/nginx-alburhantravels.com.conf"
 if [ -f "$NGINX_SRC" ]; then
   cp "$NGINX_SRC" "$NGINX_CONF"
   ln -sf "$NGINX_CONF" "/etc/nginx/sites-enabled/$DOMAIN" 2>/dev/null || true
@@ -195,10 +195,10 @@ pm2 status
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║  ✅ DEPLOY COMPLETE — https://alburhantravels.online             ║"
+echo "║  ✅ DEPLOY COMPLETE — https://alburhantravels.com             ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Future no-SSH deploys:                                          ║"
-echo "║  curl -X POST 'https://alburhantravels.online/api/              ║"
+echo "║  curl -X POST 'https://alburhantravels.com/api/              ║"
 echo "║    migrate/self-update?key=$MIGRATION_KEY'               ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""

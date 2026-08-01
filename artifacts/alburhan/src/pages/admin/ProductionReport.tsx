@@ -464,7 +464,7 @@ export default function ProductionReport() {
                       {ready ? "✅ Certified Production-Ready" : "⚠️ Near Production-Ready"}
                     </p>
                     <p className="text-xs text-emerald-700 mt-1">
-                      Certified on {generatedAt.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })} · Score: {score}/100 · alburhantravels.online
+                      Certified on {generatedAt.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })} · Score: {score}/100 · alburhantravels.com
                     </p>
                   </div>
                 </div>

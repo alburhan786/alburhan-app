@@ -785,7 +785,7 @@ router.get("/template-preview", requireAdmin as any, async (req: AuthenticatedRe
   try {
     const { bookingId: qBookingId } = req.query as { bookingId?: string };
     const { ABT_TEMPLATES, TEMPLATE_BODIES } = await import("../lib/botbee.js");
-    const SITE = "https://alburhantravels.online";
+    const SITE = "https://alburhantravels.com";
 
     // Optionally resolve live booking values
     let liveData: Record<string, string> | null = null;
