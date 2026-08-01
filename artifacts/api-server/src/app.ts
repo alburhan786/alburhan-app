@@ -237,30 +237,57 @@ app.get("/api/migrate/hotdeploy", requireLocalhost, async (req, res) => {
   // ── 2. Frontend assets ─────────────────────────────────────────────────────
   if (!skipFrontend) {
     const frontendUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
-    // Derive extract path: look for the alburhan dist alongside this bundle
-    const candidates = [
-      "/root/artifacts/alburhan/dist",
-      "/var/www/alburhan/dist",
-      path.join(__dirname, "../../alburhan/dist"),
-    ];
-    const extractTo = candidates.find(p => {
-      try { return fs.statSync(p).isDirectory(); } catch { return false; }
-    }) || candidates[0];
+    // The frontend tar contains paths relative to the workspace root:
+    //   artifacts/alburhan/dist/public/index.html
+    //   artifacts/alburhan/dist/public/assets/...
+    // We must extract to the workspace-root equivalent so files land at:
+    //   <root>/artifacts/alburhan/dist/public/index.html
+    //
+    // Two common VPS roots:
+    //   /var/www/alburhan  — nginx serves from /var/www/alburhan/artifacts/alburhan/dist/public
+    //   /root              — PM2 cwd; Express also looks here for static files
+    // We extract to ALL valid roots so both nginx and Express find the new bundle.
+    const rootCandidates = [
+      path.resolve(__dirname, "../../.."), // 3 levels up from dist/ = /var/www/alburhan on VPS
+      "/root",
+      "/var/www/alburhan",
+    ].filter((p, i, arr) => arr.indexOf(p) === i); // deduplicate
+
+    // Collect all roots that have the expected alburhan directory already
+    const extractRoots = rootCandidates.filter(p => {
+      try { return fs.existsSync(path.join(p, "artifacts/alburhan")); } catch { return false; }
+    });
+    // Fallback: if none match, create under the __dirname-relative path
+    if (!extractRoots.length) extractRoots.push(rootCandidates[0]);
+
+    const extractTo = extractRoots[0]; // primary (used in result)
+
 
     try {
-      fs.mkdirSync(extractTo, { recursive: true });
       const tmpTar = path.join(os.tmpdir(), `fe-${Date.now()}.tar.gz`);
       const fr = await fetch(frontendUrl, { signal: AbortSignal.timeout(120_000) });
       if (!fr.ok) {
         result.frontend = { updated: false, error: `Download failed: HTTP ${fr.status}` };
       } else {
         fs.writeFileSync(tmpTar, Buffer.from(await fr.arrayBuffer()));
-        await new Promise<void>((resolve, reject) => {
-          const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
-          proc.on("close", code => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
-        });
+
+        // Extract to ALL valid roots so both nginx and Express find the new bundle
+        const extracted: string[] = [];
+        const failures: string[] = [];
+        for (const root of extractRoots) {
+          try {
+            fs.mkdirSync(root, { recursive: true });
+            await new Promise<void>((resolve, reject) => {
+              const proc = spawn("tar", ["-xzf", tmpTar, "-C", root], { stdio: "pipe" });
+              proc.on("close", code => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
+            });
+            extracted.push(root);
+          } catch (e: any) {
+            failures.push(`${root}: ${e.message}`);
+          }
+        }
         try { fs.unlinkSync(tmpTar); } catch {}
-        result.frontend = { updated: true, extractedTo: extractTo };
+        result.frontend = { updated: true, extractedTo: extracted, failures: failures.length ? failures : undefined };
       }
     } catch (err: any) {
       result.frontend = { updated: false, error: err.message };

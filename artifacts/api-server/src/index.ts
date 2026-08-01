@@ -2587,6 +2587,34 @@ async function runMigrations() {
     if (nbRows && nbRows > 0)
       console.log(`[Migration] v30.3 updated ${nbRows} recent notification message(s) to .com`);
   } catch (_) {}
+
+  // v30.4 — Clear legacy Firebase Server Key, legacy FCM endpoint URL, and legacy
+  //          sender_id extra_fields from api_settings. Replaced by FCM v1 service-account-JSON.
+  //          Idempotent — safe to run on every startup.
+  try {
+    const fbUrl = await pool.query(
+      `UPDATE api_settings SET api_url = NULL
+       WHERE provider = 'firebase' AND api_url IS NOT NULL AND api_url != ''`
+    );
+    if ((fbUrl.rowCount ?? 0) > 0)
+      console.log("[Migration] v30.4 cleared legacy Firebase FCM legacy-API endpoint from api_settings");
+
+    const fbKey = await pool.query(
+      `UPDATE api_settings SET api_key_encrypted = NULL
+       WHERE provider = 'firebase' AND api_key_encrypted IS NOT NULL`
+    );
+    if ((fbKey.rowCount ?? 0) > 0)
+      console.log("[Migration] v30.4 cleared legacy Firebase Server Key from api_settings (reconfigure via FCM v1 form)");
+
+    const fbExtra = await pool.query(
+      `UPDATE api_settings SET extra_fields_encrypted = NULL
+       WHERE provider = 'firebase' AND extra_fields_encrypted IS NOT NULL`
+    );
+    if ((fbExtra.rowCount ?? 0) > 0)
+      console.log("[Migration] v30.4 cleared legacy Firebase extra_fields (sender_id) from api_settings");
+  } catch (err: any) {
+    console.warn("[Migration] v30.4 firebase legacy cleanup:", err.message);
+  }
 }
 
 const rawPort = process.env["PORT"];

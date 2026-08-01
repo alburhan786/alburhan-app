@@ -36,10 +36,19 @@ async function getCredentials(): Promise<{ projectId: string; clientEmail: strin
   const envPrivateKey  = process.env.FIREBASE_PRIVATE_KEY  || "";
 
   if (envProjectId && envClientEmail && envPrivateKey) {
+    const normalizedKey = envPrivateKey.replace(/\\n/g, "\n").trim();
+    // Validate PEM format — FCM service accounts use PKCS#8 ("BEGIN PRIVATE KEY")
+    if (!normalizedKey.includes("-----BEGIN") || !normalizedKey.includes("PRIVATE KEY-----")) {
+      throw new Error(
+        "FIREBASE_PRIVATE_KEY is not a valid PEM private key. " +
+        "Expected '-----BEGIN PRIVATE KEY-----' ... '-----END PRIVATE KEY-----'. " +
+        "Ensure \\\\n placeholders in the secret are actual newlines."
+      );
+    }
     return {
-      projectId:  envProjectId,
+      projectId:   envProjectId,
       clientEmail: envClientEmail,
-      privateKey:  envPrivateKey.replace(/\\n/g, "\n"),
+      privateKey:  normalizedKey,
     };
   }
 
