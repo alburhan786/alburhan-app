@@ -699,10 +699,13 @@ export default function ApiSettings() {
                                 return;
                               }
 
-                              // Step 3: extract exactly three fields by name (JSON.parse ensures correct types)
-                              const projectId:   string = typeof parsed.project_id   === "string" ? parsed.project_id   : "";
-                              const clientEmail: string = typeof parsed.client_email === "string" ? parsed.client_email : "";
-                              const privateKey:  string = typeof parsed.private_key  === "string" ? parsed.private_key  : "";
+                              // Step 3: extract exactly three fields by name — JSON.parse guarantees
+                              // these are native JS strings (no surrounding quotes, no trailing commas).
+                              // Apply .trim() and unescape \n sequences immediately so field values are clean.
+                              const projectId:   string = (parsed.project_id   ?? "").trim();
+                              const clientEmail: string = (parsed.client_email ?? "").trim();
+                              // Replace escaped \n sequences with real newlines so the PEM is ready to use
+                              const privateKey:  string = (parsed.private_key  ?? "").replace(/\\n/g, "\n").trim();
 
                               // Step 3: validate each extracted value
                               if (!projectId) {
@@ -725,8 +728,8 @@ export default function ApiSettings() {
                                 toast({ title: "Missing private_key", description: "The JSON has no private_key field.", variant: "destructive" });
                                 return;
                               }
-                              // Normalise escaped newlines the same way the backend does
-                              const normalizedKey = privateKey.replace(/\\n/g, "\n").trim();
+                              // privateKey already has real newlines (applied above); just alias for validation checks
+                              const normalizedKey = privateKey;
                               if (!normalizedKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
                                 toast({
                                   title: "Invalid private_key",
