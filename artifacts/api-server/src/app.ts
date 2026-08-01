@@ -315,6 +315,63 @@ app.post("/api/migrate/self-update", requireLocalhost, async (req, res) => {
   }
 });
 
+// POST /api/migrate/backend-pull — externally-accessible equivalent of self-update.
+// Intended for CI/CD pipelines (GitHub Actions) that cannot SSH into the VPS.
+// Downloads the backend bundle from DEPLOY_SOURCE_URL, validates, installs atomically,
+// then calls process.exit(0) so PM2 restarts with the new bundle on disk.
+// Auth: MIGRATION_KEY query param or body field — same key as all other migrate endpoints.
+// NOTE: no requireLocalhost here — MIGRATION_KEY is the security boundary.
+app.post("/api/migrate/backend-pull", async (req, res) => {
+  const key = (req.query.key || req.body?.key) as string;
+  if (!migrationKeyValid(key)) {
+    const hasEnvKey = !!process.env.MIGRATION_KEY;
+    return void res.status(403).json({
+      error: "Forbidden",
+      hint: hasEnvKey
+        ? "Key mismatch. Pass ?key=<MIGRATION_KEY> matching VPS environment."
+        : "MIGRATION_KEY env var is not set on this server.",
+    });
+  }
+
+  const DEV_URL = getDeploySourceUrl();
+  if (!DEV_URL) {
+    return void res.status(503).json({
+      error: "DEPLOY_SOURCE_URL not configured",
+      hint: "Set DEPLOY_SOURCE_URL=https://your-replit-dev-domain in VPS ecosystem.config.js, then: pm2 reload ecosystem.config.js --update-env",
+    });
+  }
+  const sourceUrl = `${DEV_URL}/api/migrate/server.cjs?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
+
+  const binPath = path.join(__dirname, "../dist/index.cjs");
+  const bakPath = path.join(__dirname, "../dist/index.cjs.bak");
+  try {
+    const response = await fetch(sourceUrl, { signal: AbortSignal.timeout(120_000) });
+    if (!response.ok) {
+      return void res.status(502).json({
+        error: `Download failed: HTTP ${response.status}`,
+        source: sourceUrl.replace(/key=[^&]+/, "key=***"),
+      });
+    }
+    const buffer = await response.arrayBuffer();
+    const bytes = Buffer.from(buffer);
+    if (bytes.length < 1_000_000) {
+      return void res.status(502).json({
+        error: `Bundle too small (${bytes.length} bytes) — not a valid bundle`,
+      });
+    }
+    // Backup current bundle before replacing
+    if (fs.existsSync(binPath)) fs.copyFileSync(binPath, bakPath);
+    // Atomic install: write .new then rename
+    fs.writeFileSync(binPath + ".new", bytes);
+    fs.renameSync(binPath + ".new", binPath);
+    console.log(`[backend-pull] Installed ${bytes.length} bytes from ${DEV_URL}`);
+    res.json({ ok: true, bytes: bytes.length, message: "Bundle installed — PM2 restarting" });
+    setTimeout(() => process.exit(0), 500);
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/migrate/key-status — diagnostic: confirms key config without exposing the value.
 // Returns length, first-4 and last-4 chars (enough to spot copy-paste errors), and whether
 // the supplied ?key= matches.  No auth required — safe because it never reveals the full key.

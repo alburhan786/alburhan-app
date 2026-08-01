@@ -203,10 +203,15 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────
-  # DEPLOY JOB — SSH-free HTTPS webhook upload
-  # GitHub Actions POSTs the built artifacts directly to two API endpoints on
-  # the live VPS over HTTPS. No inbound SSH needed; the VPS makes no outbound
-  # connections. Auth: X-Deploy-Key header = MIGRATION_KEY secret.
+  # DEPLOY JOB — Replit-pull approach (no SSH, no binary uploads)
+  #
+  # GitHub Actions tells the live VPS to PULL the latest built artifacts
+  # from the Replit dev server via two externally-accessible API endpoints:
+  #   POST /api/migrate/deploy-frontend  — VPS pulls frontend.tar.gz from Replit
+  #   POST /api/migrate/backend-pull     — VPS pulls index.cjs from Replit
+  #
+  # Both endpoints require the MIGRATION_KEY (set in GitHub Actions secrets).
+  # The VPS contacts Replit using its baked-in DEPLOY_SOURCE_URL.
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
@@ -218,40 +223,16 @@ jobs:
       TS: ${{ needs.build.outputs.deploy_timestamp }}
 
     steps:
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: ./frontend-dist
-
-      - name: Download backend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-bundle
-          path: ./backend-dist
-
-      # ── Package frontend into a tar.gz for the upload endpoint ────────────
-      - name: Package frontend tarball
-        run: |
-          # Replicate the VPS extraction layout: extract into /root so that
-          # artifacts/alburhan/dist/public ends up at the correct path.
-          mkdir -p tarball-root/artifacts/alburhan/dist
-          cp -r ./frontend-dist tarball-root/artifacts/alburhan/dist/public
-          tar -czf frontend.tar.gz -C tarball-root .
-          echo "Frontend tarball: $(du -sh frontend.tar.gz | cut -f1)"
-
-      # ── Upload frontend via HTTPS webhook ─────────────────────────────────
-      - name: Deploy frontend via webhook
+      # ── 1. Pull frontend — VPS fetches from Replit dev server ─────────────
+      - name: Deploy frontend (VPS pulls from Replit)
         id: fe_deploy
         run: |
+          echo "Triggering frontend pull: ${VPS_API}/api/migrate/deploy-frontend"
           HTTP=$(curl -s -o /tmp/fe-resp.json -w "%{http_code}" \
-            -X POST "${VPS_API}/api/deploy/frontend-assets" \
-            -H "X-Deploy-Key: ${{ secrets.MIGRATION_KEY }}" \
-            -H "Content-Type: application/gzip" \
-            --data-binary @frontend.tar.gz \
+            -X POST "${VPS_API}/api/migrate/deploy-frontend?key=${{ secrets.MIGRATION_KEY }}" \
             -m 180)
           echo "Frontend deploy → HTTP $HTTP"
-          cat /tmp/fe-resp.json 2>/dev/null || true
+          cat /tmp/fe-resp.json 2>/dev/null | head -20 || true
           if [ "$HTTP" = "200" ]; then
             echo "✅ Frontend deployed"
             echo "fe_ok=true" >> "$GITHUB_OUTPUT"
@@ -260,27 +241,28 @@ jobs:
             exit 1
           fi
 
-      # ── Upload backend via HTTPS webhook (VPS exits→PM2 restarts it) ──────
-      - name: Deploy backend via webhook
+      # ── 2. Pull backend — VPS fetches new bundle from Replit ──────────────
+      #    VPS installs bundle and calls process.exit(0) → PM2 restarts.
+      - name: Deploy backend (VPS pulls from Replit)
         id: be_deploy
         run: |
+          echo "Triggering backend pull: ${VPS_API}/api/migrate/backend-pull"
           HTTP=$(curl -s -o /tmp/be-resp.json -w "%{http_code}" \
-            -X POST "${VPS_API}/api/deploy/backend-bundle" \
-            -H "X-Deploy-Key: ${{ secrets.MIGRATION_KEY }}" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @backend-dist/index.cjs \
+            -X POST "${VPS_API}/api/migrate/backend-pull?key=${{ secrets.MIGRATION_KEY }}" \
             -m 180)
           echo "Backend deploy → HTTP $HTTP"
-          cat /tmp/be-resp.json 2>/dev/null || true
+          cat /tmp/be-resp.json 2>/dev/null | head -20 || true
           if [ "$HTTP" = "200" ]; then
             echo "✅ Backend deployed — PM2 restarting"
             echo "be_ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "❌ Backend deploy failed (HTTP $HTTP)"
+            echo "💡 If this is the first deploy, run the bootstrap from VPS SSH:"
+            echo "   curl -X POST http://localhost:3000/api/migrate/self-update?key=\$MIGRATION_KEY"
             exit 1
           fi
 
-      # ── Wait for PM2 to restart and API to come back ──────────────────────
+      # ── 3. Wait for PM2 to restart and API to come back ───────────────────
       - name: Wait for API restart
         run: |
           echo "Waiting up to 90s for API to restart..."
@@ -299,21 +281,18 @@ jobs:
             sleep 3
           done
 
-      # ── Rollback: re-upload the backed-up bundle if backend deploy failed ─
+      # ── 4. Rollback on deploy failure ─────────────────────────────────────
       - name: Rollback on deploy failure
         if: failure() && steps.be_deploy.outcome == 'failure'
         id: rollback
         run: |
-          echo "⚠️  Backend deploy failed — checking for rollback bundle"
-          # The VPS endpoint saves index.cjs.bak before overwriting; we can
-          # trigger rollback by calling a lightweight health endpoint and
-          # checking status. If the API came up on its own, no action needed.
+          echo "⚠️  Backend deploy failed — checking if API is still healthy"
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
             "${VPS_API}/api/health" 2>/dev/null || echo "000")
           if [ "$HTTP" = "200" ]; then
-            echo "✅ API healthy after rollback (likely PM2 restarted old bundle)"
+            echo "✅ API healthy — PM2 restarted on old bundle automatically"
           else
-            echo "⚠️  API not responding — manual intervention may be needed on VPS"
+            echo "⚠️  API not responding — manual intervention needed on VPS"
           fi
           echo "rolled_back=true" >> "$GITHUB_OUTPUT"
 
