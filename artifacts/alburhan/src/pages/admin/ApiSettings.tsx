@@ -975,6 +975,7 @@ export default function ApiSettings() {
                       {/* Lemin RCS rich result panel */}
                       {provider.id === "lemin" && sendTestResults["lemin"] && (() => {
                         const r = sendTestResults["lemin"];
+                        const dp = r.debugPayload || r.requestPayload;
                         return (
                           <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-purple-200 bg-purple-50" : "border-red-200 bg-red-50"}`}>
                             {/* Header row */}
@@ -988,9 +989,6 @@ export default function ApiSettings() {
                                   <span className={`ml-2 text-xs font-bold px-1.5 py-0.5 rounded ${r.httpStatus < 300 ? "bg-purple-200 text-purple-800" : "bg-red-200 text-red-800"}`}>
                                     HTTP {r.httpStatus}
                                   </span>
-                                )}
-                                {r.endpoint && (
-                                  <span className="ml-2 text-[10px] text-gray-400 font-mono">{r.endpoint}</span>
                                 )}
                               </div>
                               {r.logged && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>}
@@ -1012,14 +1010,34 @@ export default function ApiSettings() {
                               </div>
                             )}
 
-                            {/* Request body sent to Lemin (no API key) */}
-                            {r.requestPayload && (
+                            {/* Complete payload sent to Lemin (all 6 fields, user_id masked) */}
+                            {dp && (
                               <div className="px-3 py-2 border-b border-inherit">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                                  Request Body <span className="normal-case font-normal text-gray-400">(user_id omitted)</span>
+                                <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">
+                                  📤 Payload Sent to Lemin
+                                  <span className="ml-1 normal-case font-normal text-gray-400">(user_id partially masked)</span>
                                 </p>
-                                <pre className="bg-gray-900 text-green-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-40 whitespace-pre-wrap break-all">
-                                  {JSON.stringify(r.requestPayload, null, 2)}
+                                {/* Inline field table for quick scanning */}
+                                <div className="mb-1.5 space-y-0.5">
+                                  {(["type","dial_code","template","phone","user_id"] as const).map(f => (
+                                    <div key={f} className="flex gap-2 text-[10px] font-mono">
+                                      <span className="text-gray-400 w-20 shrink-0">{f}:</span>
+                                      <span className={`font-bold ${!dp[f] ? "text-red-500" : "text-gray-800"}`}>
+                                        {dp[f] ? String(dp[f]) : "⚠ MISSING"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="flex gap-2 text-[10px] font-mono">
+                                    <span className="text-gray-400 w-20 shrink-0">variables:</span>
+                                    <span className={`font-bold ${!dp.variables || Object.keys(dp.variables).length === 0 ? "text-red-500" : "text-green-700"}`}>
+                                      {!dp.variables || Object.keys(dp.variables).length === 0
+                                        ? "⚠ EMPTY — this causes 'Failed to process single payload'"
+                                        : `{${Object.keys(dp.variables).join(", ")}}`}
+                                    </span>
+                                  </div>
+                                </div>
+                                <pre className="bg-gray-900 text-yellow-200 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                                  {JSON.stringify(dp, null, 2)}
                                 </pre>
                               </div>
                             )}

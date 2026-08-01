@@ -23,40 +23,69 @@ const PROVIDERS = ["botbee", "fast2sms", "lemin", "smtp", "firebase", "razorpay"
 type Provider = typeof PROVIDERS[number];
 
 /**
- * Maps every confirmed Lemin variable key to a sensible test/demo value.
+ * Hardcoded test variables for each approved Lemin template ID.
  * Keys are the EXACT strings Lemin expects (confirmed by live API probe Aug 2026).
- * If a key is unrecognised, a bracketed placeholder is used so the send still succeeds.
+ * This map is authoritative — do NOT rely on rcs_template_mappings.variables_required
+ * for test sends because old DB rows may have incorrect key names.
  */
-function buildTestVariables(keys: string[]): Record<string, string> {
-  const DEFAULTS: Record<string, string> = {
-    // Template 3651/3652/3655 — plain "name"
-    "name":                                     "Test User",
-    // Template 3656 (payment_received) — plain-English-with-spaces keys
-    "booking id":                               "TEST-001",
-    "invoice no":                               "INV-TEST-001",
-    // Templates 3656/3657/3659/3660 — double-brace keys
-    "{{customer_name}}":                        "Test User",
-    "{{booking_id}}":                           "TEST-001",
-    "{{invoice_number}}":                       "INV-TEST-001",
-    "{{amount}}":                               "50,000",
-    "{{visa_number}}":                          "V-TEST-2027-001",
-    "{{package_name}}":                         "Hajj 2027",
-    "{{ticket_number}}":                        "AI-501",
-    "{{flight_number}}":                        "AI-501",
-    "{{departure_date}} at {{departure_time}}": "01 Jan 2027 at 10:00",
-    // Template 3661 (agreement_ready) — hash-bang keys with literal emoji/punctuation prefixes
-    "#!name!#":                                 "Test User",
-    ": #!agreement!#":                          "ABT-AGR-TEST-001",
-    "🔗 #!download!#":                          "https://alburhantravels.com/sign-agreement/test",
-    "#!bookingid!#":                            "TEST-001",
-    // Template 3663 (login_otp)
-    "otp":                                      "123456",
-  };
-  const out: Record<string, string> = {};
-  for (const k of keys) {
-    out[k] = DEFAULTS[k] ?? `[${k}]`;
+const LEMIN_TEMPLATE_TEST_VARS: Record<string, Record<string, string>> = {
+  // 3651 booking_submitted   — plain "name"
+  "3651": { "name": "Test User" },
+  // 3652 booking_confirmed/approved — plain "name"
+  "3652": { "name": "Test User" },
+  // 3655 pending_payment_reminder — plain "name"
+  "3655": { "name": "Test User" },
+  // 3656 payment_received — plain-English-with-spaces keys (unique to this template)
+  "3656": { "booking id": "TEST-001", "invoice no": "INV-TEST-001", "{{amount}}": "50,000", "{{customer_name}}": "Test User" },
+  // 3657 invoice_ready — double-brace keys
+  "3657": { "{{customer_name}}": "Test User", "{{invoice_number}}": "INV-TEST-001", "{{booking_id}}": "TEST-001", "{{amount}}": "50,000" },
+  // 3659 flight_ticket — double-brace keys + composite departure key
+  "3659": { "{{customer_name}}": "Test User", "{{booking_id}}": "TEST-001", "{{ticket_number}}": "AI-501", "{{flight_number}}": "AI-501", "{{departure_date}} at {{departure_time}}": "01 Jan 2027 at 10:00" },
+  // 3660 visa_ready — double-brace keys
+  "3660": { "{{booking_id}}": "TEST-001", "{{visa_number}}": "V-TEST-2027-001", "{{package_name}}": "Hajj 2027", "{{customer_name}}": "Test User" },
+  // 3661 agreement_ready — hash-bang keys with literal emoji/punctuation prefixes
+  "3661": { "#!name!#": "Test User", ": #!agreement!#": "ABT-AGR-TEST-001", "\uD83D\uDD17 #!download!#": "https://alburhantravels.com/sign-agreement/test", "#!bookingid!#": "TEST-001" },
+  // 3663 login_otp — plain "otp"
+  "3663": { "otp": "123456" },
+};
+
+/**
+ * Returns test variables for a template. Checks the hardcoded map first (by template ID),
+ * then falls back to building from variable-key names if the ID is unknown.
+ * Guaranteed to return a non-empty object for all approved templates.
+ */
+function buildTestVariables(templateId: string, fallbackKeys: string[] = []): Record<string, string> {
+  // Primary: hardcoded map — authoritative, no DB dependency
+  if (LEMIN_TEMPLATE_TEST_VARS[templateId]) {
+    return { ...LEMIN_TEMPLATE_TEST_VARS[templateId] };
   }
-  return out;
+  // Secondary: build from key names (for unknown templates added after this map was written)
+  const KEY_DEFAULTS: Record<string, string> = {
+    "name": "Test User",
+    "otp": "123456",
+    "booking id": "TEST-001",
+    "invoice no": "INV-TEST-001",
+    "{{customer_name}}": "Test User",
+    "{{booking_id}}": "TEST-001",
+    "{{invoice_number}}": "INV-TEST-001",
+    "{{amount}}": "50,000",
+    "{{visa_number}}": "V-TEST-2027-001",
+    "{{package_name}}": "Hajj 2027",
+    "{{ticket_number}}": "AI-501",
+    "{{flight_number}}": "AI-501",
+    "{{departure_date}} at {{departure_time}}": "01 Jan 2027 at 10:00",
+    "#!name!#": "Test User",
+    ": #!agreement!#": "ABT-AGR-TEST-001",
+    "\uD83D\uDD17 #!download!#": "https://alburhantravels.com/sign-agreement/test",
+    "#!bookingid!#": "TEST-001",
+  };
+  if (fallbackKeys.length === 0) return { "name": "Test User" }; // absolute last resort
+  const out: Record<string, string> = {};
+  for (const k of fallbackKeys) {
+    // Only include key if it has a known mapping — skip placeholder [key] values that Lemin will reject
+    if (KEY_DEFAULTS[k] !== undefined) out[k] = KEY_DEFAULTS[k];
+  }
+  return Object.keys(out).length > 0 ? out : { "name": "Test User" };
 }
 
 // GET /api/api-settings — all providers with masked keys
@@ -609,24 +638,35 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
           return void res.json({ ok: false, message: `Invalid mobile number — expected 10 digits after normalisation, got "${mobile}"` });
         }
 
-        // Fetch variables_required for this template from DB, then build test values
-        let variablesRequired: string[] = ["name"];
+        // ── Build test variables ──────────────────────────────────────────────────
+        // PRIMARY: hardcoded map by template_id — authoritative, zero DB dependency.
+        // FALLBACK: DB variables_required (may have old/wrong key names from v31.0 seed;
+        //           only used when templateId is not in LEMIN_TEMPLATE_TEST_VARS).
+        let dbVarsRequired: string[] = [];
         try {
           const vrRow = await pool.query(
             `SELECT variables_required FROM rcs_template_mappings WHERE template_id=$1 AND enabled=true LIMIT 1`,
             [templateId]
           );
-          if (vrRow.rows[0]?.variables_required?.length) {
-            variablesRequired = vrRow.rows[0].variables_required;
-          }
-        } catch { /* use default */ }
-        const testVariables = buildTestVariables(variablesRequired);
+          dbVarsRequired = vrRow.rows[0]?.variables_required || [];
+        } catch { /* use hardcoded map */ }
+        const testVariables = buildTestVariables(templateId, dbVarsRequired);
+
+        // Hard abort — variables MUST be a non-empty object.
+        // Lemin returns "Failed to process single payload" for any request with variables: {} or missing variables.
+        if (Object.keys(testVariables).length === 0) {
+          return void res.json({
+            ok: false,
+            message: `Cannot send: no test variables could be determined for template "${templateId}". Add it to LEMIN_TEMPLATE_TEST_VARS in api-settings.ts.`,
+            debug: { templateId, dbVarsRequired, testVariables },
+          });
+        }
 
         channel   = "rcs";
         recipient = mobile;
         const endpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
 
-        // safePayload = everything we're sending EXCEPT user_id (safe to log and return to frontend)
+        // safePayload — all fields EXCEPT user_id (safe to log and return to frontend)
         const safePayload: Record<string, unknown> = {
           type:      "single",
           dial_code: dialCode,
@@ -634,21 +674,29 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
           phone,
           variables: testVariables,
         };
-        // Final spec field check — type, dial_code, template, phone, variables must all be present
-        const specMissing = (["type","dial_code","template","phone","variables"] as const)
+        // debugPayload — all 6 required Lemin fields, user_id partially masked, shown in UI
+        const maskedKey = leminKey
+          ? `${leminKey.slice(0, 4)}${"*".repeat(Math.max(0, leminKey.length - 8))}${leminKey.slice(-4)}`
+          : "(not set — LEMIN_API_KEY secret missing)";
+        const debugPayload = { ...safePayload, user_id: maskedKey };
+
+        // Pre-send spec validation — every non-variable field must be non-empty
+        const specMissing = (["type","dial_code","template","phone"] as const)
           .filter(f => { const v = safePayload[f]; return v === undefined || v === null || v === ""; });
+        if (!leminKey) specMissing.push("user_id" as any);
         if (specMissing.length) {
           return void res.json({
             ok: false,
             message: `Pre-send validation failed — empty required fields: ${specMissing.join(", ")}`,
-            requestPayload: safePayload,
+            debugPayload,
           });
         }
 
         const reqPayload = { ...safePayload, user_id: leminKey };
         let httpStatus = 0; let respData: any = {};
         try {
-          console.log(`[lemin send-test] POST ${endpoint} body=${JSON.stringify(safePayload)}`);
+          // Log COMPLETE payload (user_id masked) so it appears in VPS PM2 logs
+          console.log(`[lemin send-test] PAYLOAD: ${JSON.stringify(debugPayload)}`);
           const resp = await axios.post(endpoint, reqPayload, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
           httpStatus = resp.status; respData = resp.data;
           console.log(`[lemin send-test] response HTTP=${httpStatus} body=${JSON.stringify(respData)}`);
@@ -674,6 +722,7 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
 
           result = {
             ok, provider: "Lemin AI", endpoint, httpStatus, messageId,
+            debugPayload,
             requestPayload:  safePayload,
             responsePayload: respData,
             errorMessage,
@@ -683,13 +732,14 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
           }
         } catch (e: any) {
           const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
-          console.error(`[lemin send-test] error HTTP=${httpStatus} body=${JSON.stringify(respData)}`);
+          console.error(`[lemin send-test] ERROR HTTP=${httpStatus} body=${JSON.stringify(respData)}`);
           const rawErr = respData?.message || respData?.error || e.message;
           const errTxt = String(rawErr || "").toLowerCase();
           const authFailed = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
             || errTxt.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
           result = {
             ok: false, provider: "Lemin AI", endpoint, httpStatus,
+            debugPayload,
             requestPayload: safePayload,
             responsePayload: respData,
             errorCode: String(respData?.code || ""),
