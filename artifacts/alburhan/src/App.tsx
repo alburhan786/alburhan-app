@@ -84,6 +84,7 @@ import PaymentAnalytics from "@/pages/admin/PaymentAnalytics";
 import PaymentTrash from "@/pages/admin/PaymentTrash";
 import SystemHealth from "@/pages/admin/SystemHealth";
 import OTPDebug from "@/pages/admin/OTPDebug";
+import OtpDiagnostics from "@/pages/admin/OtpDiagnostics";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
@@ -438,6 +439,7 @@ function Router() {
       <Route path="/admin/sms-test" component={() => <AdminRoute component={SmsTestPage} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
+      <Route path="/admin/otp-diagnostics" component={() => <AdminRoute component={OtpDiagnostics} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
       <Route path="/admin/notification-logs" component={() => <AdminRoute component={NotificationLogs} />} />

@@ -198,7 +198,14 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
   const [smsSent, setSmsSent] = useState<boolean | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
   const [whatsappSent, setWhatsappSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [allFailed, setAllFailed] = useState(false);
+  const [failReferenceId, setFailReferenceId] = useState<string | null>(null);
   const [smsFailReason, setSmsFailReason] = useState<string | null>(null);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryMobile, setRecoveryMobile] = useState("");
+  const [recoveryStatus, setRecoveryStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [recoveryMsg, setRecoveryMsg] = useState("");
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -210,6 +217,48 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
     const r = new URLSearchParams(window.location.search).get("returnUrl");
     return r && r.startsWith("/") && !r.startsWith("//") ? r : null;
   })();
+
+  // ── Admin recovery token auto-verify (from email link ?rt=TOKEN&rm=MOBILE) ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const rt = params.get("rt");
+    const rm = params.get("rm");
+    if (!rt || !rm) return;
+    // Auto-verify recovery token
+    postJson("/api/auth/admin-recovery/verify", { token: rt, mobile: rm })
+      .then(result => {
+        if (result?.ok && result?.user) {
+          queryClient.setQueryData(["/api/auth/me"], result.user);
+          toast({ title: "✅ Recovery successful", description: "Welcome back! You have been logged in via email recovery." });
+          adminRedirect(result.user.role ?? "admin");
+        }
+      })
+      .catch(() => {
+        toast({ title: "Recovery link expired", description: "This recovery link is invalid or has expired. Please request a new one.", variant: "destructive" });
+        // Clear the query params so user can use the normal login form
+        window.history.replaceState({}, "", "/admin/login");
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Admin account recovery send ───────────────────────────────────────────
+  const handleSendRecovery = async () => {
+    const clean = normaliseIndianMobile(recoveryMobile).slice(0, 10);
+    if (clean.length !== 10) {
+      setRecoveryMsg("Enter your registered admin mobile number (10 digits).");
+      setRecoveryStatus("error");
+      return;
+    }
+    setRecoveryStatus("sending");
+    setRecoveryMsg("");
+    try {
+      const result = await postJson("/api/auth/admin-recovery", { mobile: clean });
+      setRecoveryMsg(result?.message || "Recovery email sent.");
+      setRecoveryStatus("sent");
+    } catch (err: any) {
+      setRecoveryMsg(err?.message || "Failed to send recovery email.");
+      setRecoveryStatus("error");
+    }
+  };
 
   // ── Auth redirect ─────────────────────────────────────────────────────────
   function adminRedirect(userRole: string) {
@@ -233,18 +282,23 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
   if (isAuthenticated) return null;
 
   // ── Portal selection ──────────────────────────────────────────────────────
+  function resetOtpDeliveryState() {
+    setSmsSent(null); setSmsError(null); setWhatsappSent(false); setSmsFailReason(null);
+    setEmailSent(false); setAllFailed(false); setFailReferenceId(null);
+  }
+
   function handleSelectPortal(p: PortalType) {
     setPortal(p);
     savePortal(p);
     setStep(1);
     setMobile(""); setMobileError(""); setOtp("");
-    setSmsSent(null); setSmsError(null); setWhatsappSent(false); setSmsFailReason(null);
+    resetOtpDeliveryState();
   }
 
   function handleChangePortal() {
     setStep(0);
     setOtp(""); setMobile(""); setMobileError("");
-    setSmsSent(null); setSmsError(null); setWhatsappSent(false); setSmsFailReason(null);
+    resetOtpDeliveryState();
     setResendCount(0); setResendCooldown(0);
     if (cooldownRef.current) clearInterval(cooldownRef.current);
   }
@@ -274,14 +328,19 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
     if (!portal) return false;
 
     setIsSendingOtp(true);
-    setSmsSent(null); setSmsError(null); setWhatsappSent(false); setSmsFailReason(null);
+    resetOtpDeliveryState();
 
     const cleanNum = normaliseIndianMobile(mobileNum).slice(0, 10);
     try {
       const result = await postJson("/api/auth/send-otp", { mobile: cleanNum, portal });
       setIsNewUser(!!result?.isNewUser);
-      setSmsSent(result?.smsSent === true);
-      setWhatsappSent(result?.whatsappSent === true);
+      // Backend sends result.success + result.channel — never result.smsSent/whatsappSent
+      const ch: string = result?.channel ?? "";
+      setSmsSent(result?.success === true && ch === "sms");
+      setWhatsappSent(result?.success === true && ch === "whatsapp");
+      setEmailSent(result?.success === true && ch === "email");
+      setAllFailed(result?.success === false || result?.allChannelsFailed === true);
+      if (result?.referenceId) setFailReferenceId(result.referenceId);
       if (result?.smsError) setSmsError(result.smsError);
       if (result?.smsFailReason) setSmsFailReason(result.smsFailReason);
       startCooldown();
@@ -538,11 +597,72 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
                       </Button>
                     </form>
 
-                    <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>Need help?</span>
-                      <a href={SUPPORT_PHONE} className="text-primary font-medium hover:underline">{SUPPORT_DISPLAY}</a>
+                    <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-between gap-2 text-xs text-muted-foreground flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Need help?</span>
+                        <a href={SUPPORT_PHONE} className="text-primary font-medium hover:underline">{SUPPORT_DISPLAY}</a>
+                      </div>
+                      {portal === "admin" && (
+                        <button
+                          type="button"
+                          onClick={() => { setShowRecoveryModal(true); setRecoveryMobile(mobile); setRecoveryStatus("idle"); setRecoveryMsg(""); }}
+                          className="text-muted-foreground hover:text-primary underline underline-offset-4 transition-colors"
+                        >
+                          Lost access? Recover via email
+                        </button>
+                      )}
                     </div>
+
+                    {/* Admin recovery modal */}
+                    {showRecoveryModal && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-card rounded-2xl shadow-2xl border max-w-sm w-full p-6 space-y-4">
+                          <div>
+                            <h3 className="font-bold text-base">Admin Account Recovery</h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Enter your registered admin mobile number. A one-time login link will be sent to your registered email address. Valid for 15 minutes.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-input bg-muted text-muted-foreground text-sm">+91</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={10}
+                              placeholder="9XXXXXXXXX"
+                              value={recoveryMobile}
+                              onChange={e => setRecoveryMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              className="flex-1 border border-input rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                          </div>
+                          {recoveryMsg && (
+                            <div className={`text-xs p-2 rounded-lg ${recoveryStatus === "sent" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : recoveryStatus === "error" ? "bg-red-50 text-red-700 border border-red-200" : ""}`}>
+                              {recoveryMsg}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            {recoveryStatus !== "sent" && (
+                              <button
+                                type="button"
+                                onClick={handleSendRecovery}
+                                disabled={recoveryStatus === "sending"}
+                                className="flex-1 bg-primary text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                              >
+                                {recoveryStatus === "sending" ? "Sending…" : "Send Recovery Email"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setShowRecoveryModal(false)}
+                              className="flex-1 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
+                            >
+                              {recoveryStatus === "sent" ? "Close" : "Cancel"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <p className="text-center text-[10px] text-muted-foreground mt-3 opacity-60 select-none">
                       Al Burhan Tours &amp; Travels &nbsp;·&nbsp; Build {FRONTEND_BUILD}
@@ -565,7 +685,7 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
                         OTP sent to <span className="font-semibold text-foreground">+91 {maskMobile(mobile)}</span>
                       </p>
 
-                      {/* Delivery status */}
+                      {/* Delivery status — keyed on result.channel from backend */}
                       {smsSent === true && (
                         <div className="mt-2 flex items-center justify-center gap-1.5 text-emerald-600 text-xs">
                           <CheckCircle className="w-3.5 h-3.5" />
@@ -573,20 +693,35 @@ export default function Login({ defaultPortal }: LoginProps = {}) {
                         </div>
                       )}
 
-                      {smsSent === false && whatsappSent && (
+                      {whatsappSent === true && (
                         <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-left flex items-start gap-2">
                           <MessageCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                           <div>
-                            <p className="text-xs font-semibold text-emerald-800">OTP sent to your WhatsApp</p>
+                            <p className="text-xs font-semibold text-emerald-800">SMS unavailable. OTP sent to your WhatsApp</p>
                             <p className="text-xs text-emerald-700 mt-0.5">Check WhatsApp for a message from Al Burhan Tours.</p>
                           </div>
                         </div>
                       )}
 
-                      {smsSent === false && !whatsappSent && (
+                      {emailSent === true && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-left flex items-start gap-2">
+                          <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-blue-800">OTP sent to your registered email</p>
+                            <p className="text-xs text-blue-700 mt-0.5">Check your inbox for a message from Al Burhan Tours.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {allFailed && (
                         <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-start gap-2 text-left">
                           <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-                          <p className="text-xs text-orange-700 font-medium">OTP delivery failed. Please try again or contact support.</p>
+                          <div>
+                            <p className="text-xs text-orange-700 font-medium">OTP delivery failed. Please try again or contact support.</p>
+                            {failReferenceId && (
+                              <p className="text-[10px] text-orange-500 mt-1 font-mono">Ref: {failReferenceId}</p>
+                            )}
+                          </div>
                         </div>
                       )}
 

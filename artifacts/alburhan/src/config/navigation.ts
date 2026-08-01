@@ -255,6 +255,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: ClipboardList,label: "Error Logs",               href: "/admin/error-logs",         require: ["users",      "view"], aliases: ["error logs", "api errors", "500 errors", "failed requests", "production errors"] },
         { icon: Activity,     label: "E2E Test Runner",          href: "/admin/e2e-test",           require: ["users",      "view"], aliases: ["e2e", "end to end test", "system test", "integration test", "live test", "workflow test"] },
         { icon: Activity,     label: "OTP Debug",               href: "/admin/otp-debug",         require: ["users",      "view"] },
+        { icon: Shield,       label: "OTP Diagnostics",         href: "/admin/otp-diagnostics",   require: ["users",      "view"], aliases: ["otp diagnostics", "otp health", "sms diagnostics", "whatsapp otp", "login diagnostics"] },
         { icon: MessageSquare,label: "Admin Chat",              href: "/admin/chat",              require: ["customers",  "view"] },
       ],
     },
