@@ -445,7 +445,7 @@ export default function ApiSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhook/rcs" }),
+        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhooks/lemin-rcs" }),
       });
       const data = await res.json();
       setWebhookResult(data);

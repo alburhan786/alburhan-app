@@ -514,43 +514,64 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
       }
       case "lemin": {
         if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number" });
-        // Env vars take precedence — never expose key in response/logs
+        // Env vars take precedence over DB; user_id is NEVER returned to caller or logged
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        const rcsAgent     = process.env.LEMIN_AGENT     || extra.agent     || "jio";
+        // Default template 1473 used only when no event-specific template is configured
         const templateId   = extra.template_id || "1473";
-        if (!leminKey) return void res.json({ ok: false, message: "LEMIN_API_KEY secret not set" });
+        if (!leminKey) return void res.json({ ok: false, message: "User ID (Developer API Key) not set — save settings first" });
         channel = "rcs";
         recipient = mobile;
-        const phone = mobile.replace(/\D/g, "").slice(-10);
+        // Normalise: strip spaces/hyphens/+, leading 0, leading 91 → exactly 10 digits
+        let rawClean = mobile.replace(/[\s\-\+]/g, "");
+        if (rawClean.startsWith("0")) rawClean = rawClean.slice(1);
+        if (rawClean.startsWith("91") && rawClean.length === 12) rawClean = rawClean.slice(2);
+        const phone = rawClean.slice(-10);
+        if (phone.length !== 10) return void res.json({ ok: false, message: `Invalid mobile number — expected 10 digits, got "${mobile}"` });
         const endpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
-        // Safe payload for logging — never include user_id
-        const safePayload = { type: "single", dial_code: dialCode, template: templateId, phone, agent: rcsAgent };
-        const reqPayload  = { ...safePayload, user_id: leminKey };   // key only goes to Lemin
+        // Per spec: { type, dial_code, template, phone, user_id }
+        // Safe payload = same but WITHOUT user_id (never logged or returned to frontend)
+        const safePayload = { type: "single", dial_code: dialCode, template: templateId, phone };
+        const reqPayload  = { ...safePayload, user_id: leminKey };
         let httpStatus = 0; let respData: any = {};
         try {
           const resp = await axios.post(endpoint, reqPayload, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
           httpStatus = resp.status; respData = resp.data;
           const errTxt = String(respData?.message || respData?.error || "").toLowerCase();
-          const authFailed = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
+          const authFailed  = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
             || errTxt.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
-          // Connected = Lemin responded and did NOT reject our credentials
-          const ok = httpStatus > 0 && !authFailed;
+          const tplFailed   = errTxt.includes("template not found") || errTxt.includes("template_not_found");
+          const bodyFailed  = respData?.success === false || respData?.status === false;
+          // Real success: HTTP 2xx + no auth/template/body error
+          const ok = httpStatus >= 200 && httpStatus < 300 && !authFailed && !tplFailed && !bodyFailed;
+          // Extract message_id from all known Lemin response shapes
+          const messageId = respData?.data?.id || respData?.data?.message_id
+            || respData?.message_id || respData?.id || respData?.msg_id || undefined;
           result = { ok, provider: "Lemin AI", endpoint, httpStatus,
-            requestPayload: safePayload,   // user_id intentionally omitted
+            requestPayload: safePayload,
             responsePayload: respData,
-            errorMessage: ok ? undefined : (respData?.message || respData?.error || "RCS delivery failed") };
+            messageId,
+            errorMessage: ok ? undefined : (respData?.message || respData?.error || `HTTP ${httpStatus}`) };
+          // Mark provider as connected in DB only after a real successful send
+          if (ok) {
+            await pool.query(
+              `UPDATE api_settings SET status='connected', last_tested=NOW() WHERE provider='lemin'`
+            ).catch(() => {});
+          }
         } catch (e: any) {
           const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
           const errTxt = String(respData?.message || respData?.error || e.message || "").toLowerCase();
           const authFailed = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
             || errTxt.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
-          result = { ok: httpStatus > 0 && !authFailed, provider: "Lemin AI", endpoint, httpStatus,
+          result = { ok: false, provider: "Lemin AI", endpoint, httpStatus,
             requestPayload: safePayload,
             responsePayload: respData,
             errorCode: String(respData?.code || ""),
             errorMessage: respData?.message || respData?.error || e.message };
+          if (authFailed) {
+            result.errorMessage = `Authentication failed — check the User ID (Developer API Key): ${result.errorMessage}`;
+          }
         }
         break;
       }
@@ -585,6 +606,8 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
 });
 
 // POST /api/api-settings/lemin/set-webhook — register webhook URL with Lemin AI
+// Spec: POST https://rcs.leminai.com/api/webhook/set
+//       Body: { url, agent, active, user_id }
 router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   try {
     const row = await pool.query(`SELECT api_key_encrypted, api_url, extra_fields_encrypted FROM api_settings WHERE provider='lemin' LIMIT 1`);
@@ -595,17 +618,40 @@ router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async 
     if (r.extra_fields_encrypted) {
       try { extraFields = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
     }
-    const userId = decryptedKey || extraFields.user_id || "";
-    if (!userId) return void res.json({ ok: false, message: "Developer API Key not set — save settings first" });
-    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
-    const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
-    const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", payload, {
-      headers: { "Content-Type": "application/json" },
-      timeout: 10000,
-    }).catch((e: any) => e?.response || { data: { error: e.message }, status: 0 });
-    const ok = resp.status >= 200 && resp.status < 300;
-    console.log(`[Lemin] Webhook set result: status=${resp.status} ok=${ok}`, resp.data);
-    res.json({ ok, httpStatus: resp.status, requestPayload: payload, responsePayload: resp.data });
+    // Prefer env var (VPS), fall back to DB-stored value
+    const userId = process.env.LEMIN_API_KEY || decryptedKey || extraFields.user_id || "";
+    if (!userId) return void res.json({ ok: false, message: "User ID (Developer API Key) not set — save settings first" });
+    // Webhook URL: singular /api/webhook path kept for backward compat; plural /api/webhooks/lemin-rcs is the canonical target
+    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhooks/lemin-rcs";
+    // user_id sent to Lemin only — NEVER returned in response or logged
+    const safePayload  = { url: webhookUrl, agent: "jio", active: true };
+    const leminPayload = { ...safePayload, user_id: userId };
+    let httpStatus = 0; let respData: any = {};
+    try {
+      const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", leminPayload, {
+        headers: { "Content-Type": "application/json" }, timeout: 10000,
+      });
+      httpStatus = resp.status; respData = resp.data;
+    } catch (e: any) {
+      httpStatus = e?.response?.status || 0;
+      respData   = e?.response?.data   || { error: e.message };
+    }
+    const ok = httpStatus >= 200 && httpStatus < 300;
+    console.log(`[Lemin] Webhook set result: status=${httpStatus} ok=${ok}`, respData);
+    res.json({ ok, httpStatus, webhookUrl, requestPayload: safePayload, responsePayload: respData });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/api-settings/lemin/message-status?message_id=XXX — poll delivery status from Lemin
+router.get("/lemin/message-status", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  const messageId = String(req.query.message_id || "").trim();
+  if (!messageId) return void res.status(400).json({ ok: false, message: "message_id query parameter required" });
+  try {
+    const { refreshMessageStatus } = await import("../lib/rcs.js");
+    const result = await refreshMessageStatus(messageId);
+    res.json({ ok: true, ...result });
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }

@@ -392,6 +392,8 @@ router.use("/transport-ops", transportOpsRouter);
 router.use("/hr-ops", hrOpsRouter);
 router.use("/executive", executiveDashRouter);
 router.use("/webhook", webhooksRouter);
+// Canonical plural path — Lemin AI webhook registered as /api/webhooks/lemin-rcs
+router.use("/webhooks", webhooksRouter);
 router.use(storageRouter);
 
 // ── Migration diagnostics (router-level, no session required, key-protected) ──

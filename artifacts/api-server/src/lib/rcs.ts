@@ -76,10 +76,30 @@ export interface ResolvedVars {
 
 // ── Config helpers ────────────────────────────────────────────────────────────
 
-function getLeminKey():   string { return process.env.LEMIN_API_KEY   || ""; }
+function getLeminKey(): string {
+  // 1. Env var (injected at build time for VPS)
+  if (process.env.LEMIN_API_KEY) return process.env.LEMIN_API_KEY;
+  // 2. DB-stored "User ID (Developer API Key)" saved via Admin → API Settings → Lemin AI RCS
+  try {
+    const { getCachedConfig } = require("./apiSettingsProvider.js");
+    const cfg = getCachedConfig("lemin");
+    return cfg.apiKey || cfg.extra?.user_id || "";
+  } catch { return ""; }
+}
 function getLeminBase():  string { return (process.env.LEMIN_BASE_URL  || "https://rcs.leminai.com").replace(/\/$/, ""); }
 function getDialCode():   string { return process.env.LEMIN_DIAL_CODE  || "+91"; }
 function getRcsAgent():   string { return process.env.LEMIN_AGENT      || "jio"; }
+
+/**
+ * Normalise any raw Indian mobile string to exactly 10 digits.
+ * Handles: leading +, spaces, hyphens, leading 0, leading country code 91.
+ */
+function normalizeIndianMobile(raw: string): string {
+  let clean = raw.replace(/[\s\-\+]/g, "");  // strip spaces, hyphens, leading +
+  if (clean.startsWith("0")) clean = clean.slice(1); // remove leading 0
+  if (clean.startsWith("91") && clean.length === 12) clean = clean.slice(2); // strip 91 prefix
+  return clean.slice(-10); // always return last 10 digits
+}
 
 function getSendEndpoint(): string { return `${getLeminBase()}/api/send/template`; }
 function getStatusEndpoint(): string { return `${getLeminBase()}/api/messages/status`; }
@@ -422,9 +442,8 @@ export async function sendRCSForEvent(
     return { ok: false, provider: "LeminAI", endpoint, errorMessage: "LEMIN_API_KEY secret not configured" };
   }
 
-  // 3. Normalize phone
-  const clean = mobile.replace(/\D/g, "");
-  const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean.slice(-10);
+  // 3. Normalize phone — strips spaces/hyphens/+, leading 0, leading 91 → exactly 10 digits
+  const phone = normalizeIndianMobile(mobile);
   if (phone.length !== 10) {
     return { ok: false, provider: "LeminAI", endpoint, errorMessage: `Invalid mobile number: ${mobile}` };
   }
@@ -591,8 +610,7 @@ export async function sendCustomRCS(opts: {
   const leminKey = getLeminKey();
   if (!leminKey) return { ok: false, provider: "LeminAI", endpoint, errorMessage: "LEMIN_API_KEY not configured" };
 
-  const clean = opts.mobile.replace(/\D/g, "");
-  const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean.slice(-10);
+  const phone = normalizeIndianMobile(opts.mobile);
   const dialCode = getDialCode();
 
   const safePayload: Record<string, unknown> = {
@@ -701,8 +719,11 @@ export async function sendRCSForOTP(
   }
 
   // Payloads — OTP sent to Lemin but NEVER stored in logs
-  const leminPayload  = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp }, user_id: leminKey };
-  const safePayload   = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp: "******" } };
+  // Normalise mobile for OTP path
+  const cleanOtp = normalizeIndianMobile(mobile);
+
+  const leminPayload  = { type: "single", dial_code: dialCode, template: templateId, phone: cleanOtp, variables: { otp }, user_id: leminKey };
+  const safePayload   = { type: "single", dial_code: dialCode, template: templateId, phone: cleanOtp, variables: { otp: "******" } };
 
   let lastResult: RCSResult = { ok: false, provider: "LeminAI", endpoint, errorMessage: "Max retries exceeded" };
 

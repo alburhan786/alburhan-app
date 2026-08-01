@@ -2208,12 +2208,23 @@ async function _runChecks_MOVED(_req: AuthenticatedRequest, res: any) {
       }
     } catch (e: any) { results.firebase = { ok: false, status: "error", message: e.message }; }
 
-    // Lemin AI RCS
+    // Lemin AI RCS — only mark connected when a real API test has succeeded
     try {
       const l = getCachedConfig("lemin");
-      const userId = l.apiKey || l.extra?.user_id || "";
-      if (!userId) { results.lemin = { ok: false, status: "unconfigured", message: "Developer API Key not set" }; }
-      else { results.lemin = { ok: true, status: "configured", message: `API key configured (${String(userId).slice(0, 6)}...)` }; }
+      const userId = process.env.LEMIN_API_KEY || l.apiKey || l.extra?.user_id || "";
+      if (!userId) {
+        results.lemin = { ok: false, status: "unconfigured", message: "User ID (Developer API Key) not set — enter it in API Settings → Lemin AI RCS" };
+      } else {
+        // Check if a real send-test has ever succeeded (status='connected' written by send-test on first success)
+        const dbRow = await pool.query(`SELECT status, last_tested FROM api_settings WHERE provider='lemin' LIMIT 1`).catch(() => ({ rows: [] as any[] }));
+        const dbStatus = dbRow.rows[0]?.status;
+        const lastTested = dbRow.rows[0]?.last_tested;
+        if (dbStatus === "connected") {
+          results.lemin = { ok: true, status: "connected", message: `RCS connected — last tested: ${lastTested ? new Date(lastTested).toLocaleDateString("en-IN") : "unknown"}` };
+        } else {
+          results.lemin = { ok: false, status: "key_saved", message: `API key saved (${String(userId).slice(0, 6)}...) — send a test message to confirm connectivity` };
+        }
+      }
     } catch (e: any) { results.lemin = { ok: false, status: "error", message: e.message }; }
 
     res.json({ ok: true, checkedAt: new Date().toISOString(), providers: results });
