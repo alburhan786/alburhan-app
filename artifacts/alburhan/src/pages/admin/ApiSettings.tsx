@@ -977,6 +977,7 @@ export default function ApiSettings() {
                         const r = sendTestResults["lemin"];
                         return (
                           <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-purple-200 bg-purple-50" : "border-red-200 bg-red-50"}`}>
+                            {/* Header row */}
                             <div className="flex items-center gap-3 px-3 py-2 border-b border-inherit">
                               <span className="text-base">{r.ok ? "✅" : "❌"}</span>
                               <div className="flex-1">
@@ -988,23 +989,44 @@ export default function ApiSettings() {
                                     HTTP {r.httpStatus}
                                   </span>
                                 )}
+                                {r.endpoint && (
+                                  <span className="ml-2 text-[10px] text-gray-400 font-mono">{r.endpoint}</span>
+                                )}
                               </div>
                               {r.logged && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>}
                             </div>
+
+                            {/* Success: message ID */}
                             {r.messageId && (
                               <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-white/60">
                                 <span className="text-xs font-semibold text-gray-500 shrink-0">Message ID:</span>
                                 <code className="text-xs font-mono text-purple-700 font-bold break-all">{r.messageId}</code>
                               </div>
                             )}
-                            {r.errorMessage && (
-                              <div className="px-3 py-2 border-b border-inherit bg-white/60">
-                                <span className="text-xs font-semibold text-red-600">Error: </span>
-                                <span className="text-xs text-red-700">{r.errorMessage}</span>
+
+                            {/* Error: exact Lemin error string */}
+                            {!r.ok && (r.errorMessage || r.message) && (
+                              <div className="px-3 py-2 border-b border-inherit bg-red-50">
+                                <p className="text-xs font-semibold text-red-700 mb-0.5">Lemin Error</p>
+                                <p className="text-xs text-red-800 font-mono break-all">{r.errorMessage || r.message}</p>
                               </div>
                             )}
+
+                            {/* Request body sent to Lemin (no API key) */}
+                            {r.requestPayload && (
+                              <div className="px-3 py-2 border-b border-inherit">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                                  Request Body <span className="normal-case font-normal text-gray-400">(user_id omitted)</span>
+                                </p>
+                                <pre className="bg-gray-900 text-green-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                                  {JSON.stringify(r.requestPayload, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {/* Full Lemin API response */}
                             <div className="px-3 py-2">
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">API Response</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Lemin API Response</p>
                               <pre className="bg-gray-900 text-purple-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-all">
                                 {JSON.stringify(r.responsePayload ?? r, null, 2)}
                               </pre>
