@@ -2638,6 +2638,32 @@ async function runMigrations() {
   } catch (err: any) {
     console.warn("[Migration] v30.4 firebase legacy cleanup:", err.message);
   }
+
+  // v30.5 — One-time clean slate: wipe ALL Firebase credentials (api_key + extra_fields)
+  //          so corrupted values from earlier sessions cannot persist.
+  //          A marker row "_fb_cleared_v305" prevents this from running on subsequent startups.
+  try {
+    const markerCheck = await pool.query(
+      `SELECT 1 FROM api_settings WHERE provider = '_fb_cleared_v305'`
+    );
+    if (!markerCheck.rows.length) {
+      // Clear corrupted credentials
+      await pool.query(
+        `UPDATE api_settings
+         SET api_key_encrypted = NULL, extra_fields_encrypted = NULL
+         WHERE provider = 'firebase'`
+      );
+      // Write the marker so this never runs again
+      await pool.query(
+        `INSERT INTO api_settings (provider, enabled, updated_at, updated_by)
+         VALUES ('_fb_cleared_v305', false, NOW(), 'migration')
+         ON CONFLICT (provider) DO NOTHING`
+      );
+      console.log("[Migration v30.5] Firebase credentials cleared — re-enter via API Settings → Firebase Push (FCM v1)");
+    }
+  } catch (err: any) {
+    console.warn("[Migration v30.5] firebase clean slate:", err.message);
+  }
 }
 
 const rawPort = process.env["PORT"];

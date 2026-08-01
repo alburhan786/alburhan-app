@@ -689,7 +689,17 @@ export default function ApiSettings() {
                                 return;
                               }
 
-                              // Step 2: extract exactly three fields by name (JSON.parse ensures correct types)
+                              // Step 2: verify this is a Firebase service account JSON (not some other JSON)
+                              if (parsed.type !== "service_account") {
+                                toast({
+                                  title: "Wrong JSON type",
+                                  description: `Expected "type": "service_account". Got: "${parsed.type ?? "(missing)"}". Download the file from Firebase Console → Project Settings → Service Accounts → Generate new private key.`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Step 3: extract exactly three fields by name (JSON.parse ensures correct types)
                               const projectId:   string = typeof parsed.project_id   === "string" ? parsed.project_id   : "";
                               const clientEmail: string = typeof parsed.client_email === "string" ? parsed.client_email : "";
                               const privateKey:  string = typeof parsed.private_key  === "string" ? parsed.private_key  : "";
