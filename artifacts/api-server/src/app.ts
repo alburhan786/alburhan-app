@@ -564,6 +564,126 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   req.on("close", () => tar.kill());
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DIRECT UPLOAD DEPLOY ENDPOINTS
+// GitHub Actions POSTs the built artifacts directly over HTTPS — no SSH needed.
+// Auth: X-Deploy-Key header must match MIGRATION_KEY.
+// These endpoints are the primary CI/CD path; the localhost-only self-update
+// endpoints remain available for manual/emergency use from VPS SSH.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/deploy/backend-bundle
+// Receives the raw index.cjs bundle (Content-Type: application/octet-stream).
+// Validates size + syntax, backs up current bundle, installs atomically, then
+// calls process.exit(0) so PM2 restarts with the new code.
+app.post(
+  "/api/deploy/backend-bundle",
+  express.raw({ type: "application/octet-stream", limit: "50mb" }),
+  async (req, res) => {
+    const deployKey = req.headers["x-deploy-key"] as string;
+    if (!migrationKeyValid(deployKey)) {
+      return void res.status(403).json({ error: "Forbidden — X-Deploy-Key mismatch" });
+    }
+
+    const bundle: Buffer = req.body;
+    if (!Buffer.isBuffer(bundle) || bundle.length < 5_000_000) {
+      return void res.status(400).json({
+        error: `Bundle too small or missing: ${bundle?.length ?? 0} bytes (expected >5 MB)`,
+      });
+    }
+
+    const tmpPath = path.join(os.tmpdir(), `backend-upload-${Date.now()}.cjs`);
+    try {
+      fs.writeFileSync(tmpPath, bundle);
+
+      // Syntax validation — catches truncated or corrupt uploads before overwriting prod
+      const { execSync } = await import("child_process");
+      try {
+        execSync(`node --check "${tmpPath}"`, { timeout: 30_000, stdio: "pipe" });
+      } catch (syntaxErr: any) {
+        fs.unlinkSync(tmpPath);
+        return void res.status(400).json({
+          error: "Bundle syntax check failed — not installing",
+          details: String(syntaxErr?.message ?? syntaxErr).slice(0, 500),
+        });
+      }
+
+      const binPath  = path.join(__dirname, "../dist/index.cjs");
+      const bakPath  = path.join(__dirname, "../dist/index.cjs.bak");
+
+      // Backup current bundle (single-step rollback source)
+      if (fs.existsSync(binPath)) fs.copyFileSync(binPath, bakPath);
+
+      // Atomic install: write .new then rename to avoid partial-read on restart
+      fs.writeFileSync(binPath + ".new", bundle);
+      fs.renameSync(binPath + ".new", binPath);
+      try { fs.unlinkSync(tmpPath); } catch {}
+
+      console.log(`[deploy/backend-bundle] installed ${bundle.length} bytes → ${binPath}`);
+      res.json({ ok: true, bytes: bundle.length, message: "Bundle installed — restarting via PM2" });
+      // PM2 detects the exit(0) and restarts with the new bundle on disk
+      setTimeout(() => process.exit(0), 500);
+    } catch (err: any) {
+      try { fs.unlinkSync(tmpPath); } catch {}
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// POST /api/deploy/frontend-assets
+// Receives a gzipped tarball (Content-Type: application/gzip) of the built
+// frontend dist/public/ directory. Extracts to the correct location on disk.
+// Does NOT restart PM2 — frontend is static, nginx serves it immediately.
+app.post(
+  "/api/deploy/frontend-assets",
+  express.raw({ type: ["application/gzip", "application/x-gzip", "application/octet-stream"], limit: "50mb" }),
+  async (req, res) => {
+    const deployKey = req.headers["x-deploy-key"] as string;
+    if (!migrationKeyValid(deployKey)) {
+      return void res.status(403).json({ error: "Forbidden — X-Deploy-Key mismatch" });
+    }
+
+    const tarball: Buffer = req.body;
+    if (!Buffer.isBuffer(tarball) || tarball.length < 1_000) {
+      return void res.status(400).json({
+        error: `Tarball too small or missing: ${tarball?.length ?? 0} bytes`,
+      });
+    }
+
+    const tmpTar = path.join(os.tmpdir(), `frontend-upload-${Date.now()}.tar.gz`);
+    try {
+      fs.writeFileSync(tmpTar, tarball);
+
+      // Determine extract target — same logic as deploy-frontend
+      const extractTo: string = (() => {
+        const candidates = ["/root", path.resolve(__dirname, "../../..")];
+        return (
+          candidates.find(c => {
+            try { return fs.existsSync(path.join(c, "artifacts/alburhan")); } catch { return false; }
+          }) ?? "/root"
+        );
+      })();
+
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
+        proc.stderr.on("data", (d: Buffer) =>
+          console.error("[deploy/frontend-assets tar]", d.toString())
+        );
+        proc.on("close", (code: number) => {
+          try { fs.unlinkSync(tmpTar); } catch {}
+          code === 0 ? resolve() : reject(new Error(`tar exited ${code}`));
+        });
+      });
+
+      console.log(`[deploy/frontend-assets] extracted ${tarball.length} bytes to ${extractTo}`);
+      res.json({ ok: true, bytes: tarball.length, extractedTo: extractTo });
+    } catch (err: any) {
+      try { fs.unlinkSync(tmpTar); } catch {}
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 // GET /api/migrate/net-diag — deep network + DB connectivity diagnostic (no auth bypass)
 app.get("/api/migrate/net-diag", async (req, res) => {
   const key = req.query.key as string;
