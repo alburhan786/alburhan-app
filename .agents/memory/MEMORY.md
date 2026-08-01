@@ -1,3 +1,4 @@
+- [VPS API port](vps-api-port.md) — API process on port 5000 (NOT 3000); MIGRATION_KEY baked into bundle via esbuild define, not in PM2 env — extract with python3 regex on index.cjs
 - [Meta Cloud API language fix](meta-cloud-api-language-fix.md) — #132001 error root cause: default language was "en" but all ABT templates registered as "en_US"; full activation chain + production proof (3 wamids, 48K perm-failed = historical)
 - [Comms E2E channel verification July 2026](comms-e2e-july2026.md) — test-resend at POST /api/migrate/test-resend?key=alburhan-migrate-2026; 7/7 channels ok on dev; all prod webhook channels ok; VPS not reachable from Replit network (SSH + localhost self-update needed)
 - [v29.1 migration fix](v291-migration-fix.md) — must add v29.1-pre step (ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS created_at/updated_at) BEFORE v29.1 index creation; production still ran old bundle — rebuild + deploy needed

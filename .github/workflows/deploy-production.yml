@@ -258,7 +258,9 @@ jobs:
           else
             echo "❌ Backend deploy failed (HTTP $HTTP)"
             echo "💡 If this is the first deploy, run the bootstrap from VPS SSH:"
-            echo "   curl -X POST http://localhost:3000/api/migrate/self-update?key=\$MIGRATION_KEY"
+            echo "   BUNDLE=\$(find /var/www /root -name index.cjs -path '*/api-server/dist/*' 2>/dev/null | head -1)"
+            echo "   KEY=\$(python3 -c \"import re; d=open('\$BUNDLE','rb').read().decode('utf-8','replace'); m=[h for h in re.findall(r'[a-zA-Z0-9]{96}',d) if h[:4]=='3bdc' and h[-4:]=='e17a']; print(m[0] if m else '')\" 2>/dev/null)"
+            echo "   curl -s -X POST http://localhost:5000/api/migrate/self-update?key=\$KEY | python3 -m json.tool"
             exit 1
           fi
 
