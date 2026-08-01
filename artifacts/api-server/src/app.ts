@@ -959,6 +959,139 @@ app.get("/api/migrate/net-diag", async (req, res) => {
   res.json(report);
 });
 
+// GET /api/migrate/test-fcm-connection — Run a live OAuth2 token exchange against Firebase
+// using the credentials currently stored in the DB. Returns pass/fail + diagnostics.
+// Auth: MIGRATION_KEY query param. No admin session needed.
+app.get("/api/migrate/test-fcm-connection", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { testFCMConnection, invalidateFCMCredCache } = await import("./lib/fcm.js");
+  invalidateFCMCredCache(); // always test from fresh DB read, no cached state
+  const result = await testFCMConnection();
+  return void res.json(result);
+});
+
+// GET /api/migrate/clear-firebase — Wipe corrupted Firebase credentials directly from the production DB.
+// Auth: MIGRATION_KEY query param. Idempotent — safe to call multiple times.
+// Also writes the v30.5 marker so startup migration never re-clears freshly saved credentials.
+app.get("/api/migrate/clear-firebase", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool } = await import("@workspace/db");
+  try {
+    // 1. Read current state before clearing (for diagnostics)
+    const before = await pool.query(
+      `SELECT provider,
+              api_key_encrypted IS NOT NULL AS had_key,
+              extra_fields_encrypted IS NOT NULL AS had_extra
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+
+    // 2. Clear both encrypted fields — unconditional, no decryption needed
+    const updated = await pool.query(
+      `UPDATE api_settings
+       SET api_key_encrypted = NULL,
+           extra_fields_encrypted = NULL,
+           updated_at = NOW(),
+           updated_by = 'clear-firebase-endpoint'
+       WHERE provider = 'firebase'`
+    );
+
+    // 3. Ensure v30.5 marker exists so index.ts startup migration never re-clears freshly saved creds
+    await pool.query(
+      `INSERT INTO api_settings (provider, enabled, updated_at, updated_by)
+       VALUES ('_fb_cleared_v305', false, NOW(), 'clear-firebase-endpoint')
+       ON CONFLICT (provider) DO UPDATE SET updated_at = NOW(), updated_by = 'clear-firebase-endpoint'`
+    );
+
+    // 4. Confirm the row is now clear
+    const after = await pool.query(
+      `SELECT provider,
+              api_key_encrypted IS NULL AS key_cleared,
+              extra_fields_encrypted IS NULL AS extra_cleared
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+
+    return void res.json({
+      ok: true,
+      rowsUpdated: updated.rowCount,
+      before: before.rows[0] ?? null,
+      after: after.rows[0] ?? null,
+      markerWritten: "_fb_cleared_v305",
+      message: "Firebase credentials cleared. Marker written. Re-enter via Admin → API Settings → Firebase Push (FCM v1).",
+    });
+  } catch (err: any) {
+    return void res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/migrate/check-firebase — Read the current Firebase credential state from the DB (no secrets exposed).
+// Auth: MIGRATION_KEY query param.
+app.get("/api/migrate/check-firebase", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool } = await import("@workspace/db");
+  const { decrypt } = await import("./lib/encryption.js");
+  try {
+    const row = await pool.query(
+      `SELECT provider, enabled, api_key_encrypted, extra_fields_encrypted
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+    const marker = await pool.query(
+      `SELECT 1 FROM api_settings WHERE provider = '_fb_cleared_v305'`
+    );
+
+    if (!row.rows[0]) {
+      return void res.json({ ok: false, error: "No firebase row in api_settings", markerPresent: !!marker.rows[0] });
+    }
+
+    const r = row.rows[0];
+    let keyDiag: any = null;
+    let extraDiag: any = null;
+
+    if (r.api_key_encrypted) {
+      try {
+        const raw = decrypt(r.api_key_encrypted);
+        const norm = (raw || "").replace(/\\n/g, "\n").trim();
+        keyDiag = {
+          len: raw?.length,
+          first40: raw?.slice(0, 40),
+          isValidPem: norm.startsWith("-----BEGIN PRIVATE KEY-----"),
+          endsCorrectly: norm.endsWith("-----END PRIVATE KEY-----"),
+        };
+      } catch (e: any) { keyDiag = { error: e.message }; }
+    }
+
+    if (r.extra_fields_encrypted) {
+      try {
+        const raw = decrypt(r.extra_fields_encrypted);
+        const parsed = JSON.parse(raw);
+        extraDiag = {
+          project_id: parsed.project_id || null,
+          client_email: parsed.client_email || null,
+          has_service_account_json: !!parsed.service_account_json,
+        };
+      } catch (e: any) { extraDiag = { error: e.message }; }
+    }
+
+    return void res.json({
+      ok: true,
+      firebaseRow: {
+        has_api_key: !!r.api_key_encrypted,
+        has_extra_fields: !!r.extra_fields_encrypted,
+        key: keyDiag,
+        extra: extraDiag,
+      },
+      markerPresent: !!marker.rows[0],
+    });
+  } catch (err: any) {
+    return void res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // POST /api/migrate/test-resend — end-to-end resend diagnostic (migration-key auth, no session needed)
 // Picks the best real booking from DB (prefers one with payment + docs + agreement),
 // runs every resend path (WhatsApp, SMS, Email, Invoice PDF, Receipt PDF, Agreement,
