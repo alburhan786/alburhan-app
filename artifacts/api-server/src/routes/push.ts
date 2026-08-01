@@ -16,6 +16,7 @@ import {
   cleanupInvalidTokens,
   getTokensByFilter,
   logPushCampaign,
+  testFCMConnection,
 } from "../lib/fcm.js";
 import { pool } from "@workspace/db";
 
@@ -336,6 +337,16 @@ router.post("/send-all", requireAdmin as any, async (req, res) => {
     }
     await logPushCampaign({ id: campaignId, title, body, url, filter, totalTokens, sent, failed, sentBy: adminId, error });
   });
+});
+
+// ── Admin: Test FCM credentials (OAuth2 token exchange, no push sent) ────────
+router.post("/test-connection", requireAdmin as any, async (_req, res) => {
+  try {
+    const result = await testFCMConnection();
+    res.json(result);
+  } catch (err: any) {
+    res.json({ ok: false, error: err.message });
+  }
 });
 
 // ── Admin: Test notification ─────────────────────────────────────────────────

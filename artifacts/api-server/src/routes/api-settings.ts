@@ -143,6 +143,12 @@ router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: Aut
     // Invalidate cache so next notification uses new settings
     invalidateCache();
 
+    // Also flush FCM credential cache so updated service account takes effect immediately
+    if (provider === "firebase") {
+      const { invalidateFCMCredCache } = await import("../lib/fcm.js");
+      invalidateFCMCredCache();
+    }
+
     // ── Auto-verify Fast2SMS immediately after save: wallet check + real test SMS ──
     let autoTest: Record<string, any> | undefined;
     if (provider === "fast2sms") {
@@ -336,8 +342,19 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         break;
       }
       case "firebase": {
-        if (!apiKey) { result = { ok: false, message: "Firebase Server Key not set" }; break; }
-        result = { ok: true, message: "Firebase credentials present — use Send Test to verify delivery" };
+        // Real credential validation: exchange a Google OAuth2 access token
+        try {
+          const { testFCMConnection } = await import("../lib/fcm.js");
+          const r = await testFCMConnection();
+          result = {
+            ok: r.ok,
+            message: r.ok
+              ? r.message
+              : [r.error, r.hint ? `Hint: ${r.hint}` : ""].filter(Boolean).join(" — "),
+          };
+        } catch (e: any) {
+          result = { ok: false, message: e.message };
+        }
         break;
       }
       case "razorpay": {
@@ -469,21 +486,29 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       case "firebase": {
-        if (!apiKey) return void res.json({ ok: false, message: "Firebase Server Key not configured" });
-        const testToken = req.body.device_token;
-        if (!testToken) return void res.json({ ok: false, message: "Provide a device FCM token" });
+        // Uses FCM v1 API — no legacy Server Key needed
+        const deviceToken = req.body.device_token;
+        if (!deviceToken) return void res.json({ ok: false, message: "Provide a device FCM token (copy it from Push Center → This Browser)" });
         channel = "push";
-        recipient = testToken;
-        const endpoint = "https://fcm.googleapis.com/fcm/send";
-        const reqPayload = { to: testToken, notification: { title: "Al Burhan ERP", body: "✅ Firebase Push test from Test API" } };
-        let httpStatus = 0; let respData: any = {};
+        recipient = `${deviceToken.slice(0, 24)}…`;
+        const endpoint = "https://fcm.googleapis.com/v1/projects/{project}/messages:send";
         try {
-          const resp = await axios.post(endpoint, reqPayload, { headers: { Authorization: `key=${apiKey}`, "Content-Type": "application/json" }, timeout: 10000 });
-          httpStatus = resp.status; respData = resp.data;
-          result = { ok: httpStatus === 200, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData };
+          const { sendFCMToToken } = await import("../lib/fcm.js");
+          const r = await sendFCMToToken(deviceToken, {
+            title: "🔔 Al Burhan ERP Test",
+            body:  "✅ Firebase Cloud Messaging v1 — credentials are working!",
+            url:   "/admin/notifications",
+          });
+          result = {
+            ok:              r.ok,
+            provider:        "Firebase FCM v1",
+            endpoint,
+            responsePayload: { messageId: r.messageId, error: r.error, invalidToken: r.invalidToken },
+            message:         r.ok ? `Push delivered — messageId: ${r.messageId}` : undefined,
+            errorMessage:    r.error,
+          };
         } catch (e: any) {
-          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
-          result = { ok: false, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: respData?.error || e.message };
+          result = { ok: false, provider: "Firebase FCM v1", endpoint, errorMessage: e.message };
         }
         break;
       }

@@ -1,8 +1,9 @@
 // @ts-nocheck
 /**
- * Firebase Cloud Messaging — REST API implementation
- * Uses FCM v1 HTTP API directly (no firebase-admin SDK needed — works in bundled VPS environment).
- * All JWT signing done with Node.js built-in crypto. Zero extra dependencies.
+ * Firebase Cloud Messaging — FCM v1 HTTP API (no firebase-admin SDK)
+ * Authenticates via service account credentials (env vars or DB-stored JSON).
+ * JWT signing with Node.js built-in crypto. Zero extra dependencies.
+ * Supports Android, iOS (APNs), and Web push in a single message.
  */
 import crypto from "crypto";
 import { pool } from "@workspace/db";
@@ -11,22 +12,105 @@ import { pool } from "@workspace/db";
 let _cachedToken: string | null = null;
 let _tokenExpiry = 0;
 
+// ── DB credential cache ───────────────────────────────────────────────────────
+let _dbCreds: { projectId: string; clientEmail: string; privateKey: string } | null = null;
+let _dbCredsLoadedAt = 0;
+const DB_CREDS_TTL = 5 * 60 * 1000; // 5 min
+
+/** Call after saving new service account credentials so stale cache is dropped */
+export function invalidateFCMCredCache(): void {
+  _dbCreds         = null;
+  _dbCredsLoadedAt = 0;
+  _cachedToken     = null;
+  _tokenExpiry     = 0;
+}
+
+/**
+ * Resolves credentials in priority order:
+ *   1. Environment variables (FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY)
+ *   2. DB api_settings row (service account JSON or individual fields)
+ */
+async function getCredentials(): Promise<{ projectId: string; clientEmail: string; privateKey: string }> {
+  const envProjectId   = process.env.FIREBASE_PROJECT_ID   || "";
+  const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL || "";
+  const envPrivateKey  = process.env.FIREBASE_PRIVATE_KEY  || "";
+
+  if (envProjectId && envClientEmail && envPrivateKey) {
+    return {
+      projectId:  envProjectId,
+      clientEmail: envClientEmail,
+      privateKey:  envPrivateKey.replace(/\\n/g, "\n"),
+    };
+  }
+
+  // Fallback: DB-stored service account credentials (cached 5 min)
+  if (_dbCreds && Date.now() < _dbCredsLoadedAt + DB_CREDS_TTL) return _dbCreds;
+
+  try {
+    const { decrypt } = await import("./encryption.js");
+    const r = await pool.query(
+      "SELECT api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider='firebase'"
+    );
+    if (!r.rows[0]) {
+      throw new Error(
+        "Firebase not configured: set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY " +
+        "or upload a service account JSON in API Settings → Firebase Push"
+      );
+    }
+    const row = r.rows[0];
+    let projectId = "", clientEmail = "", privateKey = "";
+
+    if (row.api_key_encrypted) {
+      const keyStr = decrypt(row.api_key_encrypted);
+      try {
+        // Stored as full service account JSON
+        const sa = JSON.parse(keyStr);
+        if (sa.project_id && sa.private_key) {
+          projectId   = sa.project_id   || "";
+          clientEmail = sa.client_email || "";
+          privateKey  = (sa.private_key || "").replace(/\\n/g, "\n");
+        } else {
+          // Stored as raw PEM private key
+          privateKey = keyStr.replace(/\\n/g, "\n");
+        }
+      } catch {
+        privateKey = keyStr.replace(/\\n/g, "\n");
+      }
+    }
+
+    // Extra fields can override individual values
+    if (row.extra_fields_encrypted) {
+      try {
+        const extra = JSON.parse(decrypt(row.extra_fields_encrypted));
+        if (extra.project_id)   projectId   = extra.project_id;
+        if (extra.client_email) clientEmail = extra.client_email;
+      } catch {}
+    }
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        "Firebase credentials incomplete in DB — ensure project_id, client_email and private_key " +
+        "are all present (upload full service account JSON)"
+      );
+    }
+
+    _dbCreds         = { projectId, clientEmail, privateKey };
+    _dbCredsLoadedAt = Date.now();
+    return _dbCreds;
+  } catch (err: any) {
+    throw err;
+  }
+}
+
 async function getAccessToken(): Promise<string> {
   if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
 
-  const projectId   = process.env.FIREBASE_PROJECT_ID || "";
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || "";
-  const rawKey      = process.env.FIREBASE_PRIVATE_KEY || "";
+  const { projectId, clientEmail, privateKey } = await getCredentials();
 
-  if (!projectId || !clientEmail || !rawKey) {
-    throw new Error("Firebase not configured: missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY");
-  }
-  const privateKey = rawKey.replace(/\\n/g, "\n");
-
-  const now  = Math.floor(Date.now() / 1000);
-  const exp  = now + 3600;
-  const hdr  = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
-  const pay  = Buffer.from(JSON.stringify({
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + 3600;
+  const hdr = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const pay = Buffer.from(JSON.stringify({
     iss: clientEmail, sub: clientEmail,
     aud: "https://oauth2.googleapis.com/token",
     iat: now, exp,
@@ -41,10 +125,15 @@ async function getAccessToken(): Promise<string> {
   const res  = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
   });
   const data = await res.json();
-  if (!data.access_token) throw new Error(`Token exchange failed: ${JSON.stringify(data)}`);
+  if (!data.access_token) {
+    throw new Error(`OAuth2 token exchange failed: ${JSON.stringify(data)}`);
+  }
 
   _cachedToken = data.access_token;
   _tokenExpiry = Date.now() + 50 * 60 * 1000; // 50 min
@@ -53,57 +142,171 @@ async function getAccessToken(): Promise<string> {
 
 // ── Configuration check ───────────────────────────────────────────────────────
 export async function isFirebaseConfigured(): Promise<boolean> {
-  try { await getAccessToken(); return true; } catch { return false; }
+  try {
+    await getCredentials();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getFirebaseWebConfig() {
   return {
-    apiKey:            process.env.VITE_FIREBASE_API_KEY            || process.env.FIREBASE_API_KEY || "",
-    authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN        || "",
-    projectId:         process.env.FIREBASE_PROJECT_ID              || "",
-    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| "",
-    appId:             process.env.VITE_FIREBASE_APP_ID             || "",
+    apiKey:            process.env.VITE_FIREBASE_API_KEY             || process.env.FIREBASE_API_KEY || "",
+    authDomain:        process.env.VITE_FIREBASE_AUTH_DOMAIN         || "",
+    projectId:         process.env.FIREBASE_PROJECT_ID               || "",
+    messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+    appId:             process.env.VITE_FIREBASE_APP_ID              || "",
   };
 }
 
-// ── Send to single token ──────────────────────────────────────────────────────
+// ── Test FCM credentials by exchanging a real OAuth2 token ───────────────────
+export async function testFCMConnection(): Promise<{
+  ok: boolean;
+  projectId?: string;
+  clientEmail?: string;
+  message?: string;
+  error?: string;
+  hint?: string;
+}> {
+  // Flush token cache so we always do a fresh exchange
+  _cachedToken = null;
+  _tokenExpiry = 0;
+
+  try {
+    const creds = await getCredentials();
+    await getAccessToken(); // throws if credentials are invalid
+    return {
+      ok: true,
+      projectId:   creds.projectId,
+      clientEmail: creds.clientEmail,
+      message:     `Connected to Firebase project "${creds.projectId}" — credentials are valid`,
+    };
+  } catch (err: any) {
+    const msg = String(err?.message || "Unknown error");
+    let hint = "";
+
+    if (/PEM|PRIVATE KEY|private_key/i.test(msg)) {
+      hint = "The private key format is invalid. Ensure newlines inside the PEM block are literal \\n (not escaped).";
+    } else if (/invalid_grant|Invalid JWT|JWT/i.test(msg)) {
+      hint = "Service account credentials are invalid or expired. Generate a new key from Firebase Console → Project Settings → Service Accounts.";
+    } else if (/not authorized|permission_denied|403/i.test(msg)) {
+      hint = "Service account lacks Firebase Messaging permissions. Enable the Firebase Cloud Messaging API in Google Cloud Console.";
+    } else if (/not configured|incomplete/i.test(msg)) {
+      hint = "Upload a service account JSON in API Settings → Firebase Push, or set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY environment variables.";
+    } else if (/token exchange/i.test(msg)) {
+      hint = "Google OAuth2 token exchange failed — verify the private_key and client_email match the same service account.";
+    }
+
+    return { ok: false, error: msg, hint };
+  }
+}
+
+// ── Send to single token (Android + iOS + Web) ────────────────────────────────
 export async function sendFCMToToken(
   token: string,
-  payload: { title: string; body: string; url?: string; icon?: string; imageUrl?: string; data?: Record<string, string> }
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    icon?: string;
+    imageUrl?: string;
+    data?: Record<string, string>;
+  }
 ): Promise<{ ok: boolean; messageId?: string; error?: string; invalidToken?: boolean }> {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
   try {
+    const creds       = await getCredentials();
     const accessToken = await getAccessToken();
-    const url = payload.url || "https://alburhantravels.com/customer/dashboard";
-    const msg: any = {
-      token,
-      notification: { title: payload.title, body: payload.body },
-      webpush: {
-        fcmOptions: { link: url },
-        notification: {
-          title: payload.title,
-          body: payload.body,
-          icon: payload.icon || "/opengraph.jpg",
-          badge: "/favicon.ico",
-          requireInteraction: false,
+    const url         = payload.url || "https://alburhantravels.com/customer/dashboard";
+    const extraData   = { url, ...(payload.data || {}) };
+
+    // ── Web Push (Chrome / Edge / Firefox / Safari desktop + Android Chrome) ──
+    const webpush: any = {
+      headers: { Urgency: "high" },
+      fcmOptions: { link: url },
+      notification: {
+        title:             payload.title,
+        body:              payload.body,
+        icon:              payload.icon || "/opengraph.jpg",
+        badge:             "/favicon.ico",
+        requireInteraction: false,
+        vibrate:           [200, 100, 200],
+      },
+      data: extraData,
+    };
+    if (payload.imageUrl) webpush.notification.image = payload.imageUrl;
+
+    // ── Android native app ────────────────────────────────────────────────────
+    const android: any = {
+      priority: "high",
+      notification: {
+        title:        payload.title,
+        body:         payload.body,
+        icon:         "ic_notification",
+        color:        "#2D7B4F",
+        sound:        "default",
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+        channel_id:   "abt_default",
+      },
+      data: extraData,
+    };
+    if (payload.imageUrl) android.notification.image = payload.imageUrl;
+
+    // ── iOS (APNs via FCM) ────────────────────────────────────────────────────
+    const apns: any = {
+      headers: { "apns-priority": "10" },
+      payload: {
+        aps: {
+          alert: { title: payload.title, body: payload.body },
+          sound: "default",
+          badge: 1,
+          "content-available": 1,
+          "mutable-content":   1,
         },
-        data: { url, ...(payload.data || {}) },
+        ...extraData,
       },
     };
-    if (payload.imageUrl) msg.notification.imageUrl = payload.imageUrl;
+    if (payload.imageUrl) apns.fcmOptions = { image: payload.imageUrl };
 
-    const res = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg }),
-      signal: AbortSignal.timeout(15_000),
-    });
+    // ── Base notification (fallback for all platforms) ────────────────────────
+    const notification: any = { title: payload.title, body: payload.body };
+    if (payload.imageUrl) notification.imageUrl = payload.imageUrl;
+
+    const msg: any = {
+      token,
+      notification,
+      webpush,
+      android,
+      apns,
+      // Data payload received by the app on all platforms
+      data: Object.fromEntries(
+        Object.entries(extraData).map(([k, v]) => [k, String(v)])
+      ),
+    };
+
+    const res = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${creds.projectId}/messages:send`,
+      {
+        method:  "POST",
+        headers: {
+          Authorization:  `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body:   JSON.stringify({ message: msg }),
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      const msg = err?.error?.message || `HTTP ${res.status}`;
-      const isInvalid = msg.includes("UNREGISTERED") || msg.includes("INVALID_ARGUMENT") || res.status === 404;
-      return { ok: false, error: msg, invalidToken: isInvalid };
+      const err      = await res.json().catch(() => ({}));
+      const errMsg   = err?.error?.message || `HTTP ${res.status}`;
+      const isInvalid =
+        errMsg.includes("UNREGISTERED") ||
+        errMsg.includes("INVALID_ARGUMENT") ||
+        res.status === 404;
+      return { ok: false, error: errMsg, invalidToken: isInvalid };
     }
+
     const data = await res.json();
     return { ok: true, messageId: data.name };
   } catch (err: any) {
@@ -118,11 +321,12 @@ export async function sendFCMBatch(
 ): Promise<{ sent: number; failed: number; invalidTokens: string[] }> {
   if (!tokens.length) return { sent: 0, failed: 0, invalidTokens: [] };
 
-  const CONCURRENCY = 10;
-  let sent = 0; let failed = 0; const invalidTokens: string[] = [];
+  const CONCURRENCY  = 10;
+  let sent = 0, failed = 0;
+  const invalidTokens: string[] = [];
 
   for (let i = 0; i < tokens.length; i += CONCURRENCY) {
-    const slice = tokens.slice(i, i + CONCURRENCY);
+    const slice   = tokens.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(slice.map(t => sendFCMToToken(t, payload)));
     results.forEach((r, idx) => {
       if (r.status === "fulfilled" && r.value.ok) {
@@ -137,12 +341,14 @@ export async function sendFCMBatch(
   return { sent, failed, invalidTokens };
 }
 
-// ── Clean up invalid/expired tokens ──────────────────────────────────────────
+// ── Clean up invalid / expired tokens ────────────────────────────────────────
 export async function cleanupInvalidTokens(invalidTokens: string[]): Promise<void> {
   if (!invalidTokens.length) return;
   try {
     for (const t of invalidTokens) {
-      await pool.query(`DELETE FROM customer_push_tokens WHERE token = $1`, [t]).catch(() => {});
+      await pool.query(
+        `DELETE FROM customer_push_tokens WHERE token = $1`, [t]
+      ).catch(() => {});
     }
     console.log(`[FCM] Cleaned ${invalidTokens.length} invalid tokens`);
   } catch {}
@@ -155,7 +361,6 @@ export async function getTokensByFilter(
   let sql: string;
   const params: any[] = [];
 
-  // individual:userId — send to one specific user
   if (filter.startsWith("individual:")) {
     const uid = filter.split(":")[1];
     sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
@@ -284,7 +489,6 @@ export async function getTokensByFilter(
              ORDER BY cpt.user_id, cpt.last_seen DESC NULLS LAST`;
       break;
     default:
-      // package-wise search
       sql = `SELECT DISTINCT ON (cpt.user_id) cpt.user_id, cpt.token, u.name AS customer_name, cpt.user_type
              FROM customer_push_tokens cpt
              JOIN bookings b ON b.customer_id = cpt.user_id
@@ -298,30 +502,30 @@ export async function getTokensByFilter(
 
   const res = await pool.query(sql, params);
   return res.rows.map((r: any) => ({
-    userId: r.user_id,
-    token: r.token,
+    userId:       r.user_id,
+    token:        r.token,
     customerName: r.customer_name,
-    userType: r.user_type,
+    userType:     r.user_type,
   }));
 }
 
 // ── Auto push for booking events (called from workflowEngine) ────────────────
 const PUSH_MESSAGES: Record<string, (ctx: any) => { title: string; body: string; url?: string }> = {
-  new_booking:              ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`, url: "/customer/dashboard" }),
-  booking_submitted:        ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`, url: "/customer/dashboard" }),
+  new_booking:              ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`,           url: "/customer/dashboard" }),
+  booking_submitted:        ctx => ({ title: "📋 Booking Received",      body: `Your booking${ctx.bookingNumber ? ` #${ctx.bookingNumber}` : ""} has been submitted. We'll confirm shortly!`,           url: "/customer/dashboard" }),
   booking_approved:         ctx => ({ title: "✅ Booking Confirmed!",    body: `Great news${ctx.customerName ? `, ${ctx.customerName.split(" ")[0]}` : ""}! Your ${ctx.packageName || "package"} booking is confirmed.`, url: "/customer/dashboard" }),
-  payment_received:         ctx => ({ title: "💰 Payment Received",      body: `₹${ctx.amount ? Number(ctx.amount).toLocaleString("en-IN") : ""} received for ${ctx.bookingNumber || "your booking"}. Thank you!`, url: "/customer/dashboard" }),
+  payment_received:         ctx => ({ title: "💰 Payment Received",      body: `₹${ctx.amount ? Number(ctx.amount).toLocaleString("en-IN") : ""} received for ${ctx.bookingNumber || "your booking"}. Thank you!`,      url: "/customer/dashboard" }),
   partial_payment_received: ctx => ({ title: "💳 Partial Payment Noted", body: `Partial payment received for ${ctx.bookingNumber || "your booking"}. Balance due: ₹${ctx.balanceDue ? Number(ctx.balanceDue).toLocaleString("en-IN") : "pending"}.`, url: "/customer/dashboard" }),
-  invoice_generated:        ctx => ({ title: "🧾 Invoice Ready",         body: `Your invoice for ${ctx.bookingNumber || "your booking"} is ready to view and download.`, url: "/customer/dashboard" }),
-  agreement_generated:      ctx => ({ title: "📝 Agreement Ready",       body: `Your travel agreement for ${ctx.bookingNumber || "your booking"} is ready. Please review and sign.`, url: "/customer/dashboard" }),
-  agreement_signed:         ctx => ({ title: "✍️ Agreement Signed",      body: `Your agreement for ${ctx.bookingNumber || "your booking"} has been signed successfully!`, url: "/customer/dashboard" }),
-  visa_approved:            ctx => ({ title: "🛂 Visa Approved!",        body: `Great news! Your visa for ${ctx.packageName || "your package"} has been approved.`, url: "/customer/dashboard" }),
-  visa_issued:              ctx => ({ title: "🛂 Visa Ready",            body: `Your visa for ${ctx.bookingNumber || "your booking"} is ready! Journey status updated.`, url: "/customer/dashboard" }),
-  ticket_issued:            ctx => ({ title: "✈️ Flight Ticket Uploaded", body: `Your flight ticket for ${ctx.bookingNumber || "your booking"} is now available to download.`, url: "/customer/dashboard" }),
-  hotel_voucher_uploaded:   ctx => ({ title: "🏨 Hotel Voucher Ready",   body: `Your hotel voucher for ${ctx.bookingNumber || "your booking"} has been uploaded.`, url: "/customer/dashboard" }),
-  departure_reminder:       ctx => ({ title: "⏰ Departure Reminder",    body: `Your ${ctx.packageName || "journey"} departs soon. Check all documents are ready!`, url: "/customer/dashboard" }),
-  payment_due:              ctx => ({ title: "💰 Payment Reminder",      body: `Balance payment reminder for ${ctx.bookingNumber || "your booking"}. Please ensure timely payment.`, url: "/customer/dashboard" }),
-  balance_reminder:         ctx => ({ title: "💰 Balance Due",           body: `Reminder: balance payment for ${ctx.bookingNumber || "your booking"} is due soon.`, url: "/customer/dashboard" }),
+  invoice_generated:        ctx => ({ title: "🧾 Invoice Ready",         body: `Your invoice for ${ctx.bookingNumber || "your booking"} is ready to view and download.`,                                url: "/customer/dashboard" }),
+  agreement_generated:      ctx => ({ title: "📝 Agreement Ready",       body: `Your travel agreement for ${ctx.bookingNumber || "your booking"} is ready. Please review and sign.`,                   url: "/customer/dashboard" }),
+  agreement_signed:         ctx => ({ title: "✍️ Agreement Signed",      body: `Your agreement for ${ctx.bookingNumber || "your booking"} has been signed successfully!`,                               url: "/customer/dashboard" }),
+  visa_approved:            ctx => ({ title: "🛂 Visa Approved!",        body: `Great news! Your visa for ${ctx.packageName || "your package"} has been approved.`,                                    url: "/customer/dashboard" }),
+  visa_issued:              ctx => ({ title: "🛂 Visa Ready",            body: `Your visa for ${ctx.bookingNumber || "your booking"} is ready! Journey status updated.`,                               url: "/customer/dashboard" }),
+  ticket_issued:            ctx => ({ title: "✈️ Flight Ticket Uploaded", body: `Your flight ticket for ${ctx.bookingNumber || "your booking"} is now available to download.`,                         url: "/customer/dashboard" }),
+  hotel_voucher_uploaded:   ctx => ({ title: "🏨 Hotel Voucher Ready",   body: `Your hotel voucher for ${ctx.bookingNumber || "your booking"} has been uploaded.`,                                     url: "/customer/dashboard" }),
+  departure_reminder:       ctx => ({ title: "⏰ Departure Reminder",    body: `Your ${ctx.packageName || "journey"} departs soon. Check all documents are ready!`,                                    url: "/customer/dashboard" }),
+  payment_due:              ctx => ({ title: "💰 Payment Reminder",      body: `Balance payment reminder for ${ctx.bookingNumber || "your booking"}. Please ensure timely payment.`,                   url: "/customer/dashboard" }),
+  balance_reminder:         ctx => ({ title: "💰 Balance Due",           body: `Reminder: balance payment for ${ctx.bookingNumber || "your booking"} is due soon.`,                                    url: "/customer/dashboard" }),
 };
 
 /**
@@ -335,12 +539,10 @@ export async function sendPushForBooking(
 ): Promise<void> {
   try {
     if (!customerId) return;
-    // Look up configured? (quick check to avoid DB lookup when not configured)
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    if (!projectId) return;
+    if (!(await isFirebaseConfigured())) return;
 
     const msgFn = PUSH_MESSAGES[trigger];
-    if (!msgFn) return; // no push for this trigger
+    if (!msgFn) return;
 
     const { title, body, url } = msgFn(ctx);
 
@@ -356,9 +558,9 @@ export async function sendPushForBooking(
     const results = await Promise.allSettled(
       tokensRes.rows.map((r: any) => sendFCMToToken(r.token, { title, body, url }))
     );
-    const sent   = results.filter(r => r.status === "fulfilled" && r.value.ok).length;
+    const sent    = results.filter(r => r.status === "fulfilled" && r.value.ok).length;
     const invalid = results
-      .filter(r => r.status === "fulfilled" && r.value.ok === false && r.value.invalidToken)
+      .filter(r => r.status === "fulfilled" && !r.value.ok && r.value.invalidToken)
       .map((r, i) => tokensRes.rows[i]?.token)
       .filter(Boolean);
     await cleanupInvalidTokens(invalid);

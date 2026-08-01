@@ -14,9 +14,10 @@ interface ProviderField {
   key: string;
   label: string;
   placeholder?: string;
-  type?: "text" | "password" | "number" | "url";
+  type?: "text" | "password" | "number" | "url" | "textarea";
   required?: boolean;
   isExtra?: boolean;
+  colSpan?: "full";
 }
 
 interface ProviderDef {
@@ -136,20 +137,27 @@ const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "firebase",
-    label: "Firebase Push",
+    label: "Firebase Push (FCM v1)",
     icon: Bell,
-    color: "text-yellow-600",
-    description: "Push notifications via Firebase Cloud Messaging. Used for mobile app alerts.",
-    apiUrlLabel: "FCM Endpoint",
-    apiUrlPlaceholder: "https://fcm.googleapis.com/fcm/send",
-    apiKeyLabel: "Server Key",
-    apiKeyPlaceholder: "Enter Firebase Server Key",
+    color: "text-amber-500",
+    description: "Push notifications via Firebase Cloud Messaging API v1. Authenticate with a service account JSON — no legacy Server Key required.",
+    // No apiUrlLabel — FCM v1 endpoint is fixed (https://fcm.googleapis.com/v1/projects/{id}/messages:send)
+    apiKeyLabel: "Private Key (PEM)",
+    apiKeyPlaceholder: "Auto-filled from service account JSON below — or paste PEM directly",
     extraFields: [
-      { key: "project_id", label: "Project ID", placeholder: "my-firebase-project", isExtra: true },
-      { key: "sender_id", label: "Sender ID", placeholder: "123456789012", isExtra: true },
+      { key: "project_id",   label: "Project ID",    placeholder: "your-firebase-project-id",                                            isExtra: true },
+      { key: "client_email", label: "Client Email",  placeholder: "firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com",           isExtra: true },
+      {
+        key: "service_account_json",
+        label: "Service Account JSON — paste here to auto-fill all fields",
+        placeholder: '{\n  "type": "service_account",\n  "project_id": "your-project-id",\n  "private_key_id": "...",\n  "private_key": "-----BEGIN RSA PRIVATE KEY-----\\n...",\n  "client_email": "firebase-adminsdk-...@your-project.iam.gserviceaccount.com",\n  ...\n}\n\nGet this from Firebase Console → Project Settings → Service Accounts → Generate new private key',
+        type: "textarea",
+        isExtra: true,
+        colSpan: "full",
+      },
     ],
     testMessageFields: [
-      { key: "device_token", label: "Device FCM Token", placeholder: "Paste device token here", type: "text" },
+      { key: "device_token", label: "Device FCM Token (copy from Push Center → This Browser)", placeholder: "Paste FCM token here to send a test push", type: "text" },
     ],
   },
   {
@@ -569,28 +577,103 @@ export default function ApiSettings() {
                   {def.extraFields && def.extraFields.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {def.extraFields.map(field => (
-                        <div key={field.key}>
+                        <div
+                          key={field.key}
+                          className={field.colSpan === "full" ? "sm:col-span-2" : ""}
+                        >
                           <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
-                          <div className="relative">
-                            <input
-                              type={field.type === "password" && !showKey[`${provider.id}_${field.key}`] ? "password" : (field.type || "text")}
+                          {field.type === "textarea" ? (
+                            <textarea
+                              rows={8}
                               value={s.extra_fields[field.key] || ""}
                               onChange={e => updateExtra(provider.id, field.key, e.target.value)}
-                              placeholder={s.extra_fields[field.key]?.startsWith("****") ? "Leave blank to keep current" : (field.placeholder || "")}
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                              placeholder={field.placeholder || ""}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono resize-y"
+                              spellCheck={false}
                             />
-                            {field.type === "password" && (
-                              <button
-                                type="button"
-                                onClick={() => setShowKey(p => ({ ...p, [`${provider.id}_${field.key}`]: !p[`${provider.id}_${field.key}`] }))}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                              >
-                                {showKey[`${provider.id}_${field.key}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                            )}
-                          </div>
+                          ) : (
+                            <div className="relative">
+                              <input
+                                type={field.type === "password" && !showKey[`${provider.id}_${field.key}`] ? "password" : (field.type || "text")}
+                                value={s.extra_fields[field.key] || ""}
+                                onChange={e => updateExtra(provider.id, field.key, e.target.value)}
+                                placeholder={s.extra_fields[field.key]?.startsWith("****") ? "Leave blank to keep current" : (field.placeholder || "")}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                              />
+                              {field.type === "password" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowKey(p => ({ ...p, [`${provider.id}_${field.key}`]: !p[`${provider.id}_${field.key}`] }))}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                  {showKey[`${provider.id}_${field.key}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
+
+                      {/* Firebase: Parse JSON button */}
+                      {provider.id === "firebase" && (
+                        <div className="sm:col-span-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const raw = s.extra_fields["service_account_json"] || "";
+                              if (!raw.trim()) {
+                                toast({ title: "Paste service account JSON first", variant: "destructive" });
+                                return;
+                              }
+                              try {
+                                const sa = JSON.parse(raw);
+                                if (!sa.project_id || !sa.client_email || !sa.private_key) {
+                                  toast({ title: "Invalid JSON", description: "Missing project_id, client_email or private_key fields", variant: "destructive" });
+                                  return;
+                                }
+                                // Fill in fields and set private_key as api_key
+                                setStates(prev => ({
+                                  ...prev,
+                                  firebase: {
+                                    ...prev["firebase"],
+                                    api_key: sa.private_key,
+                                    extra_fields: {
+                                      ...prev["firebase"].extra_fields,
+                                      project_id:           sa.project_id,
+                                      client_email:         sa.client_email,
+                                      service_account_json: "", // clear after parse
+                                    },
+                                  },
+                                }));
+                                toast({ title: "✅ Parsed successfully", description: `Project: ${sa.project_id} · ${sa.client_email}` });
+                              } catch {
+                                toast({ title: "JSON parse error", description: "Could not parse the pasted text as JSON", variant: "destructive" });
+                              }
+                            }}
+                            className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                            Parse JSON → Fill Fields
+                          </button>
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            Extracts Project ID, Client Email, and Private Key from the pasted JSON. The JSON field is cleared after parsing — only individual fields are saved.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Firebase: FCM v1 info banner */}
+                  {provider.id === "firebase" && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 space-y-1.5">
+                      <p className="font-semibold flex items-center gap-1.5">🔐 Firebase Admin SDK (service account) authentication</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-blue-700">
+                        <li>No legacy Server Key required — FCM v1 uses OAuth2 with a service account</li>
+                        <li>Get your JSON from <span className="font-mono font-semibold">Firebase Console → Project Settings → Service Accounts → Generate new private key</span></li>
+                        <li>Alternatively, set environment variables: <span className="font-mono">FIREBASE_PROJECT_ID</span>, <span className="font-mono">FIREBASE_CLIENT_EMAIL</span>, <span className="font-mono">FIREBASE_PRIVATE_KEY</span></li>
+                        <li>After saving, click <strong>Test Connection</strong> to validate credentials against Google OAuth2</li>
+                        <li>Supports <strong>Android</strong> (high-priority), <strong>iOS / APNs</strong>, and <strong>Web Push</strong> in a single message</li>
+                      </ul>
                     </div>
                   )}
 

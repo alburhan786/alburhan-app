@@ -59,6 +59,8 @@ export default function PushCenter() {
   const [testResult, setTestResult]   = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
   const [countLoading, setCountLoading] = useState(false);
+  const [connTesting, setConnTesting] = useState(false);
+  const [connResult, setConnResult]   = useState<{ ok: boolean; projectId?: string; clientEmail?: string; message?: string; error?: string; hint?: string } | null>(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -154,6 +156,23 @@ export default function PushCenter() {
     if (token) {
       navigator.clipboard.writeText(token);
       toast({ title: "Token copied to clipboard" });
+    }
+  };
+
+  const testConnection = async () => {
+    setConnTesting(true);
+    setConnResult(null);
+    try {
+      const r = await fetch(`${API}/api/push/test-connection`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const d = await r.json();
+      setConnResult(d);
+    } catch (e: any) {
+      setConnResult({ ok: false, error: e.message });
+    } finally {
+      setConnTesting(false);
     }
   };
 
@@ -254,6 +273,38 @@ export default function PushCenter() {
                       </p>
                     </div>
                   </>
+                )}
+
+                {/* Test FCM Connection button — validates OAuth2 token exchange */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={testConnection}
+                    disabled={connTesting}
+                    className="flex items-center gap-1.5 text-xs"
+                  >
+                    {connTesting
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Wifi className="w-3.5 h-3.5" />}
+                    Test FCM Connection
+                  </Button>
+                  {connResult && (
+                    <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border ${connResult.ok ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"}`}>
+                      {connResult.ok ? "✅" : "❌"}
+                      {connResult.ok
+                        ? `${connResult.projectId ?? "OK"}`
+                        : (connResult.error || "Failed")}
+                    </span>
+                  )}
+                </div>
+                {connResult && !connResult.ok && connResult.hint && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    💡 {connResult.hint}
+                  </p>
+                )}
+                {connResult && connResult.ok && connResult.clientEmail && (
+                  <p className="text-[11px] text-emerald-700 font-mono">{connResult.clientEmail}</p>
                 )}
 
                 {status.configured && (
