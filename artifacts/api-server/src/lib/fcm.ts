@@ -37,19 +37,25 @@ async function getCredentials(): Promise<{ projectId: string; clientEmail: strin
 
   if (envProjectId && envClientEmail && envPrivateKey) {
     const normalizedKey = envPrivateKey.replace(/\\n/g, "\n").trim();
-    // Validate PEM format — FCM service accounts use PKCS#8 ("BEGIN PRIVATE KEY")
-    if (!normalizedKey.includes("-----BEGIN") || !normalizedKey.includes("PRIVATE KEY-----")) {
-      throw new Error(
-        "FIREBASE_PRIVATE_KEY is not a valid PEM private key. " +
-        "Expected '-----BEGIN PRIVATE KEY-----' ... '-----END PRIVATE KEY-----'. " +
-        "Ensure \\\\n placeholders in the secret are actual newlines."
-      );
+    // Only use env vars when the key is actually a real PEM block.
+    // If FIREBASE_PRIVATE_KEY is a placeholder / dummy value (e.g. len<200,
+    // no BEGIN marker) fall through silently to DB-stored credentials.
+    const isRealPem =
+      normalizedKey.includes("-----BEGIN") &&
+      normalizedKey.includes("PRIVATE KEY-----") &&
+      normalizedKey.length > 200;
+    if (isRealPem) {
+      return {
+        projectId:   envProjectId,
+        clientEmail: envClientEmail,
+        privateKey:  normalizedKey,
+      };
     }
-    return {
-      projectId:   envProjectId,
-      clientEmail: envClientEmail,
-      privateKey:  normalizedKey,
-    };
+    // Placeholder key in env — try DB credentials instead
+    console.warn(
+      "[FCM] FIREBASE_PRIVATE_KEY env var does not look like a real PEM key " +
+      `(len=${envPrivateKey.length}); checking DB credentials`
+    );
   }
 
   // Fallback: DB-stored service account credentials (cached 5 min)
