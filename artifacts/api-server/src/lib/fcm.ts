@@ -8,6 +8,59 @@
 import crypto from "crypto";
 import { pool } from "@workspace/db";
 
+// ── PEM normalisation ─────────────────────────────────────────────────────────
+/**
+ * Accepts any of the common malformed formats produced by encryption round-trips,
+ * JSON encoding, copy-paste from consoles, CRLF line-endings, etc. and returns
+ * a strict RFC-7468 PEM with exactly 64-char base64 lines.
+ *
+ * Node 20 / OpenSSL 3 raises  error:1E08010C:DECODER routines::unsupported
+ * whenever the base64 body has non-64-char lines OR the header/footer are
+ * missing a trailing newline, even if the key material itself is valid.
+ */
+function normalizePemKey(raw: string): string {
+  // 1. Unescape literal \n that survived JSON or env-var transport
+  let s = raw
+    .replace(/\\n/g, "\n")   // literal backslash-n  → real LF
+    .replace(/\r\n/g, "\n")  // Windows CRLF         → LF
+    .replace(/\r/g, "\n");   // bare CR              → LF
+
+  // 2. Pull out header / body / footer (tolerates RSA PRIVATE KEY too)
+  const m = s.match(
+    /(-{5}BEGIN [A-Z ]*PRIVATE KEY-{5})([\s\S]+?)(-{5}END [A-Z ]*PRIVATE KEY-{5})/
+  );
+  if (!m) {
+    // Give the caller something actionable, without leaking key bytes
+    const preview = s.slice(0, 30).replace(/\n/g, "\\n");
+    throw new Error(
+      `Private key has no PEM markers. ` +
+      `len=${s.length}, first30="${preview}". ` +
+      `Ensure you paste the full JSON and click "Parse JSON → Fill Fields".`
+    );
+  }
+
+  const header = m[1]; // -----BEGIN PRIVATE KEY-----
+  const body   = m[2].replace(/\s+/g, ""); // strip ALL whitespace from body
+  const footer = m[3]; // -----END PRIVATE KEY-----
+
+  // 3. Rebuild body with exactly 64-char lines (RFC 7468 / OpenSSL 3 requirement)
+  const lines: string[] = [];
+  for (let i = 0; i < body.length; i += 64) lines.push(body.slice(i, i + 64));
+
+  return `${header}\n${lines.join("\n")}\n${footer}\n`;
+}
+
+/** Safe decrypt helper that always returns a proper UTF-8 string (avoids
+ *  the implicit Buffer+string coercion in the raw decrypt() return path). */
+async function decryptToString(ciphertext: string): Promise<string> {
+  const { decrypt } = await import("./encryption.js");
+  const raw = decrypt(ciphertext);
+  // decrypt() returns decipher.update(buf)+decipher.final("utf8").
+  // When the buffer straddles a chunk boundary the implicit Buffer.toString()
+  // is fine for pure-ASCII PEM, but let's be explicit just in case.
+  return typeof raw === "string" ? raw : Buffer.from(raw as any).toString("utf8");
+}
+
 // ── Access token cache (valid 60 min, refresh at 50 min) ─────────────────────
 let _cachedToken: string | null = null;
 let _tokenExpiry = 0;
@@ -61,66 +114,96 @@ async function getCredentials(): Promise<{ projectId: string; clientEmail: strin
   // Fallback: DB-stored service account credentials (cached 5 min)
   if (_dbCreds && Date.now() < _dbCredsLoadedAt + DB_CREDS_TTL) return _dbCreds;
 
-  try {
-    const { decrypt } = await import("./encryption.js");
-    const r = await pool.query(
-      "SELECT api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider='firebase'"
+  const r = await pool.query(
+    "SELECT api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider='firebase'"
+  );
+  if (!r.rows[0]) {
+    throw new Error(
+      "Firebase not configured: upload a service account JSON in API Settings → Firebase Push, " +
+      "or set FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY env vars."
     );
-    if (!r.rows[0]) {
-      throw new Error(
-        "Firebase not configured: set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY " +
-        "or upload a service account JSON in API Settings → Firebase Push"
-      );
-    }
-    const row = r.rows[0];
-    let projectId = "", clientEmail = "", privateKey = "";
-
-    if (row.api_key_encrypted) {
-      const keyStr = decrypt(row.api_key_encrypted);
-      try {
-        // Stored as full service account JSON
-        const sa = JSON.parse(keyStr);
-        if (sa.project_id && sa.private_key) {
-          projectId   = sa.project_id   || "";
-          clientEmail = sa.client_email || "";
-          privateKey  = (sa.private_key || "").replace(/\\n/g, "\n");
-        } else {
-          // Stored as raw PEM private key
-          privateKey = keyStr.replace(/\\n/g, "\n");
-        }
-      } catch {
-        privateKey = keyStr.replace(/\\n/g, "\n");
-      }
-    }
-
-    // Extra fields can override individual values
-    if (row.extra_fields_encrypted) {
-      try {
-        const extra = JSON.parse(decrypt(row.extra_fields_encrypted));
-        if (extra.project_id)   projectId   = extra.project_id;
-        if (extra.client_email) clientEmail = extra.client_email;
-      } catch {}
-    }
-
-    if (!projectId || !clientEmail || !privateKey) {
-      throw new Error(
-        "Firebase credentials incomplete in DB — ensure project_id, client_email and private_key " +
-        "are all present (upload full service account JSON)"
-      );
-    }
-
-    _dbCreds         = { projectId, clientEmail, privateKey };
-    _dbCredsLoadedAt = Date.now();
-    return _dbCreds;
-  } catch (err: any) {
-    throw err;
   }
+  const row = r.rows[0];
+  let projectId = "", clientEmail = "", privateKey = "";
+
+  if (row.api_key_encrypted) {
+    const keyStr = await decryptToString(row.api_key_encrypted);
+    try {
+      // Preferred: api_key stored as full service account JSON
+      // JSON.parse restores real newlines from \n escape sequences
+      const sa = JSON.parse(keyStr);
+      if (sa.private_key) {
+        // sa.private_key already has real newlines (JSON.parse handled them)
+        privateKey  = sa.private_key;
+        projectId   = sa.project_id   || "";
+        clientEmail = sa.client_email || "";
+      }
+    } catch {
+      // Fallback: api_key stored as raw PEM string
+      privateKey = keyStr;
+    }
+  }
+
+  // extra_fields can supply / override project_id and client_email,
+  // and as a last resort can contain the full service_account_json
+  if (row.extra_fields_encrypted) {
+    try {
+      const extra = JSON.parse(await decryptToString(row.extra_fields_encrypted));
+      if (extra.project_id)   projectId   = extra.project_id;
+      if (extra.client_email) clientEmail = extra.client_email;
+
+      // If api_key had no private_key, try service_account_json in extra_fields
+      if (!privateKey && extra.service_account_json) {
+        try {
+          const sa2 = JSON.parse(extra.service_account_json);
+          if (sa2.private_key) {
+            privateKey  = sa2.private_key;
+            projectId   = projectId   || sa2.project_id   || "";
+            clientEmail = clientEmail || sa2.client_email || "";
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      `Firebase credentials incomplete — missing: ` +
+      [!projectId && "project_id", !clientEmail && "client_email", !privateKey && "private_key"]
+        .filter(Boolean).join(", ") +
+      `. Upload a full service account JSON in API Settings → Firebase Push.`
+    );
+  }
+
+  // Normalise the private key: fix line endings, rebuild 64-char PEM lines
+  const normalizedKey = normalizePemKey(privateKey);
+
+  _dbCreds         = { projectId, clientEmail, privateKey: normalizedKey };
+  _dbCredsLoadedAt = Date.now();
+  return _dbCreds;
 }
 
 async function getAccessToken(): Promise<string> {
   if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
 
   const { projectId, clientEmail, privateKey } = await getCredentials();
+
+  // Create an explicit KeyObject — this is the step that validates the PEM and
+  // gives a precise error (e.g. "wrong key type", "unsupported algorithm") rather
+  // than the opaque OpenSSL decoder error you get when passing a raw string to
+  // sign() on Node 20 / OpenSSL 3.
+  let keyObject: crypto.KeyObject;
+  try {
+    keyObject = crypto.createPrivateKey({ key: privateKey, format: "pem" });
+  } catch (err: any) {
+    const lines = privateKey.split("\n").filter(l => l.trim());
+    throw new Error(
+      `crypto.createPrivateKey failed: ${err.message}\n` +
+      `  first line: "${lines[0] ?? "(empty)"}"\n` +
+      `  last  line: "${lines[lines.length - 1] ?? "(empty)"}"\n` +
+      `  key length: ${privateKey.length} chars`
+    );
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3600;
@@ -132,9 +215,10 @@ async function getAccessToken(): Promise<string> {
     scope: "https://www.googleapis.com/auth/firebase.messaging",
   })).toString("base64url");
 
+  // Sign using the KeyObject (not a raw string) — reliable on all Node/OpenSSL versions
   const signer = crypto.createSign("RSA-SHA256");
   signer.update(`${hdr}.${pay}`);
-  const sig = signer.sign(privateKey, "base64url");
+  const sig = signer.sign(keyObject, "base64url");
   const jwt = `${hdr}.${pay}.${sig}`;
 
   const res  = await fetch("https://oauth2.googleapis.com/token", {
@@ -183,37 +267,67 @@ export async function testFCMConnection(): Promise<{
   message?: string;
   error?: string;
   hint?: string;
+  stack?: string;
+  keyDiagnostics?: { firstLine: string; lastLine: string; length: number };
 }> {
-  // Flush token cache so we always do a fresh exchange
-  _cachedToken = null;
-  _tokenExpiry = 0;
+  // Flush ALL caches so we always do a full fresh round-trip
+  _cachedToken     = null;
+  _tokenExpiry     = 0;
+  _dbCreds         = null;
+  _dbCredsLoadedAt = 0;
 
   try {
     const creds = await getCredentials();
-    await getAccessToken(); // throws if credentials are invalid
+
+    // Log first/last PEM lines (never log the full key)
+    const keyLines = creds.privateKey.split("\n").filter(l => l.trim());
+    const firstLine = keyLines[0]  ?? "(empty)";
+    const lastLine  = keyLines[keyLines.length - 1] ?? "(empty)";
+    console.log(
+      `[FCM] testConnection project="${creds.projectId}" client="${creds.clientEmail}" ` +
+      `key_len=${creds.privateKey.length} ` +
+      `first="${firstLine}" last="${lastLine}"`
+    );
+
+    await getAccessToken(); // throws if JWT signing or OAuth2 exchange fails
+
     return {
-      ok: true,
+      ok:          true,
       projectId:   creds.projectId,
       clientEmail: creds.clientEmail,
-      message:     `Connected to Firebase project "${creds.projectId}" — credentials are valid`,
+      message:     `Connected to Firebase project "${creds.projectId}" — credentials valid`,
+      keyDiagnostics: { firstLine, lastLine, length: creds.privateKey.length },
     };
   } catch (err: any) {
-    const msg = String(err?.message || "Unknown error");
-    let hint = "";
+    const msg   = String(err?.message || "Unknown error");
+    const stack = String(err?.stack   || msg);
+    let hint    = "";
 
-    if (/PEM|PRIVATE KEY|private_key/i.test(msg)) {
-      hint = "The private key format is invalid. Ensure newlines inside the PEM block are literal \\n (not escaped).";
+    if (/no PEM markers|PEM markers/i.test(msg)) {
+      hint = "The stored private key has no '-----BEGIN PRIVATE KEY-----' markers. " +
+             "Re-paste the service account JSON and click 'Parse JSON → Fill Fields', then save.";
+    } else if (/createPrivateKey|DECODER|unsupported|ASN1/i.test(msg)) {
+      hint = "OpenSSL could not decode the private key. The key may be truncated, have extra " +
+             "characters, or be in the wrong format. Re-download the service account JSON from " +
+             "Firebase Console → Project Settings → Service Accounts → Generate new private key.";
+    } else if (/PEM|PRIVATE KEY|private_key/i.test(msg)) {
+      hint = "The private key format is invalid. Use 'Parse JSON → Fill Fields' to extract the " +
+             "key from the original service account JSON rather than copying it manually.";
     } else if (/invalid_grant|Invalid JWT|JWT/i.test(msg)) {
-      hint = "Service account credentials are invalid or expired. Generate a new key from Firebase Console → Project Settings → Service Accounts.";
+      hint = "Service account credentials are invalid or expired. Generate a new key from " +
+             "Firebase Console → Project Settings → Service Accounts.";
     } else if (/not authorized|permission_denied|403/i.test(msg)) {
-      hint = "Service account lacks Firebase Messaging permissions. Enable the Firebase Cloud Messaging API in Google Cloud Console.";
+      hint = "Service account lacks Firebase Messaging permissions. Enable the Firebase Cloud " +
+             "Messaging API in Google Cloud Console → APIs & Services.";
     } else if (/not configured|incomplete/i.test(msg)) {
-      hint = "Upload a service account JSON in API Settings → Firebase Push, or set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY environment variables.";
+      hint = "Upload a service account JSON in API Settings → Firebase Push.";
     } else if (/token exchange/i.test(msg)) {
-      hint = "Google OAuth2 token exchange failed — verify the private_key and client_email match the same service account.";
+      hint = "Google OAuth2 exchange failed — verify the private_key and client_email belong " +
+             "to the same service account.";
     }
 
-    return { ok: false, error: msg, hint };
+    console.error(`[FCM] testConnection failed: ${msg}`);
+    return { ok: false, error: msg, hint, stack };
   }
 }
 

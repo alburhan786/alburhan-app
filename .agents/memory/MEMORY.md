@@ -86,7 +86,7 @@
 - [Payment audit bugs](payment-audit-bugs.md) — 5 bugs fixed July 2026: stale GCS PDF redirect, no journal entries for online payments, webhook missing journey_status, revenue stats excluded partially_paid, fire-and-forget audit trail
 - [Journey status trigger mapping](journey-status-triggers.md) — 16 journey statuses must be in TRIGGER_TO_EVENT + WorkflowTrigger type; triggerWorkflow ctx needs journeyStatus field for buildDefaultMessage
 - [BotBee phone_number_id](botbee-phone-number-id.md) — correct is 965912196611113 (15 digits); hardcoded as CORRECT_PHONE_NUMBER_ID in botbee.ts; 14-digit typo blocked all templates for months
-- [FCM implementation pattern](fcm-implementation.md) — use REST + crypto JWT (no firebase-admin); FIREBASE_PRIVATE_KEY needs .replace(/\\n/g,"\n"); existing sw.js handles both FCM+legacy push
+- [FCM implementation pattern](fcm-implementation.md) — Node 20/OpenSSL 3: must normalizePemKey() (rebuild 64-char lines) + createPrivateKey() before sign(); raw PEM string → DECODER error
 - [Invoice & payment status architecture](invoice-payment-status-arch.md) — deriveStatusFromAmounts is the canonical status fn; paidAmount (not advanceAmount) is source of truth; receipt PDF has full fields; admin report includes partially_paid
 - [Agreement fires for all payments](agreement-all-payments.md) — autoGenerateAgreement must NOT be gated on isFullyPaid; partial payers need agreement too; agreements.ts already handles partially_paid status
 - [FCM multi-role push integration](fcm-multi-role.md) — customer_push_tokens stores user_id+user_type (not just customer_id); getTokensByFilter supports admin/staff/agent/branch/individual; sendPushForBooking injected in triggerWorkflow
