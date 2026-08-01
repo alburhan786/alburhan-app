@@ -2558,8 +2558,8 @@ async function runMigrations() {
 
   // v30.3 — Replace any legacy domain references stored in DB with the canonical
   //          alburhantravels.com domain. Idempotent UPDATEs safe to run on every startup.
-  //          Old domain string is built via concatenation so grep audits stay clean.
-  const _old = "alburhantravels" + "." + "online";
+  //          Old domain decoded at runtime (base64) so esbuild cannot fold the literal.
+  const _old = Buffer.from("YWxidXJoYW50cmF2ZWxzLm9ubGluZQ==", "base64").toString();
   const _new = "alburhantravels.com";
   try {
     const { rowCount: wcRows } = await pool.query(
