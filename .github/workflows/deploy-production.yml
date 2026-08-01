@@ -230,14 +230,19 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          # ssh-keyscan may exit 1 if the VPS firewall blocks the scan from
+          # GitHub-Actions IPs; || true makes the step non-fatal.
+          # StrictHostKeyChecking=accept-new on all subsequent SSH commands
+          # auto-adds the host key on first connection regardless.
+          ssh-keyscan -H -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_HOST }} \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
           echo "SSH key configured"
 
       # ── Upload artifacts to a timestamped staging directory ───────────────
       - name: Upload frontend to VPS staging
         run: |
           rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=yes" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT }} -o StrictHostKeyChecking=accept-new" \
             ./frontend-dist/ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/alburhan-deploy-${{ env.TS }}/frontend/
           echo "✅ Frontend uploaded to /tmp/alburhan-deploy-${{ env.TS }}/frontend/"
@@ -420,7 +425,7 @@ jobs:
       - name: Public-domain health checks
         id: public_checks
         run: |
-          DOMAIN="https://alburhantravels.online"
+          DOMAIN="https://alburhantravels.com"
           echo "=== Public domain checks: $DOMAIN ==="
 
           # /api/health
