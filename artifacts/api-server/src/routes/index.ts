@@ -93,7 +93,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-07-31-v30.1-meta-oauth-callback";
+const BUILD_STAMP = "2026-08-01-v30.2-social-media-settings";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});

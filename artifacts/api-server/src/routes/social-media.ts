@@ -545,13 +545,43 @@ router.get("/settings", requireAdmin as any, async (_req, res) => {
 // PUT /platforms/:platform so the OAuth start endpoints can find them.
 router.post("/settings", requireAdmin as any, async (req, res) => {
   try {
-    const { provider, fields } = req.body || {};
-    if (!provider || !fields || typeof fields !== "object") {
-      return void res.status(400).json({ error: "provider and fields are required" });
+    const body = req.body || {};
+
+    // Accept two body shapes:
+    //   Shape A (OAuthHub.tsx): { provider: "google"|"meta", fields: { client_id, client_secret } }
+    //   Shape B (direct API/curl): { platform: "google"|"meta", clientId, clientSecret } or
+    //                              { platform: "google", client_id, client_secret }
+    let provider: string = body.provider || body.platform || "";
+    let fields: Record<string, string> = body.fields || {};
+
+    // Normalise shape B into shape A fields
+    if (!body.fields || typeof body.fields !== "object") {
+      if (body.clientId || body.client_id || body.clientSecret || body.client_secret ||
+          body.appId || body.app_id || body.appSecret || body.app_secret) {
+        fields = {
+          ...(body.clientId     ? { client_id: body.clientId }       : {}),
+          ...(body.client_id    ? { client_id: body.client_id }      : {}),
+          ...(body.clientSecret ? { client_secret: body.clientSecret }: {}),
+          ...(body.client_secret? { client_secret: body.client_secret}: {}),
+          ...(body.appId        ? { app_id: body.appId }             : {}),
+          ...(body.app_id       ? { app_id: body.app_id }            : {}),
+          ...(body.appSecret    ? { app_secret: body.appSecret }     : {}),
+          ...(body.app_secret   ? { app_secret: body.app_secret }    : {}),
+        };
+      }
+    }
+
+    if (!provider) {
+      return void res.status(400).json({ error: "provider (or platform) is required. Use 'google' or 'meta'." });
+    }
+    if (!fields || typeof fields !== "object" || Object.keys(fields).length === 0) {
+      return void res.status(400).json({ error: "fields are required. For Google: { client_id, client_secret }. For Meta: { app_id, app_secret }." });
     }
 
     // Map provider → the platform row that stores app-level creds
-    const platformKey = provider === "meta" ? "facebook_page" : "google";
+    const platformKey = (provider === "meta" || provider === "facebook" || provider === "facebook_page")
+      ? "facebook_page"
+      : "google";
     const meta = PLATFORM_META[platformKey as keyof typeof PLATFORM_META];
     if (!meta) {
       return void res.status(400).json({ error: `Unknown provider: ${provider}` });
