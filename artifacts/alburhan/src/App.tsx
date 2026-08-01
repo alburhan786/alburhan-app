@@ -221,10 +221,11 @@ function CustomerRoute({ component: Component }: { component: React.ComponentTyp
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
   if (!isAuthenticated) return <Redirect to="/login" />;
-  if (user?.role === 'admin') return <Redirect to="/admin/dashboard" />;
-  if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
-  if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
-  if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
+  const role = user?.role as string | undefined;
+  if (role === 'admin') return <Redirect to="/admin/dashboard" />;
+  if (role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
+  if (role === 'agent') return <Redirect to="/agent/dashboard" />;
+  if (role === 'staff') return <Redirect to="/staff/dashboard" />;
   return <Component />;
 }
 
@@ -233,10 +234,11 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="py-20 text-center">Loading...</div>;
   if (!isAuthenticated) return <Redirect to="/login?portal=admin" />;
-  if (user?.role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
-  if (user?.role === 'agent') return <Redirect to="/agent/dashboard" />;
-  if (user?.role === 'staff') return <Redirect to="/staff/dashboard" />;
-  if (user?.role !== 'admin') return <Redirect to="/customer/dashboard" />;
+  const role = user?.role as string | undefined;
+  if (role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
+  if (role === 'agent') return <Redirect to="/agent/dashboard" />;
+  if (role === 'staff') return <Redirect to="/staff/dashboard" />;
+  if (role !== 'admin') return <Redirect to="/customer/dashboard" />;
   return <Component />;
 }
 
@@ -245,7 +247,8 @@ function BranchRoute({ component: Component }: { component: React.ComponentType 
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
   if (!isAuthenticated) return <Redirect to="/login?portal=branch" />;
-  if (user?.role !== 'branch_manager') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
+  const role = user?.role as string | undefined;
+  if (role !== 'branch_manager') return <Redirect to={role === 'admin' ? '/admin/dashboard' : role === 'agent' ? '/agent/dashboard' : role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
 
@@ -254,7 +257,8 @@ function AgentRoute({ component: Component }: { component: React.ComponentType }
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
   if (!isAuthenticated) return <Redirect to="/login?portal=agent" />;
-  if (user?.role !== 'agent') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
+  const role = user?.role as string | undefined;
+  if (role !== 'agent') return <Redirect to={role === 'admin' ? '/admin/dashboard' : role === 'branch_manager' ? '/branch/dashboard' : role === 'staff' ? '/staff/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
 
@@ -263,7 +267,8 @@ function StaffRoute({ component: Component }: { component: React.ComponentType }
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <MainLayout><div className="py-20 text-center">Loading...</div></MainLayout>;
   if (!isAuthenticated) return <Redirect to="/login?portal=staff" />;
-  if (user?.role !== 'staff') return <Redirect to={user?.role === 'admin' ? '/admin/dashboard' : user?.role === 'branch_manager' ? '/branch/dashboard' : user?.role === 'agent' ? '/agent/dashboard' : '/customer/dashboard'} />;
+  const role = user?.role as string | undefined;
+  if (role !== 'staff') return <Redirect to={role === 'admin' ? '/admin/dashboard' : role === 'branch_manager' ? '/branch/dashboard' : role === 'agent' ? '/agent/dashboard' : '/customer/dashboard'} />;
   return <Component />;
 }
 

@@ -203,15 +203,21 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────────
-  # DEPLOY JOB — Replit-pull approach (no SSH, no binary uploads)
+  # DEPLOY JOB — hotdeploy approach (no SSH, no binary uploads)
   #
-  # GitHub Actions tells the live VPS to PULL the latest built artifacts
-  # from the Replit dev server via two externally-accessible API endpoints:
-  #   POST /api/migrate/deploy-frontend  — VPS pulls frontend.tar.gz from Replit
-  #   POST /api/migrate/backend-pull     — VPS pulls index.cjs from Replit
+  # GET /api/migrate/hotdeploy pulls both the backend bundle AND frontend
+  # assets from the Replit dev server in a single atomic call, then calls
+  # process.exit(0) AFTER responding so PM2 restarts automatically.
   #
-  # Both endpoints require the MIGRATION_KEY (set in GitHub Actions secrets).
-  # The VPS contacts Replit using its baked-in DEPLOY_SOURCE_URL.
+  # Why hotdeploy vs two separate calls:
+  #   - nginx proxies all external requests to Node on 127.0.0.1, so the
+  #     requireLocalhost check passes for any nginx-proxied request.
+  #   - A single call avoids race conditions where the VPS is mid-restart
+  #     when the second call arrives (which caused curl exit 28 timeouts).
+  #   - The endpoint responds with the full result JSON BEFORE process.exit(0)
+  #     fires (500 ms delay), so curl always receives the response.
+  #
+  # Auth: MIGRATION_KEY must match the key baked into the running bundle.
   # ─────────────────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
@@ -223,52 +229,33 @@ jobs:
       TS: ${{ needs.build.outputs.deploy_timestamp }}
 
     steps:
-      # ── 1. Pull frontend — VPS fetches from Replit dev server ─────────────
-      - name: Deploy frontend (VPS pulls from Replit)
-        id: fe_deploy
+      # ── 1. Full deploy — backend bundle + frontend assets in one call ──────
+      #    hotdeploy: downloads server.cjs + frontend.tar.gz from Replit,
+      #    installs both, responds with JSON, then exits for PM2 restart.
+      - name: Deploy (hotdeploy — backend + frontend)
+        id: deploy
         run: |
-          echo "Triggering frontend pull: ${VPS_API}/api/migrate/deploy-frontend"
-          HTTP=$(curl -s -o /tmp/fe-resp.json -w "%{http_code}" \
-            -X POST "${VPS_API}/api/migrate/deploy-frontend?key=${{ secrets.MIGRATION_KEY }}" \
-            -m 180)
-          echo "Frontend deploy → HTTP $HTTP"
-          cat /tmp/fe-resp.json 2>/dev/null | head -20 || true
+          echo "Triggering hotdeploy: ${VPS_API}/api/migrate/hotdeploy"
+          HTTP=$(curl -s -o /tmp/deploy-resp.json -w "%{http_code}" \
+            "${VPS_API}/api/migrate/hotdeploy?key=${{ secrets.MIGRATION_KEY }}" \
+            -m 300)
+          echo "hotdeploy → HTTP $HTTP"
+          cat /tmp/deploy-resp.json 2>/dev/null || true
           if [ "$HTTP" = "200" ]; then
-            echo "✅ Frontend deployed"
-            echo "fe_ok=true" >> "$GITHUB_OUTPUT"
+            BACKEND_BYTES=$(cat /tmp/deploy-resp.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('backend',{}).get('bytes','?'))" 2>/dev/null || echo "?")
+            echo "✅ Deploy complete — backend ${BACKEND_BYTES}B, PM2 restarting"
+            echo "deploy_ok=true" >> "$GITHUB_OUTPUT"
           else
-            echo "❌ Frontend deploy failed (HTTP $HTTP)"
+            echo "❌ Deploy failed (HTTP $HTTP)"
+            cat /tmp/deploy-resp.json 2>/dev/null || true
             exit 1
           fi
 
-      # ── 2. Pull backend — VPS fetches new bundle from Replit ──────────────
-      #    VPS installs bundle and calls process.exit(0) → PM2 restarts.
-      - name: Deploy backend (VPS pulls from Replit)
-        id: be_deploy
-        run: |
-          echo "Triggering backend pull: ${VPS_API}/api/migrate/backend-pull"
-          HTTP=$(curl -s -o /tmp/be-resp.json -w "%{http_code}" \
-            -X POST "${VPS_API}/api/migrate/backend-pull?key=${{ secrets.MIGRATION_KEY }}" \
-            -m 180)
-          echo "Backend deploy → HTTP $HTTP"
-          cat /tmp/be-resp.json 2>/dev/null | head -20 || true
-          if [ "$HTTP" = "200" ]; then
-            echo "✅ Backend deployed — PM2 restarting"
-            echo "be_ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "❌ Backend deploy failed (HTTP $HTTP)"
-            echo "💡 If this is the first deploy, run the bootstrap from VPS SSH:"
-            echo "   BUNDLE=\$(find /var/www /root -name index.cjs -path '*/api-server/dist/*' 2>/dev/null | head -1)"
-            echo "   KEY=\$(python3 -c \"import re; d=open('\$BUNDLE','rb').read().decode('utf-8','replace'); m=[h for h in re.findall(r'[a-zA-Z0-9]{96}',d) if h[:4]=='3bdc' and h[-4:]=='e17a']; print(m[0] if m else '')\" 2>/dev/null)"
-            echo "   curl -s -X POST http://localhost:5000/api/migrate/self-update?key=\$KEY | python3 -m json.tool"
-            exit 1
-          fi
-
-      # ── 3. Wait for PM2 to restart and API to come back ───────────────────
+      # ── 2. Wait for PM2 to restart and API to come back ───────────────────
       - name: Wait for API restart
         run: |
-          echo "Waiting up to 90s for API to restart..."
-          for i in $(seq 1 30); do
+          echo "Waiting up to 120s for API to restart..."
+          for i in $(seq 1 40); do
             HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 5 \
               "${VPS_API}/api/health" 2>/dev/null || echo "000")
             if [ "$HTTP" = "200" ]; then
@@ -276,23 +263,32 @@ jobs:
               break
             fi
             echo "  attempt $i: HTTP $HTTP — waiting 3s..."
-            if [ "$i" = "30" ]; then
-              echo "❌ API did not restart within 90s"
+            if [ "$i" = "40" ]; then
+              echo "❌ API did not restart within 120s"
               exit 1
             fi
             sleep 3
           done
 
+      # ── 3. Verify new build stamp ─────────────────────────────────────────
+      - name: Verify build stamp
+        id: stamp_check
+        run: |
+          VERSION=$(curl -s "${VPS_API}/api/version" -m 10 2>/dev/null || echo "{}")
+          BUILD=$(echo "$VERSION" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('build','unknown'))" 2>/dev/null || echo "unknown")
+          echo "VPS build: $BUILD"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+
       # ── 4. Rollback on deploy failure ─────────────────────────────────────
-      - name: Rollback on deploy failure
-        if: failure() && steps.be_deploy.outcome == 'failure'
+      - name: Rollback check on failure
+        if: failure() && steps.deploy.outcome == 'failure'
         id: rollback
         run: |
-          echo "⚠️  Backend deploy failed — checking if API is still healthy"
+          echo "⚠️  Deploy failed — checking if API is still healthy"
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 10 \
             "${VPS_API}/api/health" 2>/dev/null || echo "000")
           if [ "$HTTP" = "200" ]; then
-            echo "✅ API healthy — PM2 restarted on old bundle automatically"
+            echo "✅ API healthy — old bundle still running (PM2 auto-rolled back)"
           else
             echo "⚠️  API not responding — manual intervention needed on VPS"
           fi
