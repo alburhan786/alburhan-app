@@ -1,93 +1,89 @@
 ---
 name: Lemin RCS variable key formats
-description: Exact variable key formats for each Jio RCS template (3651–3661), messageId location in Lemin response, and status endpoint behavior.
+description: Exact variable key formats for each Jio RCS template (3651–3663), confirmed by live API probe. Used in rcs_template_mappings.variables_required.
 ---
+
+## Approved templates — confirmed by live API probe (Aug 2026)
+
+| Event | Template ID | Variable keys (exact Lemin format) |
+|---|---|---|
+| booking_submitted | 3651 | `name` |
+| booking_confirmed | 3652 | `name` |
+| booking_approved | 3652 | `name` |
+| pending_payment_reminder | 3655 | `name` |
+| payment_received | 3656 | `booking id`, `invoice no`, `{{amount}}`, `{{customer_name}}` |
+| invoice_ready | 3657 | `{{customer_name}}`, `{{invoice_number}}`, `{{booking_id}}`, `{{amount}}` |
+| flight_ticket | 3659 | `{{customer_name}}`, `{{booking_id}}`, `{{ticket_number}}`, `{{flight_number}}`, `{{departure_date}} at {{departure_time}}` |
+| visa_ready | 3660 | `{{booking_id}}`, `{{visa_number}}`, `{{package_name}}`, `{{customer_name}}` |
+| agreement_ready | 3661 | `#!name!#`, `: #!agreement!#`, `🔗 #!download!#`, `#!bookingid!#` |
+| login_otp (+ 8 aliases) | 3663 | `otp` |
 
 ## Three distinct variable key formats
 
-Different Lemin templates accept different JSON key shapes. `resolveVariables()` now
-populates ALL three variants; `sendRCSForEvent` filters to `variables_required` keys.
-
-### Type A — plain `name` key (templates 3651, 3652, 3654, 3655)
+### Type A — plain key (3651, 3652, 3655)
 ```json
-{ "name": "Customer Name" }
+{ "name": "Ahmad Khan" }
 ```
-Events: booking_submitted, booking_approved, payment_received, pending_payment_reminder
+Populated in resolveVariables(): `vars["name"] = customer_name`
 
-### Type B — double-brace `{{key}}` keys (templates 3657, 3659, 3660)
-
-**3657 (invoice_ready):**
+### Type B1 — plain English with spaces (3656 only — payment_received)
 ```json
-{ "{{customer_name}}": "...", "{{invoice_number}}": "...", "{{booking_id}}": "...", "{{amount}}": "..." }
+{ "booking id": "ABT-001", "invoice no": "INV-2026-001", "{{amount}}": "50000", "{{customer_name}}": "Ahmad Khan" }
 ```
+Populated in resolveVariables(): `vars["booking id"] = booking_number`, `vars["invoice no"] = invoice_number`
 
-**3659 (flight_ticket):** note composite departure key
+### Type B2 — double-brace `{{key}}` (3657, 3659, 3660)
+Populated in resolveVariables(): standard `{{customer_name}}`, `{{booking_id}}`, etc.
+
+**3659 composite key** (flight_ticket):
+```json
+{ "{{departure_date}} at {{departure_time}}": "15 Nov 2026 at 06:00" }
+```
+This entire string is the JSON key — it's not two separate fields.
+
+### Type C — hash-bang with literal prefixes (3661 — agreement_ready)
 ```json
 {
-  "{{customer_name}}": "...",
-  "{{booking_id}}": "...",
-  "{{ticket_number}}": "...",
-  "{{flight_number}}": "...",
-  "{{departure_date}} at {{departure_time}}": "15 Nov 2026 at 06:00"
-}
-```
-`ticket_number` = same as `flight_number` (no separate ticket DB column)
-
-**3660 (visa_ready):**
-```json
-{ "{{booking_id}}": "...", "{{visa_number}}": "...", "{{package_name}}": "...", "{{customer_name}}": "..." }
-```
-
-### Type C — hash-bang `#!key!#` with literal emoji/punctuation prefixes (template 3661)
-
-**3661 (agreement_ready):** keys include literal `: ` prefix and `🔗 ` prefix
-```json
-{
-  "#!name!#": "Customer Name",
+  "#!name!#": "Ahmad Khan",
   ": #!agreement!#": "ABT-AGR-2026-000001",
-  "🔗 #!download!#": "https://alburhantravels.online/sign-agreement/{id}",
+  "🔗 #!download!#": "https://alburhantravels.com/sign-agreement/{id}",
   "#!bookingid!#": "ABT26352695"
 }
 ```
 The `: ` and `🔗 ` are literal parts of the JSON key — not separators.
 
+## How variables flow
+
+1. `rcs_template_mappings.variables_required` stores the exact Lemin key names
+2. `resolveVariables()` populates every key variant from real DB data
+3. `sendRCSForEvent()` filters `resolved` to only the `variables_required` keys before sending
+4. The filtered object is sent as `payload.variables` to Lemin
+
+**Why:** Sending ALL resolved vars (50+ keys) caused "Variable mismatch" errors.
+Storing the exact Lemin key names in `variables_required` + filtering on send was the fix.
+
 ## Response shape
 
-Lemin returns message ID at `body.data.id`, NOT `body.id`:
+message_id is at `body.data.id`:
 ```json
-{ "success": true, "data": { "id": "uuid...", "message": "Message request has been created" }, "bot_name": "alburhan_jio" }
+{ "success": true, "data": { "id": "37ceeeae-8df4-11f1-8026-0a58a9feac02" }, "bot_name": "alburhan_jio" }
 ```
 Extraction: `body.data?.id || body.data?.message_id || body.message_id || body.id`
 
 ## Status endpoint
 
-`GET /api/messages/status` redirects to `/sign-in` — requires session auth not available in server-to-server calls.
-Delivery status updates come via Lemin webhook only (not polling).
-`pollMessageStatus()` is hardened with `maxRedirects:0`; returns `"unknown"` on redirect — delivery_status stays `"queued"`.
+`GET /api/messages/status` redirects to `/sign-in` — requires session auth, not available server-to-server.
+Delivery status updates come via Lemin webhook at `POST /api/webhooks/lemin-rcs` only.
+`pollMessageStatus()` returns `"unknown"` on redirect — delivery_status stays `"queued"`.
 
-## `variables_required` in DB
+## OTP template (3663)
 
-Stores the exact Lemin key names (not internal field names), so `sendRCSForEvent` can
-filter `resolved` directly using these keys. `resolveVariables` populates every variant.
+Single variable: `{"otp": "VALUE"}`. 9 alias events all map to 3663.
+Use `sendRCSForOTP(mobile, otp)` — not `sendRCSForEvent`. OTP is masked as `"******"` in logs.
 
-**Why:** Sending ALL resolved vars (50+ keys) to Lemin caused "Variable mismatch" errors on every template. Each template expects a specific key set. Storing the exact keys in `variables_required` and filtering on send was the fix.
+## Webhook
 
-## OTP template (3663 — alburhan_login_otp)
-
-Variable: `{"otp": "VALUE"}` only — single key, plain (not double-brace or hash-bang).
-
-9 alias events all map to template 3663: `login_otp`, `otp_login`, `customer_login_otp`,
-`admin_login_otp`, `agent_login_otp`, `branch_login_otp`, `staff_login_otp`,
-`password_reset_otp`, `mobile_verification_otp`.
-
-Use `sendRCSForOTP(mobile, otp)` — NOT `sendRCSForEvent`. The dedicated function:
-- Masks OTP as `"******"` in notification_logs.request_payload (never stored plaintext)
-- Enforces a 2-minute per-mobile resend cooldown
-- Never exposes LEMIN_API_KEY in any log
-
-## OTP security in auth.ts
-
-- `otps` table: `otp="[hashed]"`, `otp_hash=SHA256(otp+":"+mobile)` — plaintext never stored
-- `verify-otp` matches: `(otp_hash=$hash OR (otp_hash IS NULL AND otp=$plain))` — backward-compatible
-- Fallback delivery chain: RCS → WA template → SMS DLT → Email (sequential, never simultaneous)
-- `otp_hash TEXT` column added via migration on startup
+Canonical URL: `https://alburhantravels.com/api/webhooks/lemin-rcs`
+Legacy alias: `https://alburhantravels.com/api/webhook/rcs`
+Both handled by the same `handleLeminRCSWebhook` function in routes/webhooks.ts.
+Message-ID-based update is preferred over phone-based when `message_id` is present.

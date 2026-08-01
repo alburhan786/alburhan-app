@@ -299,9 +299,17 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        const rcsAgent     = process.env.LEMIN_AGENT     || extra.agent     || "jio";
-        const templateId   = extra.template_id || "1473";
-        if (!leminKey) { result = { ok: false, message: "LEMIN_API_KEY secret not set" }; break; }
+        // Read approved template from DB; fall back to booking_submitted (3651) — never 1473
+        let templateId = extra.template_id || "";
+        if (!templateId) {
+          try {
+            const tmplRow = await pool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            templateId = tmplRow.rows[0]?.template_id || "3651";
+          } catch { templateId = "3651"; }
+        }
+        if (!leminKey) { result = { ok: false, message: "User ID (Developer API Key) not set — save settings first" }; break; }
         // Real API call — only mark connected on HTTP 200 + success
         const leminEndpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
         const probePayload = { type: "single", dial_code: dialCode, template: templateId, phone: "9893989786", user_id: leminKey };
@@ -518,8 +526,16 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        // Default template 1473 used only when no event-specific template is configured
-        const templateId   = extra.template_id || "1473";
+        // Read approved template from DB; fall back to booking_submitted (3651) — never 1473
+        let templateId = extra.template_id || "";
+        if (!templateId) {
+          try {
+            const tmplRow2 = await pool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            templateId = tmplRow2.rows[0]?.template_id || "3651";
+          } catch { templateId = "3651"; }
+        }
         if (!leminKey) return void res.json({ ok: false, message: "User ID (Developer API Key) not set — save settings first" });
         channel = "rcs";
         recipient = mobile;

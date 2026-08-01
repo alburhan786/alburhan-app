@@ -2902,6 +2902,66 @@ async function start() {
     console.log("[Migration] v31.0 rcs_template_mappings seeded");
   } catch (err: any) { console.warn("[Migration] v31.0 rcs_template_mappings:", err.message); }
 
+  // ── v31.1 — Correct approved template IDs + exact Lemin variable key names ──
+  // Variables confirmed by probing each template with the Lemin API (error messages list exact keys).
+  // Key format varies per template family:
+  //   3651/3652/3655 → plain "name"
+  //   3656           → "booking id", "invoice no", "{{amount}}", "{{customer_name}}"
+  //   3657/3659/3660 → "{{double_brace}}" format
+  //   3661           → "#!hash_bang!#" format + emoji prefix variants
+  //   3663           → plain "otp"
+  try {
+    await pool.query(`
+      INSERT INTO rcs_template_mappings
+        (erp_event, template_name, template_id, variables_required, enabled, notes)
+      VALUES
+        ('booking_submitted',        'Booking_Submitted',          '3651',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('booking_confirmed',        'Booking_Approved',           '3652',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('booking_approved',         'Booking_Approved',           '3652',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('payment_received',         'Payment_Received',           '3656',
+          ARRAY['booking id','invoice no','{{amount}}','{{customer_name}}'],
+          true, 'Lemin keys: booking id, invoice no, {{amount}}, {{customer_name}}'),
+        ('pending_payment_reminder', 'Pending_Payment_Reminder',   '3655',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('invoice_ready',            'Invoice_Generated',          '3657',
+          ARRAY['{{customer_name}}','{{invoice_number}}','{{booking_id}}','{{amount}}'],
+          true, 'Lemin keys: {{customer_name}}, {{invoice_number}}, {{booking_id}}, {{amount}}'),
+        ('flight_ticket',            'Ticket_Issued',              '3659',
+          ARRAY['{{customer_name}}','{{booking_id}}','{{ticket_number}}','{{flight_number}}','{{departure_date}} at {{departure_time}}'],
+          true, 'Lemin keys: {{customer_name}}, {{booking_id}}, {{ticket_number}}, {{flight_number}}, composite departure'),
+        ('visa_ready',               'Visa_Issued',                '3660',
+          ARRAY['{{booking_id}}','{{visa_number}}','{{package_name}}','{{customer_name}}'],
+          true, 'Lemin keys: {{booking_id}}, {{visa_number}}, {{package_name}}, {{customer_name}}'),
+        ('agreement_ready',          'Agreement_Ready',            '3661',
+          ARRAY['#!name!#',': #!agreement!#','🔗 #!download!#','#!bookingid!#'],
+          true, 'Lemin keys: #!name!#, : #!agreement!#, 🔗 #!download!#, #!bookingid!#'),
+        ('login_otp',                'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('otp_login',                'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('customer_login_otp',       'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('admin_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('agent_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('branch_login_otp',         'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('staff_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('password_reset_otp',       'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('mobile_verification_otp',  'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL)
+      ON CONFLICT (erp_event) DO UPDATE
+        SET template_id        = EXCLUDED.template_id,
+            template_name      = EXCLUDED.template_name,
+            variables_required = EXCLUDED.variables_required,
+            enabled            = EXCLUDED.enabled,
+            notes              = EXCLUDED.notes,
+            updated_at         = NOW()
+    `);
+    console.log("[Migration] v31.1 rcs_template_mappings corrected — exact Lemin variable keys set");
+  } catch (err: any) { console.warn("[Migration] v31.1 rcs_template_mappings fix:", err.message); }
+
   // v31.0 — notification_logs: add RCS tracking columns
   try {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS message_id        TEXT`);

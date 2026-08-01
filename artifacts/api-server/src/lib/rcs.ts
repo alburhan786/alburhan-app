@@ -240,8 +240,12 @@ export async function resolveVariables(
   const cn  = vars.customer_name || "";
   const bid = vars.booking_id    || "";
 
-  // Type A — plain "name" (templates 3651/3652/3654/3655)
+  // Type A — plain "name" (templates 3651/3652/3655)
   if (!vars["name"]) vars["name"] = cn;
+
+  // Template 3656 (payment_received) uses unique plain-English keys with spaces
+  if (!vars["booking id"]) vars["booking id"] = bid;
+  if (!vars["invoice no"]) vars["invoice no"] = vars.invoice_number || "";
 
   // Type B — double-brace format (templates 3657/3659/3660)
   if (!vars["{{customer_name}}"]) vars["{{customer_name}}"] = cn;

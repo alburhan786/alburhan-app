@@ -450,7 +450,8 @@ export async function sendRCS(
   const dial_code   = process.env.LEMIN_DIAL_CODE || leminCfg.extra?.dial_code || "+91";
   const rcs_agent   = process.env.LEMIN_AGENT     || leminCfg.extra?.agent     || "jio";
   const lemin_user_id = process.env.LEMIN_API_KEY || leminCfg.apiKey || leminCfg.extra?.user_id || "";
-  const lemin_template_id = leminCfg.extra?.template_id || "1473";
+  // No hardcoded fallback — use admin-configured default or the approved booking_submitted template (3651)
+  const lemin_template_id = leminCfg.extra?.template_id || "3651";
 
   if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Missing or invalid mobile number" };

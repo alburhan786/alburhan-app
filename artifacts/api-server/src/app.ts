@@ -2111,7 +2111,16 @@ app.post("/api/admin/notification-health/run-checks", async (req: any, res: any)
         const leminBaseUrl  = process.env.LEMIN_BASE_URL || l.apiUrl  || "https://rcs.leminai.com";
         const dialCode      = process.env.LEMIN_DIAL_CODE || l.extra?.dial_code || "+91";
         const rcsAgent      = process.env.LEMIN_AGENT     || l.extra?.agent     || "jio";
-        const templateId    = l.extra?.template_id || "1473";
+        // Read approved template from DB; fall back to booking_submitted (3651) — never 1473
+        let templateId = l.extra?.template_id || "";
+        if (!templateId) {
+          try {
+            const tmplRow = await hcPool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            templateId = tmplRow.rows[0]?.template_id || "3651";
+          } catch { templateId = "3651"; }
+        }
 
         if (!leminKey) {
           results.lemin = { ok: false, status: "unconfigured", message: "LEMIN_API_KEY secret not set" };
