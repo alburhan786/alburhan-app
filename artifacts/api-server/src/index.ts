@@ -2962,6 +2962,23 @@ async function start() {
     console.log("[Migration] v31.1 rcs_template_mappings corrected — exact Lemin variable keys set");
   } catch (err: any) { console.warn("[Migration] v31.1 rcs_template_mappings fix:", err.message); }
 
+  // ── v31.2 — Fix api_settings.extra.template_id for lemin if it contains non-numeric garbage ──
+  // Root cause: admin saved placeholder/help text as the template_id value. Any non-numeric value
+  // is replaced with "3651" (the approved booking_submitted template).
+  try {
+    await pool.query(`
+      UPDATE api_settings
+      SET extra = jsonb_set(extra, '{template_id}', '"3651"'::jsonb)
+      WHERE provider = 'lemin'
+        AND (
+          extra->>'template_id' IS NULL
+          OR extra->>'template_id' = ''
+          OR extra->>'template_id' !~ '^[0-9]+$'
+        )
+    `);
+    console.log("[Migration] v31.2 lemin template_id sanitised — non-numeric values replaced with 3651");
+  } catch (err: any) { console.warn("[Migration] v31.2 lemin template_id fix:", err.message); }
+
   // v31.0 — notification_logs: add RCS tracking columns
   try {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS message_id        TEXT`);

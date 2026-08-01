@@ -99,7 +99,7 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyPlaceholder: "Enter your Lemin AI Developer API Key",
     extraFields: [
       { key: "brand_name",             label: "Brand Name",                       placeholder: "Al Burhan Tours & Travels",  isExtra: true },
-      { key: "template_id",            label: "Default Template ID",              placeholder: "1473",                       isExtra: true },
+      { key: "template_id",            label: "Default Template ID",              placeholder: "3651",                       isExtra: true },
       { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use default",                isExtra: true },
       { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use default",                isExtra: true },
       { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use default",                isExtra: true },
@@ -112,7 +112,8 @@ const PROVIDERS: ProviderDef[] = [
       { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use default",                isExtra: true },
     ],
     testMessageFields: [
-      { key: "mobile", label: "Test Mobile Number", placeholder: "10-digit number", type: "text" },
+      { key: "mobile",      label: "Test Mobile Number",  placeholder: "10-digit number", type: "text" },
+      { key: "template_id", label: "Test Template ID",    placeholder: "3651 (leave blank to use saved default)", type: "text" },
     ],
   },
   {

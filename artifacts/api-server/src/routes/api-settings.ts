@@ -365,31 +365,36 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        // Read approved template from DB; fall back to booking_submitted (3651) — never 1473
-        let templateId = extra.template_id || "";
+        // ── Resolve + validate template ID (connection-test path) ────────────
+        // Non-numeric values (help text, placeholder) are NEVER used.
+        const NUMERIC_RE_T = /^\d+$/;
+        let templateId = (extra.template_id && NUMERIC_RE_T.test(String(extra.template_id).trim()))
+          ? String(extra.template_id).trim() : "";
         if (!templateId) {
           try {
             const tmplRow = await pool.query(
               `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
             );
-            templateId = tmplRow.rows[0]?.template_id || "3651";
+            const dbTid = String(tmplRow.rows[0]?.template_id || "").trim();
+            templateId = NUMERIC_RE_T.test(dbTid) ? dbTid : "3651";
           } catch { templateId = "3651"; }
         }
         if (!leminKey) { result = { ok: false, message: "User ID (Developer API Key) not set — save settings first" }; break; }
         // Real API call with test variables so Lemin doesn't reject with "Failed to process single payload"
         const leminEndpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
-        // Fetch variables_required for this template; fall back to ["name"] (template 3651 default)
-        let probeVarKeys: string[] = ["name"];
+        // Use hardcoded test vars (authoritative); DB variables_required is the fallback
+        let probeVarKeys: string[] = [];
         try {
           const pvRow = await pool.query(
             `SELECT variables_required FROM rcs_template_mappings WHERE template_id=$1 AND enabled=true LIMIT 1`,
             [templateId]
           );
-          if (pvRow.rows[0]?.variables_required?.length) probeVarKeys = pvRow.rows[0].variables_required;
-        } catch { /* use default */ }
+          probeVarKeys = pvRow.rows[0]?.variables_required || [];
+        } catch { /* use hardcoded map */ }
+        const probeVariables = buildTestVariables(templateId, probeVarKeys);
         const probePayload = {
           type: "single", dial_code: dialCode, template: templateId,
-          phone: "9893989786", variables: buildTestVariables(probeVarKeys), user_id: leminKey,
+          phone: "9893989786", variables: probeVariables, user_id: leminKey,
         };
         try {
           const resp = await axios.post(leminEndpoint, probePayload, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
@@ -608,22 +613,45 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
 
-        // Resolve template ID: explicit setting → DB booking_submitted row → hardcoded 3651
-        let templateId = extra.template_id || "";
+        // ── Resolve template ID ───────────────────────────────────────────────
+        // Priority: 1) req.body.template_id (test-UI override)
+        //           2) extra.template_id from DB (if numeric-only)
+        //           3) rcs_template_mappings booking_submitted row
+        //           4) hardcoded "3651"
+        // At EVERY step we validate with /^\d+$/ — non-numeric values are NEVER used.
+        const NUMERIC_RE = /^\d+$/;
+        const rawTemplateId =
+          (req.body.template_id && NUMERIC_RE.test(String(req.body.template_id).trim()))
+            ? String(req.body.template_id).trim()
+          : (extra.template_id && NUMERIC_RE.test(String(extra.template_id).trim()))
+            ? String(extra.template_id).trim()
+            : "";
+
+        let templateId = rawTemplateId;
         if (!templateId) {
           try {
             const tmplRow2 = await pool.query(
               `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
             );
-            templateId = tmplRow2.rows[0]?.template_id || "3651";
+            const dbTid = String(tmplRow2.rows[0]?.template_id || "").trim();
+            templateId = NUMERIC_RE.test(dbTid) ? dbTid : "3651";
           } catch { templateId = "3651"; }
+        }
+
+        // Final guard — reject the request if template is still non-numeric (should never reach here,
+        // but explicit check satisfies the requirement and catches future regressions)
+        if (!NUMERIC_RE.test(templateId)) {
+          return void res.json({
+            ok: false,
+            message: `Please enter a valid approved numeric Lemin Template ID. Got: "${templateId}". Use one of your approved IDs (e.g. 3651, 3656, 3657, or 3663).`,
+            hint: "Save a numeric Template ID in the Default Template ID field in Lemin settings, or enter it in the Test Template ID field.",
+          });
         }
 
         // ── Pre-send field validation ─────────────────────────────────────────
         const preValidMissing: string[] = [];
         if (!dialCode)   preValidMissing.push("dial_code");
         if (!mobile)     preValidMissing.push("phone");
-        if (!templateId) preValidMissing.push("template");
         if (!leminKey)   preValidMissing.push("user_id (LEMIN_API_KEY secret — save settings first)");
         if (preValidMissing.length) {
           return void res.json({ ok: false, message: `Missing required fields: ${preValidMissing.join(", ")}` });
