@@ -2588,30 +2588,53 @@ async function runMigrations() {
       console.log(`[Migration] v30.3 updated ${nbRows} recent notification message(s) to .com`);
   } catch (_) {}
 
-  // v30.4 — Clear legacy Firebase Server Key, legacy FCM endpoint URL, and legacy
-  //          sender_id extra_fields from api_settings. Replaced by FCM v1 service-account-JSON.
-  //          Idempotent — safe to run on every startup.
+  // v30.4 — Migrate Firebase api_settings from legacy Server Key to FCM v1 format.
+  //          CONDITIONAL — only clears values that are genuinely legacy/corrupted;
+  //          preserves valid PEM private keys and service-account JSON.
+  //          Safe to run on every startup.
   try {
-    const fbUrl = await pool.query(
+    // Always clear legacy api_url (FCM v1 uses a fixed endpoint, not configurable)
+    await pool.query(
       `UPDATE api_settings SET api_url = NULL
        WHERE provider = 'firebase' AND api_url IS NOT NULL AND api_url != ''`
     );
-    if ((fbUrl.rowCount ?? 0) > 0)
-      console.log("[Migration] v30.4 cleared legacy Firebase FCM legacy-API endpoint from api_settings");
 
-    const fbKey = await pool.query(
-      `UPDATE api_settings SET api_key_encrypted = NULL
-       WHERE provider = 'firebase' AND api_key_encrypted IS NOT NULL`
+    const fbRow = await pool.query(
+      `SELECT api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider='firebase'`
     );
-    if ((fbKey.rowCount ?? 0) > 0)
-      console.log("[Migration] v30.4 cleared legacy Firebase Server Key from api_settings (reconfigure via FCM v1 form)");
+    if (fbRow.rows[0]) {
+      const row = fbRow.rows[0];
+      const { decrypt } = await import("./lib/encryption.js");
 
-    const fbExtra = await pool.query(
-      `UPDATE api_settings SET extra_fields_encrypted = NULL
-       WHERE provider = 'firebase' AND extra_fields_encrypted IS NOT NULL`
-    );
-    if ((fbExtra.rowCount ?? 0) > 0)
-      console.log("[Migration] v30.4 cleared legacy Firebase extra_fields (sender_id) from api_settings");
+      // ── api_key_encrypted: only clear if NOT a valid PEM or service-account JSON ──
+      if (row.api_key_encrypted) {
+        const keyStr = decrypt(row.api_key_encrypted);
+        const normalized = (keyStr || "").replace(/\\n/g, "\n").trim();
+        const isValidPem  = normalized.startsWith("-----BEGIN PRIVATE KEY-----");
+        let   isValidJson = false;
+        try { const sa = JSON.parse(keyStr); isValidJson = !!(sa && sa.private_key); } catch {}
+
+        if (!isValidPem && !isValidJson) {
+          // Looks like a legacy Server Key or corrupted value — clear it
+          await pool.query(`UPDATE api_settings SET api_key_encrypted = NULL WHERE provider='firebase'`);
+          console.log("[Migration v30.4] Cleared legacy/corrupted Firebase api_key_encrypted");
+        }
+        // else: valid FCM v1 key — silently preserve it
+      }
+
+      // ── extra_fields_encrypted: only clear if it has ONLY legacy sender_id (no modern fields) ──
+      if (row.extra_fields_encrypted) {
+        let extra: Record<string, any> = {};
+        try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
+        const hasLegacyOnly = extra.sender_id !== undefined &&
+                              !extra.project_id && !extra.client_email;
+        if (hasLegacyOnly) {
+          await pool.query(`UPDATE api_settings SET extra_fields_encrypted = NULL WHERE provider='firebase'`);
+          console.log("[Migration v30.4] Cleared legacy Firebase sender_id extra_fields");
+        }
+        // else: has project_id / client_email — preserve it
+      }
+    }
   } catch (err: any) {
     console.warn("[Migration] v30.4 firebase legacy cleanup:", err.message);
   }

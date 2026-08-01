@@ -224,6 +224,7 @@ export default function ApiSettings() {
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
   const [fast2smsStatus, setFast2smsStatus] = useState<any>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   async function loadFast2smsStatus() {
@@ -304,10 +305,59 @@ export default function ApiSettings() {
     setSaving(p => ({ ...p, [pid]: true }));
     try {
       const s = states[pid];
+
+      // ── Firebase pre-save validation ────────────────────────────────────────
+      if (pid === "firebase" && s.api_key && !s.api_key.startsWith("****")) {
+        const errors: string[] = [];
+        const pk = s.api_key.replace(/\\n/g, "\n").trim();
+
+        if (!pk.startsWith("-----BEGIN PRIVATE KEY-----")) {
+          errors.push(
+            `Private Key must start with '-----BEGIN PRIVATE KEY-----'. ` +
+            `Got: "${s.api_key.slice(0, 60)}..."`
+          );
+        } else if (!pk.endsWith("-----END PRIVATE KEY-----")) {
+          errors.push("Private Key must end with '-----END PRIVATE KEY-----'");
+        } else if (s.api_key.replace(/\s/g, "").length < 1000) {
+          errors.push(
+            `Private Key is too short (${s.api_key.length} chars). ` +
+            `A valid RSA-2048 service account key is typically >1600 chars.`
+          );
+        }
+
+        const pid2 = s.extra_fields["project_id"] || "";
+        if (pid2 && (pid2.includes('"') || pid2.includes(","))) {
+          errors.push("Project ID must not contain quotes or commas");
+        }
+
+        const email = s.extra_fields["client_email"] || "";
+        if (email && !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(email)) {
+          errors.push(
+            `Client Email must be a service-account address ending in .iam.gserviceaccount.com`
+          );
+        }
+
+        if (errors.length > 0) {
+          setValidationErrors(prev => ({ ...prev, firebase: errors.join(" · ") }));
+          setSaving(p => ({ ...p, [pid]: false }));
+          return;
+        }
+      }
+      setValidationErrors(prev => ({ ...prev, [pid]: "" }));
+
+      // Strip the transient service_account_json textarea from the save body —
+      // it's cleared after parse and should never be persisted long-term
+      const extraToSave =
+        pid === "firebase"
+          ? Object.fromEntries(
+              Object.entries(s.extra_fields).filter(([k]) => k !== "service_account_json")
+            )
+          : s.extra_fields;
+
       const body: any = {
         enabled: s.enabled,
         api_url: s.api_url || null,
-        extra_fields: s.extra_fields,
+        extra_fields: extraToSave,
       };
       // Only include api_key if it was actually typed (non-empty, not a masked placeholder)
       if (s.api_key && !s.api_key.startsWith("****")) body.api_key = s.api_key;
@@ -616,47 +666,110 @@ export default function ApiSettings() {
 
                       {/* Firebase: Parse JSON button */}
                       {provider.id === "firebase" && (
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-2 space-y-2">
                           <button
                             type="button"
                             onClick={() => {
-                              const raw = s.extra_fields["service_account_json"] || "";
-                              if (!raw.trim()) {
+                              const raw = (s.extra_fields["service_account_json"] || "").trim();
+                              if (!raw) {
                                 toast({ title: "Paste service account JSON first", variant: "destructive" });
                                 return;
                               }
+
+                              // Step 1: parse the JSON — never use regex or line-matching
+                              let parsed: any;
                               try {
-                                const sa = JSON.parse(raw);
-                                if (!sa.project_id || !sa.client_email || !sa.private_key) {
-                                  toast({ title: "Invalid JSON", description: "Missing project_id, client_email or private_key fields", variant: "destructive" });
-                                  return;
-                                }
-                                // Fill in fields and set private_key as api_key
-                                setStates(prev => ({
-                                  ...prev,
-                                  firebase: {
-                                    ...prev["firebase"],
-                                    api_key: sa.private_key,
-                                    extra_fields: {
-                                      ...prev["firebase"].extra_fields,
-                                      project_id:           sa.project_id,
-                                      client_email:         sa.client_email,
-                                      service_account_json: "", // clear after parse
-                                    },
-                                  },
-                                }));
-                                toast({ title: "✅ Parsed successfully", description: `Project: ${sa.project_id} · ${sa.client_email}` });
+                                parsed = JSON.parse(raw);
                               } catch {
-                                toast({ title: "JSON parse error", description: "Could not parse the pasted text as JSON", variant: "destructive" });
+                                toast({
+                                  title: "JSON parse error",
+                                  description: "Could not parse the pasted text as valid JSON. Paste the complete file contents from Firebase Console.",
+                                  variant: "destructive",
+                                });
+                                return;
                               }
+
+                              // Step 2: extract exactly three fields by name (JSON.parse ensures correct types)
+                              const projectId:   string = typeof parsed.project_id   === "string" ? parsed.project_id   : "";
+                              const clientEmail: string = typeof parsed.client_email === "string" ? parsed.client_email : "";
+                              const privateKey:  string = typeof parsed.private_key  === "string" ? parsed.private_key  : "";
+
+                              // Step 3: validate each extracted value
+                              if (!projectId) {
+                                toast({ title: "Missing project_id", description: "The JSON has no project_id field.", variant: "destructive" });
+                                return;
+                              }
+                              if (projectId.includes('"') || projectId.includes(",")) {
+                                toast({ title: "Invalid project_id", description: `Must not contain quotes or commas. Got: "${projectId}"`, variant: "destructive" });
+                                return;
+                              }
+                              if (!clientEmail) {
+                                toast({ title: "Missing client_email", description: "The JSON has no client_email field.", variant: "destructive" });
+                                return;
+                              }
+                              if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(clientEmail)) {
+                                toast({ title: "Invalid client_email", description: `Must end in .iam.gserviceaccount.com. Got: "${clientEmail}"`, variant: "destructive" });
+                                return;
+                              }
+                              if (!privateKey) {
+                                toast({ title: "Missing private_key", description: "The JSON has no private_key field.", variant: "destructive" });
+                                return;
+                              }
+                              // Normalise escaped newlines the same way the backend does
+                              const normalizedKey = privateKey.replace(/\\n/g, "\n").trim();
+                              if (!normalizedKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
+                                toast({
+                                  title: "Invalid private_key",
+                                  description: `Must start with '-----BEGIN PRIVATE KEY-----'. Got: "${normalizedKey.slice(0, 60)}"`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              if (!normalizedKey.endsWith("-----END PRIVATE KEY-----")) {
+                                toast({
+                                  title: "Invalid private_key",
+                                  description: "Must end with '-----END PRIVATE KEY-----'.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              if (privateKey.replace(/\s/g, "").length < 1000) {
+                                toast({
+                                  title: "private_key too short",
+                                  description: `Got ${privateKey.length} chars. A valid RSA-2048 key is typically >1600 chars. Check you pasted the full JSON file.`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Step 4: commit to state — only the three validated fields, nothing else
+                              setStates(prev => ({
+                                ...prev,
+                                firebase: {
+                                  ...prev["firebase"],
+                                  api_key: privateKey,          // private_key (PEM string with \n sequences)
+                                  extra_fields: {
+                                    ...prev["firebase"].extra_fields,
+                                    project_id:           projectId,
+                                    client_email:         clientEmail,
+                                    service_account_json: "",   // clear textarea after successful parse
+                                  },
+                                },
+                              }));
+                              setValidationErrors(prev => ({ ...prev, firebase: "" }));
+                              toast({
+                                title: "✅ Parsed successfully",
+                                description: `Project: ${projectId} · ${clientEmail}`,
+                              });
                             }}
                             className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
                           >
                             <Zap className="w-3.5 h-3.5" />
                             Parse JSON → Fill Fields
                           </button>
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            Extracts Project ID, Client Email, and Private Key from the pasted JSON. The JSON field is cleared after parsing — only individual fields are saved.
+                          <p className="text-[10px] text-gray-400">
+                            Uses <code className="bg-gray-100 px-1 rounded">JSON.parse()</code> to extract exactly <code className="bg-gray-100 px-1 rounded">project_id</code>, <code className="bg-gray-100 px-1 rounded">client_email</code>, and <code className="bg-gray-100 px-1 rounded">private_key</code>.
+                            Validates PEM markers and key length before filling. The textarea is cleared after a successful parse.
                           </p>
                         </div>
                       )}
@@ -677,12 +790,20 @@ export default function ApiSettings() {
                     </div>
                   )}
 
+                  {/* Firebase validation error banner */}
+                  {validationErrors[provider.id] && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-start gap-2">
+                      <span className="shrink-0 font-bold mt-0.5">✕</span>
+                      <span>{validationErrors[provider.id]}</span>
+                    </div>
+                  )}
+
                   {/* Action Buttons */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
                     {/* Save */}
                     <button
                       onClick={() => save(provider.id)}
-                      disabled={saving[provider.id]}
+                      disabled={saving[provider.id] || !!validationErrors[provider.id]}
                       className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {saving[provider.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
