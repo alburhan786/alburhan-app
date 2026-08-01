@@ -97,6 +97,7 @@ import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeed
 import { DEFAULT_RULES } from "./routes/workflows.js";
 import { runFollowupCron } from "./lib/leadEngine.js";
 import { ensureLeadEnginePhaseBSchema, runLeadReminderCron } from "./lib/leadEnginePhaseB.js";
+import { startGoogleHealthCheckCron } from "./jobs/googleHealthCheck.js";
 
 async function runMigrations() {
   // Session table — must exist BEFORE connect-pg-simple initializes
@@ -2962,6 +2963,33 @@ async function start() {
     console.log("[Migration] v31.1 rcs_template_mappings corrected — exact Lemin variable keys set");
   } catch (err: any) { console.warn("[Migration] v31.1 rcs_template_mappings fix:", err.message); }
 
+  // ── v32.0 — Google OAuth: add health columns to oauth_connections + repair stale records ──
+  try {
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS connection_status  TEXT DEFAULT 'unknown'`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_refresh_at    TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_error         TEXT`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_api_call_at   TIMESTAMPTZ`);
+    // Repair: google rows with access_token but no refresh_token → reconnect_required
+    await pool.query(`
+      UPDATE oauth_connections
+      SET connection_status = 'reconnect_required',
+          last_error        = 'No refresh token stored — reconnect required'
+      WHERE provider = 'google'
+        AND (refresh_token IS NULL OR refresh_token = '')
+        AND  access_token IS NOT NULL AND access_token != ''
+        AND (connection_status IS NULL OR connection_status IN ('unknown',''))
+    `);
+    // google rows with both tokens → mark connected (health cron will verify)
+    await pool.query(`
+      UPDATE oauth_connections
+      SET connection_status = 'connected'
+      WHERE provider = 'google'
+        AND refresh_token IS NOT NULL AND refresh_token != ''
+        AND (connection_status IS NULL OR connection_status IN ('unknown',''))
+    `);
+    console.log("[Migration] v32.0 oauth_connections Google health columns ensured");
+  } catch (err: any) { console.warn("[Migration] v32.0 google health cols:", err.message); }
+
   // ── v31.2 — Fix api_settings.extra.template_id for lemin if it contains non-numeric garbage ──
   // Root cause: admin saved placeholder/help text as the template_id value. Any non-numeric value
   // is replaced with "3651" (the approved booking_submitted template).
@@ -3014,6 +3042,7 @@ async function start() {
     startVisaReminderCron();
     startDailyAdminReportCron();
     startTicketDepartureReminderCron();
+    startGoogleHealthCheckCron();
     // Lead engine follow-up automation — runs every 5 minutes
     setTimeout(() => {
       runFollowupCron().catch(e => console.error("[LeadEngine] Initial cron error:", e));

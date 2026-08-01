@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { encrypt, decrypt } from "../lib/encryption.js";
+import { withGoogleApi, checkGooglePlatformHealth, GoogleOAuthError } from "../lib/googleOAuth.js";
 import axios from "axios";
 import {
   createOrUpdateLead,
@@ -2477,10 +2478,12 @@ router.get("/oauth/status", requireAdmin as any, async (_req, res) => {
   try {
     const r = await pool.query(
       `SELECT provider, platform, account_name, account_id, connected_at, updated_at,
-              token_expiry, scope,
-              CASE WHEN access_token IS NOT NULL THEN true ELSE false END AS connected
+              token_expiry, scope, connection_status, last_refresh_at, last_error, last_api_call_at,
+              CASE WHEN access_token IS NOT NULL THEN true ELSE false END AS connected,
+              CASE WHEN refresh_token IS NOT NULL AND refresh_token != '' THEN true ELSE false END AS has_refresh_token
        FROM oauth_connections ORDER BY connected_at DESC`
     );
+    // Never expose token values — only metadata
     res.json({ connections: r.rows });
   } catch (e: any) {
     res.json({ connections: [] });
@@ -2540,7 +2543,7 @@ router.get("/oauth/:provider/start", requireAdmin as any, async (req: any, res: 
       const scope = (platformScopes[String(platform)] || platformScopes.google) + " openid email profile";
       const state = `google:${platform}:${Date.now()}`;
       const callbackUrl = `${OAUTH_REDIRECT_BASE}/google/callback`;
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code&access_type=offline&prompt=consent`;
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code&access_type=offline&prompt=consent&include_granted_scopes=true`;
       res.json({ redirect_url: url, provider: "google", platform, state });
 
     } else if (provider === "telegram") {
@@ -2702,45 +2705,116 @@ router.get("/oauth/meta/callback", async (req: any, res: any) => {
 
 // ── GET /oauth/google/callback — Google OAuth callback ───────────────────────
 router.get("/oauth/google/callback", async (req: any, res: any) => {
-  const { code, state, error: oauthError } = req.query as any;
+  const { code, state, error: oauthError, error_description } = req.query as any;
+
   if (oauthError) {
-    return void res.redirect(`/admin/social-oauth?error=${encodeURIComponent(oauthError)}`);
+    const errMap: Record<string, string> = {
+      redirect_uri_mismatch: "Redirect URI mismatch — add the callback URL to your Google OAuth Client's Authorized Redirect URIs",
+      access_denied:         "Access was denied — the user declined the Google authorization request",
+      invalid_client:        "Invalid Client ID or Client Secret — check your Google OAuth credentials",
+    };
+    const friendly = errMap[oauthError] || error_description || oauthError;
+    console.warn(`[OAuth/Google] Error from Google: ${oauthError} — ${error_description || ""}`);
+    return void res.redirect(`/admin/social-oauth?error=${encodeURIComponent(friendly)}`);
   }
-  const [, platform] = (state || "google::").split(":");
+
+  if (!code || !state) {
+    return void res.redirect("/admin/social-oauth?error=Missing+OAuth+code+or+state.+Start+connection+from+Social+Connect.");
+  }
+
+  // Parse state: format is "google:<platform>:<timestamp>"
+  const stateParts = String(state).split(":");
+  const platform   = stateParts[1] || "google";
+
   try {
     const cfgR = await pool.query(
       `SELECT extra_fields_encrypted FROM social_platform_configs WHERE platform='google' LIMIT 1`
     ).catch(() => ({ rows: [] }));
-    const extra = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
+    const extra        = cfgR.rows[0] ? decryptExtra(cfgR.rows[0].extra_fields_encrypted) : {};
     const clientId     = extra.client_id     || process.env.GOOGLE_CLIENT_ID;
     const clientSecret = extra.client_secret || process.env.GOOGLE_CLIENT_SECRET;
     const callbackUrl  = `${OAUTH_REDIRECT_BASE}/google/callback`;
 
+    if (!clientId || !clientSecret) {
+      return void res.redirect(
+        `/admin/social-oauth?error=${encodeURIComponent("Google Client ID or Client Secret not configured — set them in Social Connect → Google Credentials first")}`
+      );
+    }
+
+    // Exchange authorization code for tokens
     const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: callbackUrl, grant_type: "authorization_code" }),
-      signal: AbortSignal.timeout(10000),
+      body:    new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: callbackUrl, grant_type: "authorization_code" }),
+      signal:  AbortSignal.timeout(12000),
     });
     const tokenData = await tokenResp.json() as any;
-    if (!tokenData.access_token) throw new Error(JSON.stringify(tokenData));
 
-    const userR = await fetch(`https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokenData.access_token}`, { signal: AbortSignal.timeout(8000) });
-    const user  = await userR.json() as any;
-    const expiry = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+    if (tokenData.error) {
+      const desc = tokenData.error_description ? `: ${tokenData.error_description}` : "";
+      throw new Error(`Google token exchange failed (${tokenData.error}${desc})`);
+    }
+    if (!tokenData.access_token) {
+      throw new Error(`Google token exchange returned no access_token: ${JSON.stringify(tokenData)}`);
+    }
+
+    // Verify identity — call userinfo BEFORE storing tokens
+    const userR = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      signal:  AbortSignal.timeout(8000),
+    });
+    if (!userR.ok) throw new Error(`Google userinfo verification failed (HTTP ${userR.status})`);
+    const user = await userR.json() as any;
+
+    const newExpiry       = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+    const encAccessToken  = encrypt(tokenData.access_token);
+    const grantedScopes   = tokenData.scope || null;
+
+    // Load existing refresh token from DB — NEVER overwrite a valid stored refresh_token with null.
+    // Google only returns refresh_token on the FIRST authorization (or after revocation + re-consent).
+    const existingRow = await pool.query(
+      `SELECT refresh_token FROM oauth_connections WHERE provider='google' AND platform=$1 LIMIT 1`,
+      [platform]
+    ).then(r => r.rows[0]).catch(() => null);
+
+    const existingRefreshToken = existingRow?.refresh_token || null;
+    const newRefreshToken      = tokenData.refresh_token ? encrypt(tokenData.refresh_token) : existingRefreshToken;
 
     await pool.query(
-      `INSERT INTO oauth_connections (provider, platform, account_name, account_id, access_token, refresh_token, token_expiry, scope, connected_at, updated_at)
-       VALUES ('google', $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+      `INSERT INTO oauth_connections
+         (provider, platform, account_name, account_id, access_token, refresh_token,
+          token_expiry, scope, connection_status, last_api_call_at, connected_at, updated_at)
+       VALUES ('google', $1, $2, $3, $4, $5, $6, $7, 'connected', NOW(), NOW(), NOW())
        ON CONFLICT (provider, platform) DO UPDATE
-         SET account_name=EXCLUDED.account_name, account_id=EXCLUDED.account_id,
-             access_token=EXCLUDED.access_token, refresh_token=EXCLUDED.refresh_token,
-             token_expiry=EXCLUDED.token_expiry, scope=EXCLUDED.scope, updated_at=NOW()`,
-      [platform || "google", user.name || user.email, user.id, encrypt(tokenData.access_token), tokenData.refresh_token ? encrypt(tokenData.refresh_token) : null, expiry, tokenData.scope]
+         SET account_name       = EXCLUDED.account_name,
+             account_id         = EXCLUDED.account_id,
+             access_token       = EXCLUDED.access_token,
+             refresh_token      = COALESCE(EXCLUDED.refresh_token, oauth_connections.refresh_token),
+             token_expiry       = EXCLUDED.token_expiry,
+             scope              = EXCLUDED.scope,
+             connection_status  = 'connected',
+             last_api_call_at   = NOW(),
+             last_error         = NULL,
+             updated_at         = NOW()`,
+      [platform, user.name || user.email, user.id, encAccessToken, newRefreshToken, newExpiry, grantedScopes]
     );
-    res.redirect(`/admin/social-oauth?connected=google&account=${encodeURIComponent(user.name || user.email)}`);
+
+    const hasRefresh = !!tokenData.refresh_token || !!existingRefreshToken;
+    console.log(`[OAuth/Google] Connected: ${user.email} (${user.id}), platform=${platform}, has_refresh=${hasRefresh}, scopes=${grantedScopes}`);
+
+    // Warn in server logs if app appears to be in Testing mode (7-day limit)
+    if (!hasRefresh) {
+      console.warn(`[OAuth/Google] WARNING: No refresh token received for ${platform}. If your OAuth app is in 'Testing' mode, tokens expire after 7 days. Publish your app to Production in Google Cloud Console.`);
+    }
+
+    res.redirect(`/admin/social-oauth?connected=google&account=${encodeURIComponent(user.name || user.email)}&platform=${encodeURIComponent(platform)}`);
   } catch (e: any) {
-    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(e.message)}`);
+    // Strip any token values from error message before redirecting
+    const safeMsg = (e.message || "OAuth connection failed")
+      .replace(/access_token=[^\s&]+/gi, "access_token=***")
+      .replace(/client_secret=[^\s&]+/gi, "client_secret=***");
+    console.error(`[OAuth/Google] Callback error for ${platform}:`, safeMsg);
+    res.redirect(`/admin/social-oauth?error=${encodeURIComponent(safeMsg)}`);
   }
 });
 
@@ -2965,6 +3039,40 @@ router.get("/integration-status", requireAdmin as any, async (_req: any, res: an
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e.message });
   }
+});
+
+// ── POST /oauth/google/test/:platform — Test Google connection with auto-refresh ─
+router.post("/oauth/google/test/:platform", requireAdmin as any, async (req: any, res: any) => {
+  const { platform } = req.params;
+  try {
+    const result = await checkGooglePlatformHealth(platform);
+    res.json({
+      ok:             result.ok,
+      status:         result.status,
+      error:          result.ok ? undefined : result.error,
+      tokenExpiresAt: result.tokenExpiresAt,
+      email:          result.email,
+    });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── POST /oauth/google/health — Force health check for all Google platforms ──
+router.post("/oauth/google/health", requireAdmin as any, async (_req: any, res: any) => {
+  const PLATFORMS = ["google", "google_business", "google_calendar", "google_drive", "youtube"];
+  const results: Record<string, any> = {};
+  await Promise.allSettled(
+    PLATFORMS.map(async p => {
+      try {
+        const r = await checkGooglePlatformHealth(p);
+        results[p] = r;
+      } catch (e: any) {
+        results[p] = { ok: false, status: "error", error: e.message };
+      }
+    })
+  );
+  res.json({ ok: true, results });
 });
 
 // ── DELETE /oauth/:provider/disconnect — Remove OAuth connection ─────────────
