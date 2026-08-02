@@ -20,7 +20,7 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
     const userId = req.user?.id;
 
     const bkRes = await pool.query(
-      `SELECT id, customer_id, customer_mobile, booking_number, status, preferred_departure_date
+      `SELECT id, customer_id, customer_mobile, group_id, booking_number, status, preferred_departure_date
        FROM bookings WHERE id = $1 LIMIT 1`,
       [bookingId]
     );
@@ -28,10 +28,20 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
     if (!booking) return void res.status(404).json({ error: "Booking not found" });
     if (booking.customer_id !== userId) return void res.status(403).json({ error: "Forbidden" });
 
+    // Restrict pilgrims to THIS booking's group AND the customer's mobile — prevents
+    // cross-group data leakage when the same mobile appears in multiple groups.
     const customerMobile = booking.customer_mobile?.replace(/\D/g, "").replace(/^91/, "");
+    const mobilePattern = `%${customerMobile?.slice(-9) || "__NOMATCH__"}`;
 
+    // Explicit safe projection — passport, visa, DOB, and identity numbers are deliberately
+    // excluded. A single phone can map to multiple family members and those fields are
+    // not needed for portal journey/hotel/flight display.
     const pilgrimRes = await pool.query(
-      `SELECT p.*, h.id AS h_id, h.name AS hotel_name, h.city AS hotel_city,
+      `SELECT p.id, p.full_name, p.gender, p.nationality, p.blood_group,
+              p.serial_number, p.family_id, p.family_relation, p.family_head,
+              p.room_number AS pilgrim_room, p.bus_number, p.seat_number,
+              p.visa_status, p.visa_type,
+              h.id AS h_id, h.name AS hotel_name, h.city AS hotel_city,
               h.address AS hotel_address, h.stars AS hotel_stars,
               h.check_in_date, h.check_out_date, h.contact_phone AS hotel_phone,
               r.room_number, r.floor, r.capacity, r.bed_type AS room_type
@@ -39,10 +49,11 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
        LEFT JOIN pilgrim_room_assignments pra ON pra.pilgrim_id = p.id
        LEFT JOIN hotels h ON h.id = pra.hotel_id AND h.is_deleted = false
        LEFT JOIN hotel_rooms r ON r.id = pra.room_id
-       WHERE REPLACE(REPLACE(p.mobile_india, ' ', ''), '-', '') LIKE $1
+       WHERE p.group_id = $1
+         AND REPLACE(REPLACE(COALESCE(p.mobile_india,''), ' ', ''), '-', '') LIKE $2
        ORDER BY p.serial_number
        LIMIT 10`,
-      [`%${customerMobile?.slice(-9) || "__NOMATCH__"}`]
+      [booking.group_id, mobilePattern]
     );
     const pilgrims = pilgrimRes.rows;
 
@@ -69,17 +80,14 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
       }
     }
 
+    // visa list: status and type only — numbers/dates are identity documents
+    // and must not be returned to the customer portal (minimized PII)
     const visaList = pilgrims.map(p => ({
       pilgrimName: p.full_name,
       pilgrimId: p.id,
       serialNumber: p.serial_number,
       visaStatus: p.visa_status || "not_applied",
-      visaNumber: p.visa_number,
       visaType: p.visa_type,
-      visaAppliedDate: p.visa_applied_date,
-      visaReceivedDate: p.visa_received_date,
-      passportNumber: p.passport_number,
-      passportExpiry: p.passport_expiry_date,
     }));
 
     const hotelList = pilgrims

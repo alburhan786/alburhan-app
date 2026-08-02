@@ -145,6 +145,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       section: "CRM",
       items: [
         { icon: UserCheck,     label: "Customer 360°",           href: "/admin/customer360",       require: ["customers", "view"], aliases: ["360", "customer", "lead", "profile", "history", "customer 360"] },
+        { icon: UserCheck,     label: "Customer Portal Controls", href: "/admin/customer-portal-controls", require: ["customers", "view"], aliases: ["portal", "portal controls", "portal admin", "customer portal", "resources", "orientation"] },
         { icon: Target,        label: "CRM Dashboard",           href: "/admin/crm",               require: ["customers", "view"], aliases: ["crm", "lead", "leads", "pipeline", "sales"] },
         { icon: Handshake,     label: "SRM Dashboard",           href: "/admin/srm",               require: ["accounting","view"], aliases: ["srm", "supplier", "vendor"] },
         { icon: Target,        label: "Leads",                   href: "/admin/leads",             require: ["customers", "view"], aliases: ["lead", "leads", "prospects", "enquiry", "follow-up"] },

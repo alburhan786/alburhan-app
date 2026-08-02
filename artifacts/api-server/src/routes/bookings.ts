@@ -1377,6 +1377,12 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     return;
   }
   const b = bookings[0];
+  // Ownership check: admin only OR the customer who owns this booking
+  const isAdmin = req.user?.role === "admin" || req.user?.role === "super_admin";
+  if (!isAdmin && (b as any).customerId !== req.user?.id) {
+    res.status(403).json({ message: "Access denied" });
+    return;
+  }
   if (!["confirmed", "partially_paid"].includes(b.status as string)) {
     res.status(400).json({ message: "Invoice only available once a payment has been received" });
     return;

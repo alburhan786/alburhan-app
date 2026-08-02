@@ -3590,6 +3590,82 @@ async function start() {
     console.log("[Migration] v35.7 communication_schedules table ensured");
   } catch (err: any) { console.warn("[Migration] v35.7 communication_schedules:", err.message); }
 
+  // ── v36.1 — orientation_resources table ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orientation_resources (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT DEFAULT 'general',
+        resource_type TEXT DEFAULT 'article',
+        content TEXT,
+        external_url TEXT,
+        file_url TEXT,
+        thumbnail_url TEXT,
+        language TEXT DEFAULT 'en',
+        is_published BOOLEAN DEFAULT true,
+        view_count INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        created_by TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS or_category_idx ON orientation_resources(category)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS or_published_idx ON orientation_resources(is_published)`);
+    console.log("[Migration] v36.1 orientation_resources table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.1 orientation_resources:", err.message); }
+
+  // ── v36.2 — customer_portal_activity table ──────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_portal_activity (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL,
+        booking_id TEXT,
+        action TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpa_customer_idx ON customer_portal_activity(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpa_created_idx  ON customer_portal_activity(created_at DESC)`);
+    console.log("[Migration] v36.2 customer_portal_activity table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.2 customer_portal_activity:", err.message); }
+
+  // ── v36.3 — customer_profile_edits table ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_profile_edits (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL,
+        field_name TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        status TEXT DEFAULT 'pending',
+        reviewed_by TEXT,
+        reviewed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpe_customer_idx ON customer_profile_edits(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpe_status_idx   ON customer_profile_edits(status)`);
+    console.log("[Migration] v36.3 customer_profile_edits table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.3 customer_profile_edits:", err.message); }
+
+  // ── v36.4 — enhance customer_notifications ──────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS action_url   TEXT`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS priority      TEXT DEFAULT 'normal'`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS expires_at    TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS is_archived   BOOLEAN DEFAULT false`);
+    console.log("[Migration] v36.4 customer_notifications enhancement ensured");
+  } catch (err: any) { console.warn("[Migration] v36.4 customer_notifications:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

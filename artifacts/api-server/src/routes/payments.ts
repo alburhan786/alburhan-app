@@ -2043,12 +2043,13 @@ router.get("/my-payments/:bookingId", requireAuth as any, async (req: Authentica
   const { bookingId } = req.params;
   try {
     const bRes = await pool.query(
-      `SELECT id, customer_mobile, status FROM bookings WHERE id=$1 LIMIT 1`,
+      `SELECT id, customer_id, status FROM bookings WHERE id=$1 LIMIT 1`,
       [bookingId]
     );
     const bk = bRes.rows[0];
     if (!bk) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (req.user?.role !== "admin" && bk.customer_mobile !== req.user?.mobile) {
+    // Use customer_id equality — mobile string comparison is brittle (country code/format differences)
+    if (req.user?.role !== "admin" && req.user?.role !== "super_admin" && bk.customer_id !== req.user?.id) {
       res.status(403).json({ message: "Access denied" }); return;
     }
     const txRes = await pool.query(
@@ -2087,7 +2088,8 @@ router.get("/receipt-pdf/:bookingId", requireAuth as any, async (req: Authentica
     );
     const row = bRes.rows[0];
     if (!row) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (req.user?.role !== "admin" && row.customer_mobile !== req.user?.mobile) {
+    // Use customer_id equality — mobile string comparison is brittle (country code/format differences)
+    if (req.user?.role !== "admin" && req.user?.role !== "super_admin" && row.customer_id !== req.user?.id) {
       res.status(403).json({ message: "Access denied" }); return;
     }
     const paidAmount = Number(row.paid_amount || 0);

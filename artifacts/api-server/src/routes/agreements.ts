@@ -212,7 +212,7 @@ const RICH_SELECT = `
 `;
 
 // ── Build PDF options from enriched DB row ────────────────────────────────────
-function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfOptions> = {}): AgreementPdfOptions {
+export function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfOptions> = {}): AgreementPdfOptions {
   const hi  = (ag.hotel_info  && typeof ag.hotel_info  === "object") ? ag.hotel_info  : {};
   const fi  = (ag.flight_info && typeof ag.flight_info === "object") ? ag.flight_info : {};
   const sm  = (ag.signing_metadata && typeof ag.signing_metadata === "object") ? ag.signing_metadata : {};
@@ -341,7 +341,7 @@ function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfO
   };
 }
 
-function getSiteBase(): string {
+export function getSiteBase(): string {
   // IMPORTANT: Never use REPLIT_DEV_DOMAIN for notification URLs.
   // If REPLIT_DEV_DOMAIN is set on the VPS (e.g. a leftover env var from a previous Replit
   // deploy), it produces malformed URLs like "https://<uuid>.replit.dev/sign-agreement/..."
@@ -1017,9 +1017,11 @@ router.get("/sign/:token/pdf", async (req, res) => {
 router.get("/my", requireAuth, async (req: any, res) => {
   try {
     const result = await pool.query(
-      `SELECT a.*, b.booking_number, b.package_name, b.final_amount, b.paid_amount
+      `SELECT a.*, b.booking_number, b.package_name, b.final_amount, b.paid_amount,
+              b.customer_id AS booking_customer_id
        FROM agreements a LEFT JOIN bookings b ON b.id = a.booking_id
-       WHERE a.customer_id = $1 AND a.status NOT IN ('cancelled','superseded')
+       WHERE (a.customer_id = $1 OR b.customer_id = $1)
+         AND a.status NOT IN ('cancelled','superseded')
        ORDER BY a.created_at DESC`, [req.user.id]
     );
     // Backfill any agreements that are missing a verification_token (legacy records)
@@ -1029,7 +1031,13 @@ router.get("/my", requireAuth, async (req: any, res) => {
       await pool.query(`UPDATE agreements SET verification_token=$1, updated_at=NOW() WHERE id=$2`, [newToken, row.id]);
       row.verification_token = newToken;
     }
-    res.json({ agreements: result.rows });
+    // Strip bearer credentials — access_token must never be sent to customers
+    // The portal uses session-authenticated signing endpoints (/api/customer/agreements/:id/*)
+    const safe = result.rows.map((r: any) => {
+      const { access_token, access_token_expires_at, ...rest } = r;
+      return rest;
+    });
+    res.json({ agreements: safe });
   } catch { res.status(500).json({ error: "Failed to load agreements" }); }
 });
 

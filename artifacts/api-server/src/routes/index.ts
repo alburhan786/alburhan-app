@@ -85,6 +85,7 @@ import { leadEngineRouter } from "./lead-engine.js";
 import inboxRouter from "./inbox.js";
 import customer360Router from "./customer360.js";
 import rcsRouter from "./rcs.js";
+import customerPortalRouter from "./customer-portal.js";
 
 const router: IRouter = Router();
 
@@ -371,6 +372,7 @@ router.use("/communication", communicationRouter);
 router.use("/auto-notifications", autoNotificationsRouter);
 router.use("/agreements", agreementsRouter);
 router.use("/customer/journey", customerJourneyRouter);
+router.use("/customer", customerPortalRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
 router.use("/marketing", enterpriseRouter);
