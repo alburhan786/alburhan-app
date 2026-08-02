@@ -3666,6 +3666,164 @@ async function start() {
     console.log("[Migration] v36.4 customer_notifications enhancement ensured");
   } catch (err: any) { console.warn("[Migration] v36.4 customer_notifications:", err.message); }
 
+  // ── v37.1 — automation_service_tokens ────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS automation_service_tokens (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        token_name    TEXT NOT NULL,
+        token_hash    TEXT NOT NULL UNIQUE,
+        scopes        JSONB NOT NULL DEFAULT '[]'::jsonb,
+        allowed_ips   JSONB,
+        is_active     BOOLEAN NOT NULL DEFAULT true,
+        expires_at    TIMESTAMPTZ,
+        revoked_at    TIMESTAMPTZ,
+        last_used_at  TIMESTAMPTZ,
+        created_by    TEXT,
+        notes         TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ast_hash_idx ON automation_service_tokens(token_hash)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ast_active_idx ON automation_service_tokens(is_active) WHERE is_active = true`);
+    // Seed N8N token if env var is set and no token exists yet
+    const n8nToken = process.env.N8N_SERVICE_TOKEN;
+    if (n8nToken) {
+      const crypto = await import("crypto");
+      const hash = crypto.createHash("sha256").update(n8nToken).digest("hex");
+      await pool.query(
+        `INSERT INTO automation_service_tokens (id, token_name, token_hash, scopes, is_active, created_by, notes)
+         VALUES (gen_random_uuid()::text, 'n8n-main', $1,
+           '["packages:read","leads:create","leads:update","support:create","conversations:create","knowledge:read"]'::jsonb,
+           true, 'system', 'Auto-seeded from N8N_SERVICE_TOKEN env var')
+         ON CONFLICT (token_hash) DO NOTHING`,
+        [hash]
+      );
+    }
+    console.log("[Migration] v37.1 automation_service_tokens ensured");
+  } catch (err: any) { console.warn("[Migration] v37.1 automation_service_tokens:", err.message); }
+
+  // ── v37.2 — ai_conversations ─────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_conversations (
+        id                        TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        conversation_key          TEXT NOT NULL UNIQUE,
+        channel                   TEXT NOT NULL,
+        external_contact_id       TEXT,
+        customer_id               TEXT,
+        lead_id                   TEXT,
+        booking_id                TEXT,
+        customer_name             TEXT,
+        mobile_masked             TEXT,
+        language                  TEXT NOT NULL DEFAULT 'en',
+        status                    TEXT NOT NULL DEFAULT 'ai_active'
+                                    CHECK (status IN ('ai_active','human_required','human_active','closed')),
+        last_ai_message_at        TIMESTAMPTZ,
+        last_customer_message_at  TIMESTAMPTZ,
+        closed_at                 TIMESTAMPTZ,
+        created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_key_idx    ON ai_conversations(conversation_key)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_status_idx ON ai_conversations(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_channel_idx ON ai_conversations(channel)`);
+    console.log("[Migration] v37.2 ai_conversations ensured");
+  } catch (err: any) { console.warn("[Migration] v37.2 ai_conversations:", err.message); }
+
+  // ── v37.3 — ai_conversation_messages ─────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_conversation_messages (
+        id                   TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        conversation_id      TEXT NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+        direction            TEXT NOT NULL CHECK (direction IN ('inbound','outbound')),
+        sender_type          TEXT NOT NULL CHECK (sender_type IN ('customer','ai','staff','system')),
+        channel              TEXT NOT NULL,
+        message_type         TEXT NOT NULL DEFAULT 'text',
+        message_text         TEXT NOT NULL,
+        provider_message_id  TEXT,
+        request_id           TEXT,
+        ai_model             TEXT,
+        tool_calls           JSONB,
+        confidence           NUMERIC(4,3),
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS acm_conv_idx ON ai_conversation_messages(conversation_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS acm_dir_idx  ON ai_conversation_messages(direction)`);
+    console.log("[Migration] v37.3 ai_conversation_messages ensured");
+  } catch (err: any) { console.warn("[Migration] v37.3 ai_conversation_messages:", err.message); }
+
+  // ── v37.4 — automation_audit_logs ───────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS automation_audit_logs (
+        id           TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        actor_type   TEXT NOT NULL DEFAULT 'service_token',
+        actor_id     TEXT NOT NULL,
+        action       TEXT NOT NULL,
+        entity_type  TEXT NOT NULL,
+        entity_id    TEXT,
+        request_id   TEXT,
+        ip_address   TEXT,
+        before_data  JSONB,
+        after_data   JSONB,
+        result       TEXT NOT NULL DEFAULT 'success' CHECK (result IN ('success','failure')),
+        error_code   TEXT,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_actor_idx  ON automation_audit_logs(actor_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_action_idx ON automation_audit_logs(action, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_entity_idx ON automation_audit_logs(entity_type, entity_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_idem_idx   ON automation_audit_logs((after_data->>'idempotency_key')) WHERE after_data->>'idempotency_key' IS NOT NULL`);
+    console.log("[Migration] v37.4 automation_audit_logs ensured");
+  } catch (err: any) { console.warn("[Migration] v37.4 automation_audit_logs:", err.message); }
+
+  // ── v37.5 — ai_knowledge_base ───────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_knowledge_base (
+        id               TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        category         TEXT NOT NULL,
+        question         TEXT NOT NULL,
+        answer           TEXT NOT NULL,
+        language         TEXT NOT NULL DEFAULT 'en',
+        tags             JSONB,
+        sort_order       INTEGER,
+        version          INTEGER NOT NULL DEFAULT 1,
+        status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','archived')),
+        approval_status  TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
+        approved_by      TEXT,
+        is_active        BOOLEAN NOT NULL DEFAULT true,
+        last_reviewed_at TIMESTAMPTZ,
+        created_by       TEXT,
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_cat_idx    ON ai_knowledge_base(category, sort_order NULLS LAST)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_status_idx ON ai_knowledge_base(status, is_active)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_lang_idx   ON ai_knowledge_base(language)`);
+    // Add DB soft-switch for AI kill switch (admin can toggle without env var change)
+    await pool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at)
+       VALUES ('ai_assistant_enabled', 'false', 'ai_automation', false, NOW())
+       ON CONFLICT (key) DO NOTHING`,
+    ).catch(() => {
+      // api_settings may use (provider) as PK — try alternate upsert
+      pool.query(
+        `INSERT INTO api_settings (provider, enabled, updated_at)
+         VALUES ('ai_automation', false, NOW())
+         ON CONFLICT (provider) DO NOTHING`
+      ).catch(() => {});
+    });
+    console.log("[Migration] v37.5 ai_knowledge_base + ai_automation api_settings ensured");
+  } catch (err: any) { console.warn("[Migration] v37.5 ai_knowledge_base:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

@@ -221,6 +221,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       items: [
         { icon: Sparkles, label: "AI Assistant",          href: "/admin/ai" },
         { icon: Brain,    label: "AI Analytics Dashboard", href: "/admin/ai-ops", require: ["bookings", "view"] },
+        { icon: Bot,      label: "AI Control Center",      href: "/admin/ai-assistant-control", require: ["settings", "edit"], aliases: ["ai control", "ai automation", "n8n", "service token", "ai kill switch", "automation api"] },
       ],
     },
 

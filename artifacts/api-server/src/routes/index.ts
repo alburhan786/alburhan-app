@@ -402,6 +402,14 @@ router.use("/webhook", webhooksRouter);
 router.use("/webhooks", webhooksRouter);
 router.use(storageRouter);
 
+// ── AI Automation API (external n8n / service-token integration) ────────────
+import automationRouter from "./automation.js";
+router.use("/automation", automationRouter);
+
+// ── AI Automation Admin (session-auth management UI) ────────────────────────
+import aiAutomationAdminRouter from "./ai-automation-admin.js";
+router.use("/admin/ai-automation", aiAutomationAdminRouter);
+
 // ── Migration diagnostics (router-level, no session required, key-protected) ──
 // These mirror the app-level routes in app.ts. Being in the router guarantees
 // they work on VPS even if the app-level registration order is wrong.

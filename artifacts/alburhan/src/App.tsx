@@ -52,6 +52,7 @@ import SupplierManager from "@/pages/admin/SupplierManager";
 import GroupTracking from "@/pages/admin/GroupTracking";
 import KnowledgeCenter from "@/pages/public/KnowledgeCenter";
 import AIOperationsCenter from "@/pages/admin/AIOperationsCenter";
+import AIAssistantControlCenter from "@/pages/admin/AIAssistantControlCenter";
 import ExecutiveDashboard from "@/pages/admin/ExecutiveDashboard";
 import BookingFunnel from "@/pages/admin/BookingFunnel";
 import RevenueAnalytics from "@/pages/admin/RevenueAnalytics";
@@ -448,6 +449,7 @@ function Router() {
       <Route path="/admin/suppliers" component={() => <AdminRoute component={SupplierManager} />} />
       <Route path="/admin/group-tracking" component={() => <AdminRoute component={GroupTracking} />} />
       <Route path="/admin/ai-ops" component={() => <AdminRoute component={AIOperationsCenter} />} />
+      <Route path="/admin/ai-assistant-control" component={() => <AdminRoute component={AIAssistantControlCenter} />} />
       <Route path="/admin/executive" component={() => <AdminRoute component={ExecutiveDashboard} />} />
       <Route path="/admin/funnel" component={() => <AdminRoute component={BookingFunnel} />} />
       <Route path="/admin/revenue" component={() => <AdminRoute component={RevenueAnalytics} />} />

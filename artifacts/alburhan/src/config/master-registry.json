@@ -1,7 +1,7 @@
 {
   "version": 3,
   "description": "Master registry — single source of truth for Al Burhan ERP. Reflects ONLY what is implemented. Out-of-scope features are listed in outOfScope[]. Hidden pages (no sidebar entry by design) are auto-detected by update-snapshot.mjs into nav-snapshot.hiddenAdminPages.",
-  "updatedAt": "2026-07-27",
+  "updatedAt": "2026-08-02",
   "_auditPolicy": {
     "failOnlyFor": [
       "missing route",
@@ -748,8 +748,8 @@
     "totalNotificationModules": 9,
     "totalApiEndpoints": 31,
     "totalOutOfScope": 6,
-    "totalNavItems": 145,
-    "totalHiddenPages": 9,
+    "totalNavItems": 148,
+    "totalHiddenPages": 10,
     "totalPrintOnlyPages": 3
   }
 }
