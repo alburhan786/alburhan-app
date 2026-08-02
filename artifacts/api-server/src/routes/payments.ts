@@ -1942,16 +1942,31 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
     // ── 6. Agreement (if one exists for this booking) ─────────────────────────
     try {
       const agrQ = await pool.query(
-        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, agreement_number, status, access_token, access_token_expires_at, created_at
+         FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
         [row.id]
       );
       if (agrQ.rows.length > 0) {
         const agr = agrQ.rows[0];
+        // Ensure the signing URL always carries a valid access_token.
+        // If the stored token is missing or expired, generate a fresh 72-hour token.
+        let signingToken: string = agr.access_token || "";
+        const tokenExpired = agr.access_token_expires_at && new Date() > new Date(agr.access_token_expires_at);
+        if (agr.status !== "signed" && (!signingToken || tokenExpired)) {
+          signingToken = crypto.randomBytes(32).toString("hex");
+          await pool.query(
+            `UPDATE agreements SET access_token=$1, access_token_expires_at=NOW() + INTERVAL '72 hours', updated_at=NOW() WHERE id=$2`,
+            [signingToken, agr.id]
+          );
+        }
+        const agreementUrl = agr.status === "signed"
+          ? `${siteBase}/sign-agreement/${row.booking_number}`
+          : `${siteBase}/sign-agreement/${row.booking_number}?token=${signingToken}`;
         const { sendAgreementReadyTemplate } = await import("../lib/botbee.js");
         const agrResult = await sendAgreementReadyTemplate(row.customer_mobile, {
           customerName: row.customer_name, bookingId: row.booking_number,
           agreementNumber: agr.agreement_number,
-          agreementUrl: `${siteBase}/agreement/${row.booking_number}`,
+          agreementUrl,
         }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined, forceTemplateApi: true });
         summary.push({ key: "agreement", label: "Agreement", status: agrResult.ok ? "sent" : "failed", reason: agrResult.ok ? undefined : (agrResult.errorMessage || "Send failed") });
       }

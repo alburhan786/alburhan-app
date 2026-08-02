@@ -20,11 +20,23 @@ interface AgreementData {
 }
 
 export default function PublicAgreementSign() {
+  // `:token` in the route is the booking number (e.g. ABT26373792).
+  // `?token=` in the query string is the cryptographic access token.
   const { token } = useParams<{ token: string }>();
+  const accessToken = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("token")
+    : null;
+
+  /** Build a signing API URL with the access token appended as ?token= */
+  const signApi = (suffix = "") => {
+    const base = `${API}/api/agreements/sign/${encodeURIComponent(token || "")}${suffix}`;
+    return accessToken ? `${base}?token=${encodeURIComponent(accessToken)}` : base;
+  };
 
   const [agreement, setAgreement] = useState<AgreementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [accessError, setAccessError] = useState<{ code: string; message: string } | null>(null);
   const [step, setStep] = useState<"terms" | "sign" | "complete">("terms");
 
   // Terms
@@ -53,21 +65,28 @@ export default function PublicAgreementSign() {
     setTimeout(() => setToastMsg(null), 5000);
   };
 
-  // Load agreement
+  // Load agreement — passes the access_token as ?token= query parameter
   useEffect(() => {
     if (!token) return;
-    fetch(`${API}/api/agreements/sign/${encodeURIComponent(token)}`)
-      .then(r => r.ok ? r.json() : r.json().then(d => Promise.reject(d)))
-      .then(d => {
-        setAgreement(d);
-        if (d.status === "signed") setStep("complete");
+    fetch(signApi())
+      .then(r => r.json().then(d => ({ ok: r.ok, status: r.status, data: d })))
+      .then(({ ok, status, data }) => {
+        if (ok) {
+          setAgreement(data);
+          if (data.status === "signed") setStep("complete");
+        } else {
+          const code = data?.code || "";
+          if (["TOKEN_MISSING", "TOKEN_INVALID", "TOKEN_EXPIRED", "AGREEMENT_CANCELLED"].includes(code)) {
+            setAccessError({ code, message: data?.error || "This link is invalid." });
+          } else {
+            setNotFound(true);
+          }
+        }
       })
-      .catch((e) => {
-        if (e?.code === "AGREEMENT_NOT_FOUND" || e?.status === 404) setNotFound(true);
-        else setNotFound(true);
-      })
+      .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, accessToken]);
 
   useEffect(() => {
     if (!agreement?.clauses) return;
@@ -139,7 +158,7 @@ export default function PublicAgreementSign() {
   const requestOtp = async () => {
     setOtpLoading(true);
     try {
-      const r = await fetch(`${API}/api/agreements/sign/${encodeURIComponent(token!)}/request-otp`, {
+      const r = await fetch(signApi("/request-otp"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -160,7 +179,7 @@ export default function PublicAgreementSign() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const r = await fetch(`${API}/api/agreements/sign/${encodeURIComponent(token!)}/sign`, {
+      const r = await fetch(signApi("/sign"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ otp, signatureData, termsAccepted: accepted, ...getDeviceMeta() }),
@@ -183,6 +202,45 @@ export default function PublicAgreementSign() {
       toast("Error", "Network error while signing", false);
     } finally { setSubmitting(false); }
   };
+
+  // ── Token / access error (never 404 — branded error page) ───────────────────
+  if (accessError) {
+    const isExpired   = accessError.code === "TOKEN_EXPIRED";
+    const isCancelled = accessError.code === "AGREEMENT_CANCELLED";
+    const icon  = isCancelled ? "🚫" : isExpired ? "⏰" : "🔒";
+    const title = isCancelled ? "Agreement Cancelled"
+                : isExpired   ? "Link Expired"
+                              : "Invalid Signing Link";
+    return (
+      <div style={{ minHeight: "100vh", background: "#f4f6f8", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div style={{ maxWidth: 460, width: "100%", background: "white", borderRadius: 12, boxShadow: "0 2px 20px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+          <div style={{ background: "#0B3D2E", padding: "24px 28px" }}>
+            <div style={{ color: "#C9A23F", fontSize: 11, letterSpacing: 2, marginBottom: 4 }}>AL BURHAN TOURS & TRAVELS</div>
+            <div style={{ color: "white", fontSize: 20, fontWeight: "bold" }}>{title}</div>
+          </div>
+          <div style={{ padding: "32px 28px", textAlign: "center" }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>{icon}</div>
+            <h2 style={{ fontSize: 18, fontWeight: "bold", color: "#CC0000", marginBottom: 12 }}>{title}</h2>
+            <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>{accessError.message}</p>
+            {isExpired && (
+              <div style={{ background: "#FFF8E7", border: "1px solid #F0CC70", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#7B4700", marginBottom: 20 }}>
+                Signing links are valid for <strong>72 hours</strong>. Please contact Al Burhan Tours & Travels and ask them to send a new link.
+              </div>
+            )}
+            <div style={{ background: "#F5F5F5", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#888", marginBottom: 24, fontFamily: "monospace" }}>
+              Booking: {token || "unknown"}
+            </div>
+            <a
+              href="https://wa.me/919893225590"
+              style={{ display: "inline-block", background: "#25D366", color: "white", textDecoration: "none", borderRadius: 6, padding: "10px 24px", fontSize: 14, fontWeight: 600 }}
+            >
+              📞 Contact Support on WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {

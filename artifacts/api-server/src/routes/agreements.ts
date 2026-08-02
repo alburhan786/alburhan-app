@@ -41,6 +41,25 @@ const router = Router();
     // 2. Set column DEFAULT so all future INSERTs that omit the field get a UUID automatically
     await pool.query(`ALTER TABLE agreements ALTER COLUMN verification_token SET DEFAULT gen_random_uuid()`);
     console.log("[Agreement] verification_token DEFAULT gen_random_uuid() enforced");
+    // 3. Secure access token for public signing links (separate from verification_token)
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS access_token TEXT`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS access_token_expires_at TIMESTAMPTZ`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS agreements_access_token_idx ON agreements (access_token) WHERE access_token IS NOT NULL`);
+    // Backfill access_token for any unsigned agreements (so admin resend can use them).
+    // Uses gen_random_uuid() concatenation — available without pgcrypto, 128-bit entropy per half.
+    const backfillAt = await pool.query(
+      `UPDATE agreements
+         SET access_token            = REPLACE(gen_random_uuid()::text,'-','') || REPLACE(gen_random_uuid()::text,'-',''),
+             access_token_expires_at = NOW() + INTERVAL '30 days',
+             updated_at              = NOW()
+       WHERE status = 'pending_signature'
+         AND access_token IS NULL
+       RETURNING agreement_number`
+    );
+    if (backfillAt.rowCount && backfillAt.rowCount > 0) {
+      console.log(`[Agreement] ✅ Backfilled access_token for ${backfillAt.rowCount} unsigned agreement(s) (30-day compat window)`);
+    }
+    console.log("[Agreement] access_token columns ensured");
     // Extended customer_profiles columns (safe — no-ops if already exist)
     await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS father_name TEXT`);
     await pool.query(`ALTER TABLE customer_profiles ADD COLUMN IF NOT EXISTS nationality TEXT`);
@@ -225,6 +244,91 @@ function getSiteBase(): string {
     : (process.env.SITE_URL || "https://alburhantravels.com");
 }
 
+// ── Secure access-token helpers ───────────────────────────────────────────────
+
+/** Generate a cryptographically secure 256-bit signing link token (64-char hex). */
+function genAccessToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+/**
+ * Build the public signing URL with the secure access token in the query string.
+ * Format: /sign-agreement/<bookingNumber>?token=<64-hex>
+ */
+function buildSigningUrl(bookingNumber: string, accessToken: string, siteBase: string): string {
+  return `${siteBase}/sign-agreement/${encodeURIComponent(bookingNumber)}?token=${accessToken}`;
+}
+
+/**
+ * Agreements created BEFORE this cutoff were already dispatched to customers without a token.
+ * Those links stay functional for backward compatibility. All agreements created on or after
+ * this date require the access_token query parameter.
+ */
+const ACCESS_TOKEN_ENFORCE_AFTER = new Date("2026-08-02T00:00:00Z");
+
+/**
+ * Validate public access for the signing page.
+ *
+ * Rules:
+ *  1. Already-signed  → always permitted (customer downloads their copy).
+ *  2. Cancelled/void  → always refused (no token fixes a cancelled agreement).
+ *  3. Legacy unsigned (created before ACCESS_TOKEN_ENFORCE_AFTER, access_token IS NULL)
+ *                     → allow without token (backward-compat window).
+ *  4. Token provided  → must match stored value AND not be expired.
+ *  5. New unsigned + no token → TOKEN_MISSING.
+ *
+ * NEVER log the full access_token — callers must log only a safe prefix.
+ */
+function validatePublicAccess(
+  ag: any,
+  providedToken: string | null | undefined,
+): { ok: boolean; code?: string; message?: string } {
+  // 1. Signed — always OK
+  if (ag.status === "signed") return { ok: true };
+
+  // 2. Cancelled / voided
+  if (ag.status === "cancelled" || ag.status === "void") {
+    return {
+      ok: false,
+      code: "AGREEMENT_CANCELLED",
+      message: "This agreement has been cancelled. Please contact Al Burhan Tours & Travels for assistance.",
+    };
+  }
+
+  const createdAt = ag.created_at ? new Date(ag.created_at) : new Date(0);
+  const isLegacy  = createdAt < ACCESS_TOKEN_ENFORCE_AFTER;
+  const hasStoredToken = !!ag.access_token;
+
+  // 3. Legacy agreement with no stored token — backward compat, no token required
+  if (isLegacy && !hasStoredToken) return { ok: true };
+
+  // 4. Token provided — validate strictly
+  if (providedToken) {
+    if (!ag.access_token || ag.access_token !== providedToken) {
+      return { ok: false, code: "TOKEN_INVALID", message: "This signing link is invalid or has already been used. Please request a new link from Al Burhan Tours & Travels." };
+    }
+    if (ag.access_token_expires_at && new Date() > new Date(ag.access_token_expires_at)) {
+      return { ok: false, code: "TOKEN_EXPIRED", message: "This signing link has expired (links are valid for 72 hours). Please contact Al Burhan Tours & Travels to receive a new link." };
+    }
+    return { ok: true };
+  }
+
+  // 5. No token provided
+  if (isLegacy) return { ok: true }; // legacy link without token still OK
+
+  return {
+    ok: false,
+    code: "TOKEN_MISSING",
+    message: "This signing link is incomplete. Please use the full link sent to your WhatsApp or SMS.",
+  };
+}
+
+/** Return only the safe log prefix of an access token (first 8 chars + …). Never log full token. */
+function tokenLogPrefix(t: string | null | undefined): string {
+  if (!t) return "(none)";
+  return t.slice(0, 8) + "…";
+}
+
 // ── Fetch an image from storage/disk/URL into a Buffer (for PDF embedding) ───
 async function fetchImageBuffer(url: string | null | undefined): Promise<Buffer | null> {
   if (!url) return null;
@@ -288,11 +392,15 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
 
     const agreementNumber = await generateAgreementNumber();
     const verificationToken = crypto.randomUUID();
+    const accessToken = genAccessToken();
     const agId = crypto.randomUUID();
     await pool.query(
-      `INSERT INTO agreements (id, agreement_number, booking_id, customer_id, status, verification_token, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'pending_signature',$5,NOW(),NOW())`,
-      [agId, agreementNumber, bookingId, booking.customer_id, verificationToken]
+      `INSERT INTO agreements
+         (id, agreement_number, booking_id, customer_id, status,
+          verification_token, access_token, access_token_expires_at,
+          created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'pending_signature',$5,$6,NOW() + INTERVAL '72 hours',NOW(),NOW())`,
+      [agId, agreementNumber, bookingId, booking.customer_id, verificationToken, accessToken]
     );
 
     await logAgreementAudit(agId, "auto_generated", {
@@ -300,11 +408,11 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
       customerName: booking.customer_name || booking.customer_name_user,
       triggeredBy: "payment_confirmed",
     });
-    console.log(`[Agreement] Auto-generated ${agreementNumber} for booking ${booking.booking_number}`);
+    console.log(`[Agreement] Auto-generated ${agreementNumber} for booking ${booking.booking_number} | access_token=${tokenLogPrefix(accessToken)}`);
 
-    // Notify customer via WhatsApp — agreement_ready template (fire-and-forget)
-    // Use booking_number (ABT...) so the link is short, readable, and doesn't expose internal UUIDs.
-    const signingUrl = `https://alburhantravels.com/sign-agreement/${booking.booking_number}`;
+    // Notify customer — signing URL includes the secure access token.
+    const siteBase = getSiteBase();
+    const signingUrl = buildSigningUrl(booking.booking_number, accessToken, siteBase);
     const notifyMobile = booking.customer_mobile || booking.whatsapp_number || booking.mobile_india;
     console.log(`[Agreement] Triggering agreement_generated workflow for ${booking.booking_number} | mobile=${notifyMobile ? notifyMobile.slice(-4).padStart(notifyMobile.length, "*") : "MISSING"}`);
     triggerWorkflow("agreement_generated", {
@@ -440,10 +548,11 @@ async function lookupByPublicToken(token: string): Promise<any | null> {
 }
 
 // ── PUBLIC: Get agreement data for the signing page ───────────────────────────
-// GET /api/agreements/sign/:token
+// GET /api/agreements/sign/:token?token=<access_token>
 router.get("/sign/:token", async (req, res) => {
   const { token } = req.params;
-  console.log(`[Agreement/Public] ▶ sign GET token="${token}"`);
+  const providedToken = (req.query.token as string) || null;
+  console.log(`[Agreement/Public] ▶ sign GET booking="${token}" access_token=${tokenLogPrefix(providedToken)}`);
   try {
     const ag = await lookupByPublicToken(token);
     if (!ag) {
@@ -451,6 +560,13 @@ router.get("/sign/:token", async (req, res) => {
         code: "AGREEMENT_NOT_FOUND",
         error: "Agreement not found. Please check your link or contact support.",
       });
+    }
+
+    const validation = validatePublicAccess(ag, providedToken);
+    if (!validation.ok) {
+      const status = validation.code === "AGREEMENT_CANCELLED" ? 410 : 401;
+      console.log(`[Agreement/Public] ⛔ Access denied booking="${token}" code=${validation.code}`);
+      return res.status(status).json({ code: validation.code, error: validation.message });
     }
 
     const siteBase = getSiteBase();
@@ -481,18 +597,27 @@ router.get("/sign/:token", async (req, res) => {
 });
 
 // ── PUBLIC: Request OTP ───────────────────────────────────────────────────────
-// POST /api/agreements/sign/:token/request-otp
+// POST /api/agreements/sign/:token/request-otp?token=<access_token>
 router.post("/sign/:token/request-otp", async (req, res) => {
   const { token } = req.params;
-  console.log(`[Agreement/Public] ▶ request-otp token="${token}"`);
+  const providedToken = (req.query.token as string) || null;
+  console.log(`[Agreement/Public] ▶ request-otp booking="${token}" access_token=${tokenLogPrefix(providedToken)}`);
   try {
     const ag = await lookupByPublicToken(token);
-    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+    if (!ag) return res.status(404).json({ code: "AGREEMENT_NOT_FOUND", error: "Agreement not found" });
+
+    const validation = validatePublicAccess(ag, providedToken);
+    if (!validation.ok) {
+      const status = validation.code === "AGREEMENT_CANCELLED" ? 410 : 401;
+      return res.status(status).json({ code: validation.code, error: validation.message });
+    }
+
     if (ag.status === "signed") return res.status(400).json({ error: "Agreement already signed" });
 
     const mobile = ag.customer_mobile;
     if (!mobile) return res.status(400).json({ error: "No mobile number on record for this booking. Please contact support." });
 
+    // Generate OTP — never log the value itself
     const otp    = String(Math.floor(100000 + Math.random() * 900000));
     const expiry = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -502,7 +627,8 @@ router.post("/sign/:token/request-otp", async (req, res) => {
     );
 
     const smsOk = await sendOtpSMS(mobile, otp);
-    console.log(`[Agreement/Public] OTP ${smsOk ? "✅ sent" : "⚠ failed"} → ***${mobile.slice(-4)} agreement=${ag.agreement_number}`);
+    // Log only last-4 digits of mobile — never log OTP value
+    console.log(`[Agreement/Public] OTP dispatch ${smsOk ? "✅ ok" : "⚠ failed"} → ***${mobile.slice(-4)} agreement=${ag.agreement_number}`);
 
     await logAgreementAudit(ag.id, "otp_requested_public", {
       mobile: mobile.slice(-4).padStart(mobile.length, "*"),
@@ -518,18 +644,26 @@ router.post("/sign/:token/request-otp", async (req, res) => {
 });
 
 // ── PUBLIC: Sign agreement ────────────────────────────────────────────────────
-// POST /api/agreements/sign/:token/sign
+// POST /api/agreements/sign/:token/sign?token=<access_token>
 router.post("/sign/:token/sign", async (req, res) => {
   const { token } = req.params;
-  console.log(`[Agreement/Public] ▶ sign POST token="${token}"`);
+  const providedToken = (req.query.token as string) || null;
+  console.log(`[Agreement/Public] ▶ sign POST booking="${token}" access_token=${tokenLogPrefix(providedToken)}`);
   try {
     const { otp, signatureData, termsAccepted, signingBrowser, signingDevice, signingOS, signingGPS } = req.body;
     if (!otp || !signatureData || !termsAccepted) {
       return res.status(400).json({ error: "OTP, signature, and terms acceptance are required" });
     }
+    // NEVER log otp, signatureData, or termsAccepted values
 
     const ag = await lookupByPublicToken(token);
-    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+    if (!ag) return res.status(404).json({ code: "AGREEMENT_NOT_FOUND", error: "Agreement not found" });
+
+    const validation = validatePublicAccess(ag, providedToken);
+    if (!validation.ok) {
+      const status = validation.code === "AGREEMENT_CANCELLED" ? 410 : 401;
+      return res.status(status).json({ code: validation.code, error: validation.message });
+    }
 
     if (ag.status === "signed") {
       return res.json({
@@ -563,6 +697,7 @@ router.post("/sign/:token/sign", async (req, res) => {
       os: signingOS || null, gps: signingGPS || null,
       userAgent: userAgent.substring(0, 200), timestamp: now.toISOString(),
     };
+    // Digital hash: never includes raw signature data in log — only used internally
     const hashInput = `${ag.id}:${ag.agreement_number}:${signatureData}:${now.toISOString()}:${ip}`;
     const digitalHash = createHash("sha256").update(hashInput).digest("hex");
 
@@ -571,10 +706,13 @@ router.post("/sign/:token/sign", async (req, res) => {
          signed_at=$3, signed_ip=$4, signed_user_agent=$5,
          otp_verified=true, otp_verified_at=$3,
          signing_otp=NULL, signing_otp_expires_at=NULL,
-         signing_metadata=$6, digital_hash=$7, updated_at=NOW()
+         signing_metadata=$6, digital_hash=$7,
+         access_token=NULL, access_token_expires_at=NULL,
+         updated_at=NOW()
        WHERE id=$8`,
       [signatureData, JSON.stringify(termsAccepted), now, ip, userAgent, JSON.stringify(signingMetadata), digitalHash, ag.id]
     );
+    // Log only hash prefix — never the raw OTP, signature, or token
     await logAgreementAudit(ag.id, "agreement_signed_public", { ip, userAgent: userAgent.substring(0, 100), digitalHash: digitalHash.substring(0, 16) }, ip, userAgent);
 
     // Notify
@@ -647,12 +785,30 @@ router.post("/sign/:token/sign", async (req, res) => {
 });
 
 // ── PUBLIC: Download PDF ──────────────────────────────────────────────────────
-// GET /api/agreements/sign/:token/pdf
+// GET /api/agreements/sign/:token/pdf?token=<access_token>
+// Already-signed agreements: access_token NOT required (customer bookmarks signed copy).
+// Unsigned agreements: access_token IS required (same rules as the signing page).
 router.get("/sign/:token/pdf", async (req, res) => {
   const { token } = req.params;
+  const providedToken = (req.query.token as string) || null;
+  console.log(`[Agreement/Public] ▶ PDF booking="${token}" access_token=${tokenLogPrefix(providedToken)}`);
   try {
     const ag = await lookupByPublicToken(token);
-    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+    if (!ag) {
+      return res.status(404).setHeader("Content-Type", "application/json")
+        .json({ code: "AGREEMENT_NOT_FOUND", error: "Agreement not found" });
+    }
+
+    // Signed PDFs are always accessible (customer should be able to download their copy)
+    if (ag.status !== "signed") {
+      const validation = validatePublicAccess(ag, providedToken);
+      if (!validation.ok) {
+        const status = validation.code === "AGREEMENT_CANCELLED" ? 410 : 401;
+        console.log(`[Agreement/Public] ⛔ PDF access denied booking="${token}" code=${validation.code}`);
+        return res.status(status).setHeader("Content-Type", "application/json")
+          .json({ code: validation.code, error: validation.message });
+      }
+    }
 
     const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
     const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
@@ -1299,25 +1455,78 @@ router.post("/:id/reissue", requireAdmin, async (req: any, res) => {
     const ag = agRes.rows[0];
 
     const rev = (ag.revision_number || 1) + 1;
-    // Reset to pending_signature, clear signing data, bump revision
+    const newAccessToken = genAccessToken();
+    // Reset to pending_signature, clear signing data, bump revision, issue fresh access_token
     await pool.query(
       `UPDATE agreements SET status='pending_signature',
          signature_data=NULL, terms_accepted=NULL, signed_at=NULL, signed_ip=NULL,
          signed_user_agent=NULL, otp_verified=false, otp_verified_at=NULL,
          signing_otp=NULL, signing_otp_expires_at=NULL,
          signing_metadata=NULL, digital_hash=NULL,
+         access_token=$3, access_token_expires_at=NOW() + INTERVAL '72 hours',
          revision_number=$1, void_at=NULL, void_reason=NULL,
          cancelled_at=NULL, cancelled_reason=NULL,
          updated_at=NOW()
        WHERE id=$2`,
-      [rev, id]
+      [rev, id, newAccessToken]
     );
     await logAgreementAudit(id, "agreement_reissued", { revision: rev, adminId: req.user?.id }, getClientIp(req));
     const newAg = await pool.query(RICH_SELECT + `WHERE a.id=$1`, [id]);
-    res.json({ ok: true, agreement: newAg.rows[0] });
+    const bkNum = newAg.rows[0]?.booking_number || "";
+    const sigUrl = bkNum ? buildSigningUrl(bkNum, newAccessToken, getSiteBase()) : null;
+    res.json({ ok: true, agreement: newAg.rows[0], signingUrl: sigUrl });
   } catch (err) {
     console.error("[Agreement] Reissue error:", err);
     res.status(500).json({ error: "Failed to reissue" });
+  }
+});
+
+// ── ADMIN: Refresh signing link ───────────────────────────────────────────────
+// Generates a new 72-hour access_token and re-sends the signing notification on all channels.
+// Use when an existing link has expired or was lost.
+router.post("/:id/refresh-token", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [id]);
+    if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
+    const ag = agRes.rows[0];
+
+    if (ag.status === "signed") {
+      return res.status(400).json({ error: "Agreement is already signed — no new signing link needed." });
+    }
+    if (ag.status === "cancelled" || ag.status === "void") {
+      return res.status(400).json({ error: "Cannot refresh a cancelled or voided agreement." });
+    }
+
+    const newToken = genAccessToken();
+    await pool.query(
+      `UPDATE agreements SET access_token=$1, access_token_expires_at=NOW() + INTERVAL '72 hours', updated_at=NOW() WHERE id=$2`,
+      [newToken, id]
+    );
+    await logAgreementAudit(id, "access_token_refreshed", { adminId: req.user?.id }, getClientIp(req));
+
+    const siteBase  = getSiteBase();
+    const signingUrl = buildSigningUrl(ag.booking_number, newToken, siteBase);
+
+    // Re-dispatch notification on all channels (WhatsApp, SMS, RCS, Email)
+    const mobile = ag.customer_mobile;
+    if (mobile) {
+      triggerWorkflow("agreement_generated", {
+        customerName:   ag.customer_name  || "Valued Customer",
+        customerMobile: mobile,
+        bookingNumber:  ag.booking_number,
+        packageName:    ag.package_name,
+        agreementUrl:   signingUrl,
+        bookingId:      ag.booking_id,
+        customerId:     ag.customer_id,
+      }).catch(e => console.error("[Agreement] refresh-token notify failed:", e));
+    }
+
+    console.log(`[Agreement] ✅ access_token refreshed for ${ag.agreement_number} | booking=${ag.booking_number}`);
+    res.json({ ok: true, signingUrl, message: "New 72-hour signing link generated and notification sent to all channels." });
+  } catch (err: any) {
+    console.error("[Agreement] refresh-token error:", err?.message);
+    res.status(500).json({ error: "Failed to refresh token" });
   }
 });
 
@@ -1490,6 +1699,24 @@ export async function runAgreementIntegrityCheck(): Promise<{ checked: number; f
     if (nullRes.rowCount && nullRes.rowCount > 0) {
       for (const r of nullRes.rows) {
         issues.push(`Fixed NULL verification_token: ${r.agreement_number}`);
+        fixed++;
+      }
+    }
+
+    // Fix 1b: backfill any NULL access_tokens for unsigned agreements
+    // (all pending_signature agreements must have a valid access_token so admin can resend)
+    const nullAt = await pool.query(
+      `UPDATE agreements
+         SET access_token            = REPLACE(gen_random_uuid()::text,'-','') || REPLACE(gen_random_uuid()::text,'-',''),
+             access_token_expires_at = NOW() + INTERVAL '30 days',
+             updated_at              = NOW()
+       WHERE status = 'pending_signature'
+         AND access_token IS NULL
+       RETURNING id, agreement_number`
+    );
+    if (nullAt.rowCount && nullAt.rowCount > 0) {
+      for (const r of nullAt.rows) {
+        issues.push(`Backfilled NULL access_token: ${r.agreement_number}`);
         fixed++;
       }
     }

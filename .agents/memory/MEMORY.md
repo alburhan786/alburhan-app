@@ -1,3 +1,4 @@
+- [Agreement access_token security](agreement-access-token.md) — token in ?token= QS, backward-compat cutoff Aug 2 2026, gen_random_uuid concat (NOT gen_random_bytes) for SQL backfill
 - [Notification bug root causes Aug 2026](notification-bug-root-causes.md) — email suspended (circuit breaker), Meta Cloud API wrong priority for ABT events, new_booking email missing from POST body, partial_payment SMS dlt_template_missing
 - [Frontend tar extraction path](frontend-tar-extraction-fix.md) — extract to /var/www/alburhan AND /root (dual-root); NOT to /root/artifacts/alburhan/dist (creates deeply nested wrong path); hotdeploy needs 2nd call after bundle swap
 - [VPS API port](vps-api-port.md) — API process on port 5000 (NOT 3000); MIGRATION_KEY baked into bundle via esbuild define, not in PM2 env — extract with python3 regex on index.cjs

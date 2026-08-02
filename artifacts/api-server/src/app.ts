@@ -676,6 +676,30 @@ app.post("/api/migrate/reset-email-circuit", async (req, res) => {
   }
 });
 
+// POST /api/migrate/backfill-access-tokens
+// One-time: fills access_token for all pending_signature agreements that don't have one yet.
+// Safe to run multiple times (WHERE access_token IS NULL guard).
+app.post("/api/migrate/backfill-access-tokens", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string | undefined;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dbPool } = await import("@workspace/db");
+    const result = await dbPool.query(
+      `UPDATE agreements
+         SET access_token            = REPLACE(gen_random_uuid()::text,'-','') || REPLACE(gen_random_uuid()::text,'-',''),
+             access_token_expires_at = NOW() + INTERVAL '30 days',
+             updated_at              = NOW()
+       WHERE status = 'pending_signature'
+         AND access_token IS NULL
+       RETURNING agreement_number, booking_id`
+    );
+    console.log(`[migrate/backfill-access-tokens] Backfilled ${result.rowCount} agreement(s)`);
+    res.json({ ok: true, backfilled: result.rowCount, rows: result.rows.map((r: any) => r.agreement_number) });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DIRECT UPLOAD DEPLOY ENDPOINTS
 // GitHub Actions POSTs the built artifacts directly over HTTPS — no SSH needed.
