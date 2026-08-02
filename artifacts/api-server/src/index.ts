@@ -1035,6 +1035,21 @@ async function runMigrations() {
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_status_idx ON notification_logs(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_created_idx ON notification_logs(created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_updated_idx ON notification_logs(updated_at)`);
+    // Before creating the UNIQUE index, remove any duplicate idempotency_key rows
+    // that may exist from before this index was introduced. Keeping the most recent row per key.
+    // Without this step, CREATE UNIQUE INDEX fails silently on a DB with existing duplicates.
+    await pool.query(`
+      DELETE FROM notification_logs
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (PARTITION BY idempotency_key ORDER BY created_at DESC, id DESC) AS rn
+          FROM notification_logs
+          WHERE idempotency_key IS NOT NULL
+        ) ranked
+        WHERE rn > 1
+      )
+    `);
     // Partial unique index — prevents duplicate log rows for the same send
     // (e.g. sms.ts internal log + notificationEngine log, or duplicate webhook calls)
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_logs_idempotency ON notification_logs (idempotency_key) WHERE idempotency_key IS NOT NULL`);

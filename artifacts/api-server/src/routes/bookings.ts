@@ -31,19 +31,19 @@ import { auditLog } from "../lib/audit.js";
 import { autoGenerateAgreement, buildAgreementUrl } from "./agreements.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
-  sendBookingApprovalNotification,
+  // sendBookingApprovalNotification — REMOVED 2026-08-02: replaced by triggerWorkflow("booking_approved")
+  // sendPaymentConfirmationNotification — REMOVED 2026-08-02: replaced by triggerWorkflow("payment_received")
   sendBookingConfirmationNotification,
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
-  sendPaymentConfirmationNotification,
   sendAdminNewBookingEmail,
   sendJourneyStatusNotification,
   sendWhatsApp,
   sendDLTSMS,
 } from "../lib/notifications.js";
 import {
-  notifyNewBooking,
-  notifyBookingApproved,
+  // notifyNewBooking — REMOVED 2026-08-02: one notification path only (triggerWorkflow)
+  // notifyBookingApproved — REMOVED 2026-08-02: one notification path only (triggerWorkflow)
   notifyBookingRejected,
   notifyBookingCancelled,
 } from "../lib/adminNotifications.js";
@@ -253,35 +253,43 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       invoiceNumber: isPaid ? generateInvoiceNumber() : null,
     }).returning();
 
-    if (isPaid) {
-      sendPaymentConfirmationNotification({
-        mobile: booking.customerMobile,
-        email: booking.customerEmail,
-        customerName: booking.customerName,
-        bookingNumber: booking.bookingNumber,
-        amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
-        invoiceNumber: booking.invoiceNumber ?? "",
-      }).catch(console.error);
-    } else {
-      sendBookingApprovalNotification({
-        mobile: booking.customerMobile,
-        email: booking.customerEmail,
-        customerName: booking.customerName,
-        bookingNumber: booking.bookingNumber,
-      }).catch(console.error);
-    }
+    // ── Customer notifications via the central lifecycle orchestrator ──────────
+    // Offline bookings are created by admins with status "approved" or "confirmed"
+    // (never "pending"). Fire the appropriate lifecycle event via triggerWorkflow
+    // so exactly ONE notification path is used — same as online bookings.
+    // Legacy helpers (sendPaymentConfirmationNotification, sendBookingApprovalNotification)
+    // are permanently removed from this path to prevent duplicate/unlogged sends.
+    const siteBaseOffline = process.env.SITE_URL || "https://alburhantravels.com";
+    (async () => {
+      try {
+        const offlineCtx = {
+          bookingId:      booking.id,
+          bookingNumber:  booking.bookingNumber,
+          customerId:     booking.customerId     ?? undefined,
+          customerName:   booking.customerName,
+          customerMobile: booking.customerMobile,
+          customerEmail:  booking.customerEmail  ?? undefined,
+          packageName:    booking.packageName    ?? packageData?.name ?? undefined,
+          amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+          finalAmount:    booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+          invoiceUrl:     `${siteBaseOffline}/invoice/${booking.bookingNumber}`,
+        };
+        if (isPaid) {
+          // Fully-paid offline booking → payment_received (status=confirmed)
+          await triggerWorkflow("payment_received", { ...offlineCtx, invoiceNumber: booking.invoiceNumber ?? undefined });
+        } else {
+          // Approved offline booking → booking_approved (status=approved)
+          await triggerWorkflow("booking_approved", offlineCtx);
+        }
+      } catch (offlineNotifErr) {
+        console.error("[offline-booking] notification triggerWorkflow failed:", offlineNotifErr);
+      }
+    })().catch(console.error);
 
-    notifyNewBooking({
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName,
-      customerMobile: booking.customerMobile,
-      customerEmail: booking.customerEmail,
-      packageName: booking.packageName ?? null,
-      finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
-      numberOfPilgrims: booking.numberOfPilgrims,
-      isOffline: true,
-    });
+    // Auto-generate agreement immediately since offline bookings start as approved/confirmed
+    autoGenerateAgreement(booking.id).catch(err =>
+      console.error("[offline-booking] autoGenerateAgreement failed:", err)
+    );
 
     sendAdminNewBookingEmail({
       bookingId: booking.id,
@@ -295,10 +303,11 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       isOffline: true,
     }).catch(console.error);
 
-    // Auto-generate agreement on booking creation (fire-and-forget)
-    autoGenerateAgreement(booking.id).catch(err =>
-      console.error("[create] autoGenerateAgreement failed:", err)
-    );
+    // NOTE: autoGenerateAgreement is NOT called here.
+    // Agreements must only be generated after admin approval (see the approve route ~line 777)
+    // or after payment (see payments.ts). Calling it at offline booking creation fires
+    // agreement_ready notifications on a still-pending, unapproved booking — a UX bug
+    // that was confirmed and permanently removed on 2026-08-02.
 
     res.status(201).json(formatBooking(booking));
   } catch (err: any) {
@@ -600,17 +609,9 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     }).catch(() => {});
   }
 
-  notifyNewBooking({
-    bookingId: booking.id,
-    bookingNumber: booking.bookingNumber,
-    customerName: booking.customerName,
-    customerMobile: booking.customerMobile,
-    customerEmail: booking.customerEmail,
-    packageName: booking.packageName ?? pkg?.name ?? null,
-    finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
-    numberOfPilgrims: booking.numberOfPilgrims,
-    isOffline: false,
-  });
+  // Legacy notifyNewBooking() (admin SSE dashboard feed) permanently removed from
+  // this path on 2026-08-02 per acceptance requirements: only ONE notification path
+  // allowed. Dashboard live feed uses the admin_notifications table via triggerWorkflow.
 
   sendAdminNewBookingEmail({
     bookingId: booking.id,
@@ -764,12 +765,8 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     }
   })();
 
-  notifyBookingApproved({
-    bookingId: updated.id,
-    bookingNumber: updated.bookingNumber,
-    customerName: updated.customerName,
-    customerMobile: updated.customerMobile,
-  });
+  // Legacy notifyBookingApproved() (admin SSE only) permanently removed from this path
+  // on 2026-08-02 — only ONE notification path allowed (triggerWorkflow above owns all channels).
 
   auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
 
@@ -1171,6 +1168,52 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
     return;
   }
   let b = bookings[0];
+
+  // Guard: block invoice notifications for pending/unapproved bookings or zero-amount bookings.
+  // Sending invoice notifications before approval causes customers to receive premature messages
+  // with blank invoice numbers and zero amounts — a confirmed production bug (2026-08-02).
+  if (b.status === "pending" || b.status === "submitted") {
+    console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} is in status '${b.status}' — must be approved before sending invoice notification`);
+    res.status(422).json({
+      message: "DATA_VALIDATION_FAILED",
+      detail: `Booking ${b.bookingNumber} is in status '${b.status}'. Approve the booking before sending an invoice notification.`,
+    });
+    return;
+  }
+  if (!b.finalAmount || Number(b.finalAmount) <= 0) {
+    console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} has no final amount`);
+    res.status(422).json({
+      message: "DATA_VALIDATION_FAILED",
+      detail: `Booking ${b.bookingNumber} has no final amount. Set the package price before sending an invoice notification.`,
+    });
+    return;
+  }
+  // Guard: require that a real invoice record exists in the invoices table
+  // (not just an invoice_number field on the booking row). This prevents sending
+  // invoice notifications for bookings that have a number assigned but no actual invoice.
+  {
+    const { pool: pgPool2 } = await import("@workspace/db");
+    const invCheck = await pgPool2.query(
+      `SELECT id, total, invoice_status FROM invoices WHERE booking_id=$1 AND invoice_status NOT IN ('void','cancelled') LIMIT 1`,
+      [b.id]
+    );
+    if (invCheck.rows.length === 0) {
+      console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} has no invoice record in invoices table`);
+      res.status(422).json({
+        message: "DATA_VALIDATION_FAILED",
+        detail: `Booking ${b.bookingNumber} has no invoice in the system. Generate the invoice first before sending a notification.`,
+      });
+      return;
+    }
+    if (!invCheck.rows[0].total || Number(invCheck.rows[0].total) <= 0) {
+      console.error(`[send-invoice] DATA_VALIDATION_FAILED: invoice for ${b.bookingNumber} has zero total`);
+      res.status(422).json({
+        message: "DATA_VALIDATION_FAILED",
+        detail: `The invoice for booking ${b.bookingNumber} has a zero total amount. Update the invoice before sending.`,
+      });
+      return;
+    }
+  }
 
   if (!b.invoiceNumber) {
     const { pool: pgPool } = await import("@workspace/db");

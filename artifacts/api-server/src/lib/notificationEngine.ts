@@ -441,7 +441,23 @@ export async function trackNotification(data: {
         wamid, template, provider_message_id,
         sent_at, failed_at, retry_count, idempotency_key)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),$21,0,$22)
-       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE SET
+         status           = EXCLUDED.status,
+         customer_id      = COALESCE(notification_logs.customer_id, EXCLUDED.customer_id),
+         message          = COALESCE(EXCLUDED.message, notification_logs.message),
+         provider_response= EXCLUDED.provider_response,
+         provider_name    = EXCLUDED.provider_name,
+         api_endpoint     = EXCLUDED.api_endpoint,
+         http_status      = EXCLUDED.http_status,
+         request_payload  = EXCLUDED.request_payload,
+         error_code       = EXCLUDED.error_code,
+         error_message    = EXCLUDED.error_message,
+         wamid            = COALESCE(EXCLUDED.wamid, notification_logs.wamid),
+         template         = COALESCE(EXCLUDED.template, notification_logs.template),
+         provider_message_id = COALESCE(EXCLUDED.provider_message_id, notification_logs.provider_message_id),
+         sent_at          = CASE WHEN EXCLUDED.status = 'sent' THEN NOW() ELSE notification_logs.sent_at END,
+         failed_at        = EXCLUDED.failed_at,
+         retry_count      = notification_logs.retry_count`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
@@ -640,6 +656,10 @@ export async function sendBotBeeEventTemplate(
         customerName: ctx.customerName,
         packageName: newBkgPkg || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        // Pass amount so template slot {{4}} / Amount shows the actual booking total, not "-".
+        // ctx.finalAmount is preferred (set from booking.finalAmount in triggerWorkflow call);
+        // ctx.amount is the fallback (some callers use amount= directly).
+        amount: ctx.finalAmount ?? ctx.amount,
         invoiceUrl,
       }, opts);
     }
@@ -1289,6 +1309,58 @@ export async function fireNotificationEvent(
   const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
   const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
 
+  // ── IDEMPOTENCY PRE-RESERVATION: check + reserve keys BEFORE calling providers ──
+  // For each channel, compute the idempotency key and check whether it already exists
+  // in notification_logs with a non-failed status. Skip channels that are already
+  // reserved/sent. This prevents concurrent webhook/retry calls from double-sending
+  // even when both pass the time-window dedup check above.
+  const paymentRef = (ctx as any).paymentRef as string | undefined;
+  const channelKeyMap: Record<string, string> = {};
+  if (ctx.bookingId) {
+    for (const ch of orderedChannels) {
+      channelKeyMap[ch] = paymentRef
+        ? `pay:${paymentRef}:${eventType}:${ch}`
+        : `${eventType}:${ctx.bookingId}:${ch}`;
+    }
+    const keyValues = Object.values(channelKeyMap);
+    if (keyValues.length > 0) {
+      try {
+        const existing = await pool.query(
+          `SELECT idempotency_key FROM notification_logs
+           WHERE idempotency_key = ANY($1) AND status IN ('sent','pending')`,
+          [keyValues]
+        );
+        const reservedKeys = new Set(existing.rows.map((r: any) => r.idempotency_key));
+        const channelsToFire = orderedChannels.filter(ch => !reservedKeys.has(channelKeyMap[ch]));
+        const skippedChannels = orderedChannels.filter(ch => reservedKeys.has(channelKeyMap[ch]));
+        if (skippedChannels.length > 0) {
+          console.log(`[notifEngine] ${eventType}: IDEMPOTENCY-PRE-SKIP channels [${skippedChannels.join(", ")}] — key already reserved/sent`);
+        }
+        // Pre-insert "pending" rows to hold the slot before any provider call
+        for (const ch of channelsToFire) {
+          const iKey = channelKeyMap[ch];
+          const reserveId = `nr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+          await pool.query(
+            `INSERT INTO notification_logs
+               (id, event_type, channel, recipient, status, booking_id, customer_name, booking_number, idempotency_key, created_at)
+             VALUES ($1,$2,$3,$4,'pending',$5,$6,$7,$8,NOW())
+             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
+            [reserveId, eventType, ch, ctx.customerMobile, ctx.bookingId, ctx.customerName ?? null, ctx.bookingNumber ?? null, iKey]
+          ).catch((e: any) => console.warn(`[notifEngine] pre-reserve insert failed (non-fatal):`, e?.message));
+        }
+        // Replace orderedChannels with the filtered list in-place
+        orderedChannels.splice(0, orderedChannels.length, ...channelsToFire);
+      } catch (preResErr: any) {
+        console.warn(`[notifEngine] pre-reservation check failed (non-fatal):`, preResErr?.message);
+      }
+    }
+  }
+
+  if (orderedChannels.length === 0) {
+    console.log(`[notifEngine] ${eventType}: all channels skipped by idempotency pre-reservation`);
+    return;
+  }
+
   // ── BROADCAST MODE: fire ALL enabled channels in parallel ──────────────────
   console.log(`[notifEngine] ${eventType}: dispatching to ${orderedChannels.length} channel(s)…`);
   const results = await Promise.allSettled(
@@ -1303,18 +1375,19 @@ export async function fireNotificationEvent(
       ? result.value
       : { status: "failed" as const, providerResponse: { ok: false, errorMessage: (result.reason as Error)?.message } };
 
-    // Build idempotency key — prevents double-log rows (e.g. sms.ts also logs internally)
+    // Build idempotency key — matches the pre-reserved key so trackNotification uses ON CONFLICT UPDATE
     const pr2 = providerResponse as Record<string, unknown> | null | undefined;
     const smsRequestId = pr2?.messageId || pr2?.request_id ||
       (pr2?.rawResponse as Record<string, unknown>)?.request_id || null;
-    const paymentRef = (ctx as any).paymentRef as string | undefined;
     let iKey: string | undefined;
     if (paymentRef) {
-      // Payment events: keyed by paymentRef so each real payment fires exactly once per channel
       iKey = `pay:${paymentRef}:${eventType}:${channel}`;
     } else if (channel === "sms" && smsRequestId && ctx.bookingId) {
       // SMS: keyed by Fast2SMS request_id to collapse the sms.ts internal log + notificationEngine log
       iKey = `sms:${ctx.bookingId}:${eventType}:${smsRequestId}`;
+    } else if (channelKeyMap[channel]) {
+      // Use the pre-reserved key so the final INSERT resolves against the reserved "pending" row
+      iKey = channelKeyMap[channel];
     }
     await trackNotification({
       eventType, channel,

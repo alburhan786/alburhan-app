@@ -472,6 +472,27 @@ async function sendDLT(
   }
   console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=${effectiveSenderId} route=DLT template=${templateId} → ${mobile}`);
 
+  // ── UNIVERSAL PRE-SEND PLACEHOLDER CHECK ────────────────────────────────────
+  // Block the send if any variable contains an unresolved placeholder, "undefined",
+  // "null", blank amount, or bare URL slot. These patterns cause garbled customer messages.
+  const PLACEHOLDER_RE = /#![^!]+!#|\{\{[^}]+\}\}/;
+  const UNSAFE_LITERAL = new Set(["undefined", "null", "[object object]"]);
+  for (const v of variables) {
+    const s = String(v ?? "").trim();
+    if (PLACEHOLDER_RE.test(s)) {
+      const msg = `SMS BLOCKED — variable contains unresolved placeholder "${s}" for event "${opts.eventType}"`;
+      console.error(`[SMS][${opts.eventType}] ⛔ UNRESOLVED_TEMPLATE_VARIABLE: ${msg}`);
+      if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "UNRESOLVED_TEMPLATE_VARIABLE", bookingId: opts.bookingId, customerId: opts.customerId });
+      return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
+    }
+    if (UNSAFE_LITERAL.has(s.toLowerCase())) {
+      const msg = `SMS BLOCKED — variable is literal "${s}" (unresolved field) for event "${opts.eventType}"`;
+      console.error(`[SMS][${opts.eventType}] ⛔ UNRESOLVED_TEMPLATE_VARIABLE: ${msg}`);
+      if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "UNRESOLVED_TEMPLATE_VARIABLE", bookingId: opts.bookingId, customerId: opts.customerId });
+      return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
+    }
+  }
+
   const phone = toPhone(mobile);
   const vars = encodeURIComponent(variables.map(v => {
     const s = String(v);
