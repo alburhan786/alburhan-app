@@ -712,7 +712,7 @@ router.get("/migrate/booking-diagnostic/:ref", async (req: any, res: any) => {
 
     const [invRes, agRes, wfRes, nlRes, ptRes] = await Promise.all([
       pool.query(`SELECT invoice_number, invoice_status, total, paid, balance, due_date, updated_at FROM invoices WHERE booking_id=$1 LIMIT 1`, [booking.id]),
-      pool.query(`SELECT agreement_number, status, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status!='cancelled' ORDER BY created_at DESC LIMIT 1`, [booking.id]),
+      pool.query(`SELECT agreement_number, status, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded') ORDER BY created_at DESC LIMIT 1`, [booking.id]),
       pool.query(`SELECT trigger_type, status, error_message, created_at FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 20`, [booking.id]),
       pool.query(`SELECT event_type, channel, status, recipient, error_code, provider_response, sent_at FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 20`, [booking.id]),
       pool.query(`SELECT amount, payment_mode, payment_date, reference_number, is_deleted FROM payment_transactions WHERE booking_id=$1 AND is_deleted=false ORDER BY payment_date DESC`, [booking.id]),

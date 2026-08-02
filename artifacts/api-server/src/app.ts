@@ -1165,7 +1165,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
      WHERE b.status IN ('approved','confirmed')
        AND COALESCE(b.paid_amount,0) > 0
        AND EXISTS (SELECT 1 FROM documents d WHERE d.booking_id = b.id)
-       AND EXISTS (SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','rejected'))
+       AND EXISTS (SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','rejected','superseded'))
      ORDER BY b.created_at DESC LIMIT 1`,
     // Good: has payment + docs
     `SELECT b.*, u.email AS customer_email FROM bookings b
@@ -1293,7 +1293,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
   // ── 6. Agreement ─────────────────────────────────────────────────────────────
   await run("agreement", async () => {
     const agQ = await pool.query(
-      `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+      `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected','superseded') ORDER BY created_at DESC LIMIT 1`,
       [booking.id]
     );
     if (!agQ.rows[0]) return { status: "skip", detail: "no agreement exists for this booking" };
@@ -3887,7 +3887,7 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     const t0 = Date.now();
     try {
       const agRes = await p.query(
-        `SELECT * FROM agreements WHERE booking_id=$1 AND (void_at IS NULL OR void_at > NOW()) ORDER BY created_at DESC LIMIT 1`,
+        `SELECT * FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded') AND (void_at IS NULL OR void_at > NOW()) ORDER BY created_at DESC LIMIT 1`,
         [booking.id]);
       if (agRes.rows[0]) {
         agreement = agRes.rows[0];
@@ -5763,7 +5763,7 @@ app.post("/api/migrate/payment-pipeline-diag", async (req, res) => {
 
     // 3. Agreements
     const agRes = await dPool.query(
-      `SELECT id, agreement_number, status, verification_token, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled')`, [b.id]
+      `SELECT id, agreement_number, status, verification_token, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded')`, [b.id]
     );
     step("agreements", { count: agRes.rows.length, rows: agRes.rows.map(r => ({ agreement_number: r.agreement_number, status: r.status, signed: !!r.signed_at, token_set: !!r.verification_token })) });
 

@@ -102,6 +102,7 @@ export default function AgreementCenter() {
   const [statusUpdating,setStatusUpdating]= useState(false);
   const [backfilling,   setBackfilling]   = useState(false);
   const [backfillResult,setBackfillResult]= useState<{ found: number; created: number } | null>(null);
+  const [kycAlert,      setKycAlert]      = useState<{ message: string; missingFields: string[]; bookingId?: string } | null>(null);
 
   // Hotel / Flight edit modal
   const [detailsModal, setDetailsModal] = useState<{ id: string } | null>(null);
@@ -144,8 +145,9 @@ export default function AgreementCenter() {
     finally { setAuditLoading(false); }
   };
 
-  const doAction = async (action: string, id: string, extra?: any) => {
+  const doAction = async (action: string, id: string, extra?: any, bookingId?: string) => {
     setActionLoading(action + id);
+    setKycAlert(null);
     try {
       const urlMap: Record<string, string> = {
         cancel:          `${API}/api/agreements/${id}/cancel`,
@@ -159,6 +161,11 @@ export default function AgreementCenter() {
         body: JSON.stringify(extra || {}),
       });
       const d = await r.json();
+      // 422: KYC validation failure — show inline alert instead of generic toast
+      if (r.status === 422 && d.missingFields) {
+        setKycAlert({ message: d.error, missingFields: d.missingFields, bookingId });
+        return;
+      }
       if (d.ok) {
         toast({ title: "Success", description: "Action completed successfully" });
         loadAgreements(page);
@@ -272,6 +279,30 @@ export default function AgreementCenter() {
   return (
     <AdminLayout>
       <div style={{ padding: "24px", maxWidth: 1400, margin: "0 auto" }}>
+
+        {/* ── KYC Validation Alert ── */}
+        {kycAlert && (
+          <div style={{ background: "#FFF3CD", border: "2px solid #FFC107", borderRadius: 8, padding: "14px 18px", marginBottom: 18, position: "relative" }}>
+            <button onClick={() => setKycAlert(null)} style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", cursor: "pointer", color: "#856404", fontSize: 20, lineHeight: 1 }}>×</button>
+            <div style={{ fontWeight: 700, color: "#856404", fontSize: 14, marginBottom: 6 }}>
+              ⚠️ Agreement blocked — customer profile is incomplete
+            </div>
+            <div style={{ color: "#856404", fontSize: 13, marginBottom: 8 }}>{kycAlert.message}</div>
+            <div style={{ fontWeight: 600, color: "#6d4c00", fontSize: 12, marginBottom: 4 }}>Required fields missing:</div>
+            <ul style={{ margin: "0 0 12px", paddingLeft: 20, color: "#856404", fontSize: 13 }}>
+              {kycAlert.missingFields.map(f => <li key={f}>{f}</li>)}
+            </ul>
+            <div style={{ display: "flex", gap: 8 }}>
+              <a href={kycAlert.bookingId ? `/admin/customers?booking=${kycAlert.bookingId}` : "/admin/customers"}
+                style={{ display: "inline-block", background: "#856404", color: "white", padding: "6px 14px", borderRadius: 6, textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+                ✏️ Edit Customer Profile
+              </a>
+              <button onClick={() => setKycAlert(null)} style={{ background: "none", border: "1px solid #856404", color: "#856404", padding: "6px 14px", borderRadius: 6, fontSize: 12, cursor: "pointer" }}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Header ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -403,7 +434,7 @@ export default function AgreementCenter() {
                             {ag.status !== "cancelled" ? (
                               <button onClick={e => { e.stopPropagation(); setCancelModal({ id: ag.id }); }} style={btnStyle("#CC0000")}>✕</button>
                             ) : (
-                              <button onClick={e => { e.stopPropagation(); doAction("regenerate", ag.id); }} disabled={isLoading("regenerate" + ag.id)} style={btnStyle(GOLD, "#1a0a00")}>↻</button>
+                              <button onClick={e => { e.stopPropagation(); doAction("regenerate", ag.id, {}, ag.booking_id); }} disabled={isLoading("regenerate" + ag.id)} style={btnStyle(GOLD, "#1a0a00")}>↻</button>
                             )}
                           </div>
                         </td>
@@ -581,7 +612,7 @@ export default function AgreementCenter() {
                       ✕ Cancel Agreement
                     </button>
                   ) : (
-                    <button onClick={() => doAction("regenerate", selected.id)} disabled={!!actionLoading} style={panelBtnStyle(GOLD, "#1a0a00")}>
+                    <button onClick={() => doAction("regenerate", selected.id, {}, (selected as any).booking_id)} disabled={!!actionLoading} style={panelBtnStyle(GOLD, "#1a0a00")}>
                       ↻ Regenerate Agreement
                     </button>
                   )}

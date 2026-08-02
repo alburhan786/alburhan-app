@@ -114,7 +114,7 @@ router.post("/:id/confirm", requireAdmin as any, async (req: AuthenticatedReques
        FROM bookings b
        WHERE b.id = ag.booking_id
          AND b.group_id = $2
-         AND ag.status NOT IN ('cancelled','void')
+         AND ag.status NOT IN ('cancelled','void','superseded')
        RETURNING ag.id, ag.status, ag.agreement_number, b.customer_name, b.customer_mobile, b.customer_email, b.booking_number`,
       [flight_info, flight.groupId]
     );

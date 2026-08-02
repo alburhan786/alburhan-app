@@ -134,7 +134,7 @@ router.get("/:bookingId/steps", requireAuth as any, async (req: AuthenticatedReq
 
     // Agreement status
     const agRes = await pool.query(
-      `SELECT status, created_at, updated_at FROM agreements WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      `SELECT status, created_at, updated_at FROM agreements WHERE booking_id = $1 AND status NOT IN ('cancelled','superseded') ORDER BY created_at DESC LIMIT 1`,
       [bookingId]
     );
     const agreement = agRes.rows[0] || null;

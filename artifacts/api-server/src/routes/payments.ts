@@ -1906,7 +1906,7 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
     try {
       const agrQ = await pool.query(
         `SELECT id, agreement_number, status, access_token, access_token_expires_at, created_at
-         FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+         FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected','superseded') ORDER BY created_at DESC LIMIT 1`,
         [row.id]
       );
       if (agrQ.rows.length > 0) {

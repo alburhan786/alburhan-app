@@ -803,7 +803,7 @@ export function startAgreementIntegrityCron() {
       const orphaned = await pool.query(
         `SELECT a.agreement_number FROM agreements a
            LEFT JOIN bookings b ON b.id = a.booking_id
-          WHERE b.id IS NULL AND a.status != 'cancelled'`
+          WHERE b.id IS NULL AND a.status NOT IN ('cancelled','superseded')`
       );
       if (orphaned.rows.length > 0) {
         console.log(`[AgreementIntegrity] ⚠️ ${orphaned.rows.length} orphaned agreement(s) (no booking):`);
@@ -815,7 +815,7 @@ export function startAgreementIntegrityCron() {
         `SELECT b.booking_number FROM bookings b
           WHERE b.status IN ('approved','confirmed','partially_paid')
             AND NOT EXISTS (
-              SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status != 'cancelled'
+              SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','superseded')
             )`
       );
       if (missing.rows.length > 0) {
@@ -823,7 +823,7 @@ export function startAgreementIntegrityCron() {
         missing.rows.forEach((r: any) => console.log(`  • ${r.booking_number}`));
       }
 
-      const total = await pool.query(`SELECT COUNT(*) FROM agreements WHERE status != 'cancelled'`);
+      const total = await pool.query(`SELECT COUNT(*) FROM agreements WHERE status NOT IN ('cancelled','superseded')`);
       const fixed0 = fixed.rowCount || 0;
       const issues = orphaned.rows.length + missing.rows.length;
       if (issues === 0 && fixed0 === 0) {

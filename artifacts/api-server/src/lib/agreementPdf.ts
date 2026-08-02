@@ -2,6 +2,7 @@
 import PDFDocument from "pdfkit";
 import { LOGO_BASE64 } from "./logoData.js";
 import QRCode from "qrcode";
+import { loadNotoSansFont } from "./fontLoader.js";
 
 // ── Colour & layout constants ─────────────────────────────────────────────────
 const LOGO_BUF  = Buffer.from(LOGO_BASE64, "base64");
@@ -40,9 +41,20 @@ function fmtDate(v: any, fallback = "—"): string {
   if (!v) return fallback;
   try { return new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); } catch { return fallback; }
 }
-function fmtMoney(v: any): string {
+/**
+ * Format a currency amount. `hasNoto` is passed per-document from
+ * `AgreementPdfOptions.hasNoto` — never read from module-level state so
+ * concurrent PDF generations cannot interfere.
+ */
+function fmtMoney(v: any, hasNoto?: boolean): string {
   const n = Number(v || 0);
-  return "₹\u00A0" + n.toLocaleString("en-IN");
+  const prefix = hasNoto ? "\u20B9\u00A0" : "Rs.\u00A0";
+  return prefix + n.toLocaleString("en-IN");
+}
+/** Render a money string using Noto Sans (supports ₹) when available, else Helvetica. */
+function textMoney(doc: any, value: string, x: number, y: number, drawOpts: any = {}, hasNoto?: boolean) {
+  const font = hasNoto ? "NotoSans" : "Helvetica";
+  doc.font(font).text(value, x, y, drawOpts);
 }
 function maskAadhaar(v: any): string {
   if (!v) return "—";
@@ -196,6 +208,32 @@ export const HAJJ_AGREEMENT_CLAUSES = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PACKAGE CLASS HELPER
+// Classifies the raw DB package type into a display class used throughout the PDF.
+// 'hajj'    — Hajj / Special Hajj      (Makkah + Madinah + Aziziyah + Mina)
+// 'umrah'   — Umrah / Ramadan Umrah    (Makkah + Madinah)
+// 'ziyarat' — Iraq / Baitul Muqaddas / Syria-Jordan Ziyarat (Makkah + Madinah + city)
+// 'other'   — Custom tour or anything else
+// ─────────────────────────────────────────────────────────────────────────────
+export function getPackageClass(t: string | null | undefined): "hajj" | "umrah" | "ziyarat" | "other" {
+  if (!t) return "other";
+  const l = t.toLowerCase();
+  if (l.includes("hajj")) return "hajj";
+  if (l.includes("umrah") || l.includes("ramadan")) return "umrah";
+  if (l.includes("ziyarat") || l.includes("iraq") || l.includes("baitul") || l.includes("syria") || l.includes("jordan")) return "ziyarat";
+  return "other";
+}
+
+/** Return value or a context-appropriate placeholder. */
+export function flightVal(v: any, kind: "airline" | "number" | "datetime" | "general" = "general"): string {
+  if (v != null && v !== "" && v !== "—") return String(v);
+  if (kind === "airline")   return "As per final ticket";
+  if (kind === "datetime")  return "To be confirmed";
+  if (kind === "number")    return "To be confirmed";
+  return "—";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN OPTIONS INTERFACE
 // ─────────────────────────────────────────────────────────────────────────────
 export interface AgreementPdfOptions {
@@ -232,7 +270,8 @@ export interface AgreementPdfOptions {
   passportPhotoBuffer?: Buffer | null;
   // Package
   packageName?: string | null;
-  packageType?: string | null;
+  packageType?: string | null;      // display label (may be admin-set in hotel_info)
+  packageTypeDb?: string | null;    // raw type from packages table (umrah/hajj/etc.)
   packageCategory?: string | null;
   hajjYear?: string | null;
   numberOfPilgrims?: number | null;
@@ -244,6 +283,7 @@ export interface AgreementPdfOptions {
   groupNumber?: string | null;
   maktabNumber?: string | null;
   bookingStatus?: string | null;
+  revisionNumber?: number | null;
   // Hotels
   makkahHotel?: string | null;
   makkahCategory?: string | null;
@@ -288,10 +328,17 @@ export interface AgreementPdfOptions {
   discountAmount?: number | null;
   gstAmount?: number | null;
   tcsAmount?: number | null;
+  tcsPercentage?: number | null;    // TCS rate used (default 2)
+  tcsApplicable?: boolean;          // whether TCS was computed / applicable
   govtCharges?: number | null;
   visaCharges?: number | null;
   dueDate?: string | null;
   paymentStatus?: string | null;
+  // Visa
+  visaIncluded?: boolean | null;    // true = included in package, false = excluded, null = unknown
+  visaType?: string | null;         // e.g. "Hajj Visa", "Umrah Visa"
+  visaStatus?: string | null;       // pending / applied / approved / not_included
+  visaNotes?: string | null;
   // Signing & verification
   signatureData?: string | null;
   signedAt?: Date | null;
@@ -308,6 +355,8 @@ export interface AgreementPdfOptions {
   verificationUrl?: string;
   termsAccepted?: Record<string, boolean>;
   auditActions?: Array<{ action: string; details: any; created_at: string }>;
+  /** True when Noto Sans was successfully registered for this document (supports ₹). Document-scoped — set by generateAgreementPdfBuffer. */
+  hasNoto?: boolean;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -461,29 +510,34 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
   // ── Financial Summary ─────────────────────────────────────────────────────
   y = secBar(doc, y, "FINANCIAL SUMMARY");
 
-  const total = Number(o.totalAmount || 0);
-  const paid  = Number(o.paidAmount || 0);
-  const bal   = Number(o.balanceAmount ?? (total - paid));
-  const disc  = Number(o.discountAmount || 0);
-  const gst   = Number(o.gstAmount || 0);
-  const tcs   = Number(o.tcsAmount || 0);
-  const govt  = Number(o.govtCharges || 0);
-  const visa  = Number(o.visaCharges || 0);
+  const total      = Number(o.totalAmount || 0);
+  const paid       = Number(o.paidAmount || 0);
+  const bal        = Number(o.balanceAmount ?? (total - paid));
+  const disc       = Number(o.discountAmount || 0);
+  const gst        = Number(o.gstAmount || 0);
+  const tcs        = Number(o.tcsAmount || 0);
+  const tcsRate    = Number(o.tcsPercentage ?? 2);
+  const govt       = Number(o.govtCharges || 0);
+  const visa       = Number(o.visaCharges || 0);
 
   const finCW1 = CW * 0.50;
   const finCW2 = CW * 0.25;
   const finCW3 = CW - finCW1 - finCW2;
 
+  // TCS label: always show rate; value shows amount if > 0, else clarify it is included in total
+  const tcsLabel = tcs > 0 ? `TCS @ ${tcsRate}%` : `TCS (${tcsRate}%)`;
+  const tcsValue = tcs > 0 ? fmtMoney(tcs, o.hasNoto) : (o.tcsApplicable !== false ? "Included in total" : "—");
+
   const finRows: [string, string, boolean][] = [
-    ["Package Base Amount",       fmtMoney(total + disc - gst - tcs - govt - visa), false],
-    ["GST Applicable",            gst > 0 ? fmtMoney(gst) : "Included",            false],
-    ["TCS Applicable",            tcs > 0 ? fmtMoney(tcs) : "Included",            false],
-    ["Govt. Charges",             govt > 0 ? fmtMoney(govt) : "—",                 false],
-    ["Visa Charges",              visa > 0 ? fmtMoney(visa) : "—",                 false],
-    ["Discount / Waiver",         disc > 0 ? `- ${fmtMoney(disc)}` : "—",          false],
-    ["NET PACKAGE AMOUNT",        fmtMoney(total),                                  true],
-    ["Advance Paid to Date",      fmtMoney(paid),                                   false],
-    ["OUTSTANDING BALANCE",       fmtMoney(bal),                                    bal > 0],
+    ["Package Base Amount",       fmtMoney(total + disc - gst - tcs - govt - visa, o.hasNoto), false],
+    ["GST Applicable",            gst > 0 ? fmtMoney(gst, o.hasNoto) : "Included",            false],
+    [tcsLabel,                    tcsValue,                                                      false],
+    ["Govt. Charges",             govt > 0 ? fmtMoney(govt, o.hasNoto) : "—",                 false],
+    ["Visa Charges",              visa > 0 ? fmtMoney(visa, o.hasNoto) : "—",                 false],
+    ["Discount / Waiver",         disc > 0 ? `- ${fmtMoney(disc, o.hasNoto)}` : "—",          false],
+    ["NET PACKAGE AMOUNT",        fmtMoney(total, o.hasNoto),                                   true],
+    ["Advance Paid to Date",      fmtMoney(paid, o.hasNoto),                                    false],
+    ["OUTSTANDING BALANCE",       fmtMoney(bal, o.hasNoto),                                     bal > 0],
     ["Due Date",                  fmtDate(o.dueDate),                               false],
     ["Payment Status",            fmt(o.paymentStatus, paid >= total ? "Paid" : "Partially Paid"), false],
   ];
@@ -491,10 +545,16 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
   finRows.forEach(([label, value, hl], i) => {
     const rowY = y + i * 14;
     const bgFill = hl && i === 6 ? LG : (hl ? "#FFF3CD" : (i % 2 === 0 ? "white" : "#FAFAFA"));
+    const isMoney = value.startsWith("Rs.") || value.startsWith("\u20B9") || value.startsWith("-\u00A0Rs.") || value.startsWith("-\u00A0\u20B9");
     doc.rect(M, rowY, CW, 13).fill(bgFill);
     doc.fill("#666").font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(7.5).text(label, M + 6, rowY + 3, { width: finCW1 - 6 });
-    doc.fill(hl ? DG : GREY_DARK).font(hl ? "Helvetica-Bold" : "Helvetica").fontSize(7.5)
-      .text(value, M + finCW1, rowY + 3, { width: finCW2 + finCW3 - 6, align: "right" });
+    doc.fill(hl ? DG : GREY_DARK).fontSize(7.5);
+    if (isMoney && !hl) {
+      textMoney(doc, value, M + finCW1, rowY + 3, { width: finCW2 + finCW3 - 6, align: "right" }, o.hasNoto);
+    } else {
+      doc.font(hl ? "Helvetica-Bold" : "Helvetica")
+         .text(value, M + finCW1, rowY + 3, { width: finCW2 + finCW3 - 6, align: "right" });
+    }
   });
   y += finRows.length * 14 + 4;
 
@@ -507,22 +567,31 @@ function drawPage1(doc: any, o: AgreementPdfOptions, qrBuf: Buffer | null) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PAGE 2 — FLIGHTS + HOTELS + TRANSPORT + INCLUDES / EXCLUDES
+// Package-type aware: Hajj gets 4-column hotel layout; Umrah/Ziyarat get 2-column.
 // ══════════════════════════════════════════════════════════════════════════════
 function drawPage2(doc: any, o: AgreementPdfOptions) {
   let y = CONTENT_Y + 2;
   const cellH = 23;
   const g = 2;
+  const pkgClass = getPackageClass(o.packageTypeDb || o.packageType);
+  const isHajj   = pkgClass === "hajj";
+  const isUmrah  = pkgClass === "umrah";
 
   // ── Flight Details ────────────────────────────────────────────────────────
   y = secBar(doc, y, "FLIGHT DETAILS");
 
   const fH = 70;
   doc.rect(M, y, CW, fH).fill(GOLD_LITE).stroke(GOLD);
-  // Flight grid
   const fCells = [
-    ["AIRLINE", fmt(o.airline)], ["FLIGHT NO.", fmt(o.flightNumber)], ["PNR", fmt(o.flightPnr)],
-    ["DEPARTURE AIRPORT", fmt(o.departureAirport)], ["TRANSIT", fmt(o.flightTransit)], ["DEPARTURE", fmt(o.flightDeparture)],
-    ["ARRIVAL", fmt(o.flightArrival)], ["CHECKED BAGGAGE", fmt(o.baggageAllowance, "25 KG")], ["CABIN BAGGAGE", fmt(o.cabinBaggage, "As per airline")],
+    ["AIRLINE",           flightVal(o.airline,          "airline")],
+    ["FLIGHT NO.",        flightVal(o.flightNumber,     "number")],
+    ["PNR",               flightVal(o.flightPnr,        "general")],
+    ["DEPARTURE AIRPORT", flightVal(o.departureAirport, "general")],
+    ["TRANSIT",           flightVal(o.flightTransit,    "general")],
+    ["DEPARTURE",         flightVal(o.flightDeparture,  "datetime")],
+    ["ARRIVAL",           flightVal(o.flightArrival,    "datetime")],
+    ["CHECKED BAGGAGE",   fmt(o.baggageAllowance, "25 KG")],
+    ["CABIN BAGGAGE",     fmt(o.cabinBaggage, "As per airline")],
   ];
   const fc3 = (CW - 2 * 2) / 3;
   const fcH = 20;
@@ -539,70 +608,105 @@ function drawPage2(doc: any, o: AgreementPdfOptions) {
 
   // ── Hotels ────────────────────────────────────────────────────────────────
   y = secBar(doc, y, "ACCOMMODATION DETAILS");
-
-  const hColW = (CW - 3 * 2) / 4;
   const hH = 84;
 
-  // Makkah
-  doc.rect(M, y, hColW, hH).fill(LG).stroke(DG);
-  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("MAKKAH", M + 5, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.makkahHotel, "To be confirmed"), M + 5, y + 16, { width: hColW - 10 });
-  if (o.makkahCategory) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.makkahCategory, M + 5, y + 32, { width: hColW - 10 }); }
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.makkahDistance, "~500m"), M + 5, y + 42, { width: hColW - 10 });
-  if (o.makkahAddress) { doc.fill(GREY_MID).font("Helvetica").fontSize(6).text(o.makkahAddress, M + 5, y + 52, { width: hColW - 10 }); }
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.makkahCheckIn), M + 5, y + 63, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.makkahCheckOut), M + 5, y + 73, { width: hColW - 10 });
-  doc.fill("black");
+  if (isHajj) {
+    // ── HAJJ: 4-column layout — Makkah | Madinah | Aziziyah | Mina ──────────
+    const hColW = (CW - 3 * 2) / 4;
 
-  // Madinah
-  const hX2 = M + hColW + 2;
-  doc.rect(hX2, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
-  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MADINAH", hX2 + 5, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.madinahHotel, "To be confirmed"), hX2 + 5, y + 16, { width: hColW - 10 });
-  if (o.madinahCategory) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.madinahCategory, hX2 + 5, y + 32, { width: hColW - 10 }); }
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.madinahDistance, "—"), hX2 + 5, y + 42, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.madinahCheckIn), hX2 + 5, y + 63, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.madinahCheckOut), hX2 + 5, y + 73, { width: hColW - 10 });
-  doc.fill("black");
+    // Makkah
+    doc.rect(M, y, hColW, hH).fill(LG).stroke(DG);
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("MAKKAH", M + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.makkahHotel, "To be confirmed"), M + 5, y + 16, { width: hColW - 10 });
+    if (o.makkahCategory) doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.makkahCategory, M + 5, y + 32, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.makkahDistance, "~500m"), M + 5, y + 42, { width: hColW - 10 });
+    if (o.makkahAddress) doc.fill(GREY_MID).font("Helvetica").fontSize(6).text(o.makkahAddress, M + 5, y + 52, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.makkahCheckIn), M + 5, y + 63, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.makkahCheckOut), M + 5, y + 73, { width: hColW - 10 });
+    doc.fill("black");
 
-  // Aziziyah
-  const hX3 = hX2 + hColW + 2;
-  doc.rect(hX3, y, hColW, hH).fill(LG).stroke(DG);
-  doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("AZIZIYAH", hX3 + 5, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.aziziyahHotel, "To be confirmed"), hX3 + 5, y + 16, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.aziziyahDistance, "~5 km"), hX3 + 5, y + 42, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.aziziyahCheckIn), hX3 + 5, y + 63, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.aziziyahCheckOut), hX3 + 5, y + 73, { width: hColW - 10 });
-  doc.fill("black");
+    // Madinah
+    const hX2 = M + hColW + 2;
+    doc.rect(hX2, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
+    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MADINAH", hX2 + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.madinahHotel, "To be confirmed"), hX2 + 5, y + 16, { width: hColW - 10 });
+    if (o.madinahCategory) doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Category: " + o.madinahCategory, hX2 + 5, y + 32, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.madinahDistance, "—"), hX2 + 5, y + 42, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.madinahCheckIn), hX2 + 5, y + 63, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.madinahCheckOut), hX2 + 5, y + 73, { width: hColW - 10 });
+    doc.fill("black");
 
-  // Mina
-  const hX4 = hX3 + hColW + 2;
-  doc.rect(hX4, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
-  doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MINA", hX4 + 5, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text("Zone 5 (New Mina)", hX4 + 5, y + 16, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent Category: " + fmt(o.minaCategory, "Category D"), hX4 + 5, y + 32, { width: hColW - 10 });
-  if (o.minaTentNumber) { doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent No.: " + o.minaTentNumber, hX4 + 5, y + 42, { width: hColW - 10 }); }
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Maktab No.: " + fmt(o.minaMaktabNumber || o.maktabNumber, "To Be Assigned"), hX4 + 5, y + 52, { width: hColW - 10 });
-  doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Zone: " + fmt(o.minaZone, "Zone 5 (New Mina)"), hX4 + 5, y + 63, { width: hColW - 10 });
-  doc.fill("black");
+    // Aziziyah
+    const hX3 = hX2 + hColW + 2;
+    doc.rect(hX3, y, hColW, hH).fill(LG).stroke(DG);
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("AZIZIYAH", hX3 + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text(fmt(o.aziziyahHotel, "To be confirmed"), hX3 + 5, y + 16, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Dist. from Haram: " + fmt(o.aziziyahDistance, "~5 km"), hX3 + 5, y + 42, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-in: " + fmtDate(o.aziziyahCheckIn), hX3 + 5, y + 63, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Check-out: " + fmtDate(o.aziziyahCheckOut), hX3 + 5, y + 73, { width: hColW - 10 });
+    doc.fill("black");
+
+    // Mina
+    const hX4 = hX3 + hColW + 2;
+    doc.rect(hX4, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
+    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MINA", hX4 + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(7.5).text("Zone 5 (New Mina)", hX4 + 5, y + 16, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent Category: " + fmt(o.minaCategory, "Category D"), hX4 + 5, y + 32, { width: hColW - 10 });
+    if (o.minaTentNumber) doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Tent No.: " + o.minaTentNumber, hX4 + 5, y + 42, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Maktab No.: " + fmt(o.minaMaktabNumber || o.maktabNumber, "To Be Assigned"), hX4 + 5, y + 52, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text("Zone: " + fmt(o.minaZone, "Zone 5 (New Mina)"), hX4 + 5, y + 63, { width: hColW - 10 });
+    doc.fill("black");
+
+  } else {
+    // ── UMRAH / ZIYARAT / OTHER: 2-column layout — Makkah | Madinah ──────────
+    const hColW = (CW - 2) / 2;
+
+    // Makkah
+    doc.rect(M, y, hColW, hH).fill(LG).stroke(DG);
+    doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("MAKKAH", M + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(8).text(fmt(o.makkahHotel, "To be confirmed"), M + 5, y + 16, { width: hColW - 10 });
+    if (o.makkahCategory) doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Category: " + o.makkahCategory, M + 5, y + 32, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Dist. from Haram: " + fmt(o.makkahDistance, "—"), M + 5, y + 44, { width: hColW - 10 });
+    if (o.makkahAddress) doc.fill(GREY_MID).font("Helvetica").fontSize(6.5).text(o.makkahAddress, M + 5, y + 55, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Check-in: " + fmtDate(o.makkahCheckIn), M + 5, y + 64, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Check-out: " + fmtDate(o.makkahCheckOut), M + 5, y + 74, { width: hColW - 10 });
+    doc.fill("black");
+
+    // Madinah
+    const hX2b = M + hColW + 2;
+    doc.rect(hX2b, y, hColW, hH).fill(GOLD_LITE).stroke(GOLD);
+    doc.fill("#7B4700").font("Helvetica-Bold").fontSize(7).text("MADINAH", hX2b + 5, y + 5);
+    doc.fill(GREY_DARK).font("Helvetica-Bold").fontSize(8).text(fmt(o.madinahHotel, "To be confirmed"), hX2b + 5, y + 16, { width: hColW - 10 });
+    if (o.madinahCategory) doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Category: " + o.madinahCategory, hX2b + 5, y + 32, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Dist. from Haram: " + fmt(o.madinahDistance, "—"), hX2b + 5, y + 44, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Check-in: " + fmtDate(o.madinahCheckIn), hX2b + 5, y + 64, { width: hColW - 10 });
+    doc.fill(GREY_MID).font("Helvetica").fontSize(7).text("Check-out: " + fmtDate(o.madinahCheckOut), hX2b + 5, y + 74, { width: hColW - 10 });
+    doc.fill("black");
+  }
 
   y += hH + 4;
 
   // Room sharing note
   doc.rect(M, y, CW, 18).fill(GREY_LITE).stroke("#DDD");
   doc.fill(DG).font("Helvetica-Bold").fontSize(7).text("ROOM SHARING:", M + 8, y + 5, { continued: true });
-  doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(`  ${fmt(o.roomSharing, "5-bed sharing standard")}  |  Upgrades available at extra charge  |  Subject to availability`, { continued: false });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(7).text(
+    `  ${fmt(o.roomSharing, isHajj ? "5-bed sharing standard" : "Sharing as per group")}  |  Upgrades available at extra charge  |  Subject to availability`,
+    { continued: false });
   doc.fill("black");
   y += 22;
 
   // ── Transportation ────────────────────────────────────────────────────────
   y = secBar(doc, y, "TRANSPORTATION");
 
+  const guideLabel    = isHajj ? "Hajj Guide" : (isUmrah ? "Umrah Guide" : "Tour Guide");
+  const transportNote = isHajj
+    ? "Officially arranged by Hajj authorities"
+    : "Included as per itinerary";
   const transCells = [
-    ["Airport Transfer", fmt(o.airportTransfer, "Included — India & Saudi Arabia")],
-    ["Bus Service", fmt(o.busService, "Group transport included")],
-    ["Hajj Guide", fmt(o.guideService, "Certified bilingual guide")],
-    ["Internal Hajj Transport", fmt(o.internalTransport, "Officially arranged by Hajj authorities")],
+    ["Airport Transfer",  fmt(o.airportTransfer, "Included — India & Destination")],
+    ["Bus Service",       fmt(o.busService, "Group transport included")],
+    [guideLabel,          fmt(o.guideService, "Certified bilingual guide")],
+    ["Internal Transport",fmt(o.internalTransport, transportNote)],
   ];
   const tW = (CW - 2) / 2;
   transCells.forEach(([lbl, val], i) => {
@@ -615,22 +719,57 @@ function drawPage2(doc: any, o: AgreementPdfOptions) {
   y += Math.ceil(transCells.length / 2) * (cellH + 2) + 6;
 
   // ── Package Includes ──────────────────────────────────────────────────────
-  y = secBar(doc, y, "PACKAGE INCLUSIONS  ✓");
+  y = secBar(doc, y, "PACKAGE INCLUSIONS  (included)");
 
-  const includes = [
-    "Return Economy Air Ticket (India ↔ KSA)",
-    "Hajj Visa Processing Assistance",
-    "Airport Assistance (India & Saudi Arabia)",
-    "Complete Accommodation (Makkah, Madinah, Aziziyah)",
-    "10 Days Accommodation in Aziziyah (~5 km from Haram)",
-    "5 Days Accommodation in Mina, Arafat & Muzdalifah",
-    "Breakfast, Lunch, Dinner & Tea (where provided)",
-    "Complete Hajj Guidance & Orientation Programme",
-    "Experienced Tour Manager & Religious Guide",
-    "Hajj Travel Kit, ID Card & Luggage Tag",
-    "Emergency Assistance (24/7)",
-    "Internal Hajj Transportation (officially arranged)",
-  ];
+  // Visa row is driven by visaIncluded flag
+  const visaIncStr = o.visaIncluded === false ? null
+    : o.visaIncluded === true
+      ? (isHajj ? "Hajj Visa Processing" : isUmrah ? "Umrah Visa Processing" : "Visa Processing")
+      : "Visa Processing Assistance";
+
+  let includes: string[];
+  if (isHajj) {
+    includes = [
+      "Return Economy Air Ticket (India \u2194 KSA)",
+      ...(visaIncStr ? [visaIncStr] : []),
+      "Airport Assistance (India & Saudi Arabia)",
+      "Complete Accommodation (Makkah, Madinah, Aziziyah)",
+      "5 Days Accommodation in Mina, Arafat & Muzdalifah",
+      "Breakfast, Lunch, Dinner & Tea (where provided)",
+      "Complete Hajj Guidance & Orientation Programme",
+      "Experienced Tour Manager & Religious Guide",
+      "Hajj Travel Kit, ID Card & Luggage Tag",
+      "Emergency Assistance (24/7)",
+      "Internal Hajj Transportation (officially arranged)",
+    ];
+  } else if (isUmrah) {
+    includes = [
+      "Return Economy Air Ticket (India \u2194 KSA)",
+      ...(visaIncStr ? [visaIncStr] : []),
+      "Airport Assistance (India & Saudi Arabia)",
+      "Accommodation in Makkah & Madinah",
+      "Breakfast & Dinner (where provided)",
+      "Umrah Guidance & Orientation Programme",
+      "Experienced Tour Manager & Religious Guide",
+      "Umrah Travel Kit, ID Card & Luggage Tag",
+      "Emergency Assistance (24/7)",
+      "Internal Group Transport (as per itinerary)",
+    ];
+  } else {
+    includes = [
+      "Return Air Ticket (as per itinerary)",
+      ...(visaIncStr ? [visaIncStr] : []),
+      "Airport Assistance (Origin & Destination)",
+      "Accommodation (all destinations per itinerary)",
+      "Breakfast & Dinner (where provided)",
+      "Tour Guidance & Orientation Programme",
+      "Experienced Tour Manager & Guide",
+      "Travel Kit, ID Card & Luggage Tag",
+      "Emergency Assistance (24/7)",
+      "Internal Group Transport (as per itinerary)",
+    ];
+  }
+
   const incHalf = (CW - 6) / 2;
   let leftY = y;
   includes.forEach((item, i) => {
@@ -641,20 +780,43 @@ function drawPage2(doc: any, o: AgreementPdfOptions) {
   y += Math.ceil(includes.length / 2) * 12 + 6;
 
   // ── Package Excludes ──────────────────────────────────────────────────────
-  y = secBar(doc, y, "PACKAGE EXCLUSIONS  ✗");
+  y = secBar(doc, y, "PACKAGE EXCLUSIONS  (not included)");
 
-  const excludes = [
-    "Transportation between Aziziyah and Masjid Al Haram",
-    "Transportation for Tawaf-e-Ziyarat",
-    "Laundry & Personal Services",
-    "Medical Expenses & Personal Shopping",
-    "International Calls & Data",
-    "Travel Insurance (unless specified)",
-    "Extra Meals beyond plan",
-    "Extra Baggage Charges",
-    "Room Upgrades (unless paid)",
-    "Any service not specifically mentioned",
-  ];
+  // Visa row goes into excludes if explicitly excluded
+  const visaExcStr = o.visaIncluded === false
+    ? (isHajj ? "Hajj Visa Charges (quoted separately)" : "Visa Charges (quoted separately)")
+    : null;
+
+  let excludes: string[];
+  if (isHajj) {
+    excludes = [
+      ...(visaExcStr ? [visaExcStr] : []),
+      "Transportation: Aziziyah to Masjid Al Haram",
+      "Transportation for Tawaf-e-Ziyarat",
+      "Laundry & Personal Services",
+      "Medical Expenses & Personal Shopping",
+      "International Calls & Data",
+      "Travel Insurance (unless specified)",
+      "Extra Meals beyond plan",
+      "Extra Baggage Charges",
+      "Room Upgrades (unless paid)",
+      "Any service not specifically mentioned",
+    ];
+  } else {
+    excludes = [
+      ...(visaExcStr ? [visaExcStr] : []),
+      "Laundry & Personal Services",
+      "Medical Expenses & Personal Shopping",
+      "International Calls & Data",
+      "Travel Insurance (unless specified)",
+      "Extra Meals beyond plan",
+      "Extra Baggage Charges",
+      "Room Upgrades (unless paid)",
+      "Optional excursions or side trips",
+      "Any service not specifically mentioned",
+    ];
+  }
+
   let excY = y;
   excludes.forEach((item, i) => {
     const col = i % 2;
@@ -664,13 +826,17 @@ function drawPage2(doc: any, o: AgreementPdfOptions) {
   y += Math.ceil(excludes.length / 2) * 12 + 6;
 
   // Accommodation policy note
+  const accNote = isHajj
+    ? "• Aziziyah accommodation approximately 5 km from Haram. Mina in New Mina Zone, Maktab as allocated.\n" +
+      "• Standard on 5-bed sharing. 3/2/single sharing requires additional charges.\n" +
+      "• Hotels may be changed to equivalent/higher category due to Saudi Government allocation. No room changes after allocation."
+    : "• Standard accommodation on sharing basis. Upgrades subject to availability and extra charge.\n" +
+      "• Hotels may be changed to equivalent/higher category. No room changes after allocation.\n" +
+      "• Meal plan subject to hotel policy at each destination.";
+
   doc.rect(M, y, CW, 42).fill(GREY_LITE).stroke("#DDD");
   doc.fill(DG).font("Helvetica-Bold").fontSize(7.5).text("ACCOMMODATION POLICY", M + 8, y + 5);
-  doc.fill(GREY_DARK).font("Helvetica").fontSize(6.8)
-    .text("• Aziziyah accommodation approximately 5 km from Haram. Mina accommodation in New Mina Zone, Maktab as allocated.\n" +
-      "• Standard accommodation on 5-bed sharing. 3-sharing, 2-sharing or single room requires additional charges.\n" +
-      "• Hotels may be changed to equivalent/higher category due to Saudi Government allocation. No room changes after allocation.",
-      M + 8, y + 17, { width: CW - 16, lineGap: 1 });
+  doc.fill(GREY_DARK).font("Helvetica").fontSize(6.8).text(accNote, M + 8, y + 17, { width: CW - 16, lineGap: 1 });
   doc.fill("black");
 }
 
@@ -1109,16 +1275,46 @@ export async function generateAgreementPdfBuffer(opts: AgreementPdfOptions): Pro
     try { qrBuf = await QRCode.toBuffer(opts.verificationUrl, { width: 130, margin: 1 }); } catch {}
   }
 
+  // ── Font setup (document-scoped, never written to module-level state) ───────
+  const notoBuf = await loadNotoSansFont().catch(() => null);
+  let docHasNoto = false;
+
   const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: true, bufferPages: true });
 
+  // Register Noto Sans if available — enables ₹ (U+20B9) and full Unicode
+  if (notoBuf) {
+    try {
+      doc.registerFont("NotoSans", notoBuf);
+      docHasNoto = true;
+    } catch (e: any) {
+      console.warn("[AgreementPdf] registerFont NotoSans failed:", e?.message);
+    }
+  }
+  // Embed font availability into opts so draw functions can use it without module-level state
+  opts = { ...opts, hasNoto: docHasNoto };
+
+  // Dynamic page 2 subtitle based on package type
+  const pkgClass = getPackageClass(opts.packageTypeDb || opts.packageType);
+  const p2Title = pkgClass === "hajj"
+    ? "FLIGHTS, HOTELS, TRANSPORT & PACKAGE SERVICES"
+    : pkgClass === "umrah"
+    ? "FLIGHTS, ACCOMMODATION, TRANSPORT & PACKAGE SERVICES"
+    : "FLIGHTS, ACCOMMODATION, TRANSPORT & TOUR SERVICES";
+
+  // Dynamic main title
+  const p1Title = pkgClass === "hajj"   ? "PREMIUM DIGITAL HAJJ AGREEMENT"
+    : pkgClass === "umrah"              ? "PREMIUM DIGITAL UMRAH AGREEMENT"
+    : pkgClass === "ziyarat"            ? "PREMIUM DIGITAL ZIYARAT AGREEMENT"
+    :                                    "PREMIUM DIGITAL TRAVEL AGREEMENT";
+
   // Page 1
-  drawHeader(doc, "PREMIUM DIGITAL HAJJ AGREEMENT", opts.agreementNumber, opts.bookingNumber);
+  drawHeader(doc, p1Title, opts.agreementNumber, opts.bookingNumber);
   drawPage1(doc, opts, qrBuf);
   drawFooter(doc, 1, 6);
 
   // Page 2
   doc.addPage();
-  drawHeader(doc, "FLIGHTS, HOTELS, TRANSPORT & PACKAGE SERVICES", opts.agreementNumber, opts.bookingNumber);
+  drawHeader(doc, p2Title, opts.agreementNumber, opts.bookingNumber);
   drawPage2(doc, opts);
   drawFooter(doc, 2, 6);
 
