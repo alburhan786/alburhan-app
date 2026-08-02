@@ -196,14 +196,20 @@ export async function resolveVariables(
     // Agreement
     if (event === "agreement_ready" || !vars.agreement_number) {
       const agrRow = await pool.query(
-        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+        `SELECT a.id, a.agreement_number, b.booking_number
+         FROM agreements a
+         LEFT JOIN bookings b ON b.id = a.booking_id
+         WHERE a.booking_id=$1 ORDER BY a.created_at DESC LIMIT 1`,
         [bookingId]
       ).catch(() => ({ rows: [] }));
       if (agrRow.rows.length) {
         const agr = agrRow.rows[0];
         if (!vars.agreement_number) vars.agreement_number = agr.agreement_number || agr.id?.slice(0,8).toUpperCase() || "";
-        // agreements table has no document_url column — use the public signing link
-        if (!vars.document_url) vars.document_url = `https://alburhantravels.com/sign-agreement/${agr.id}`;
+        // Use booking_number in public signing URL (short, readable, matches what WhatsApp message sends)
+        if (!vars.document_url) {
+          const linkId = agr.booking_number || agr.id;
+          vars.document_url = `https://alburhantravels.com/sign-agreement/${linkId}`;
+        }
       }
     }
 

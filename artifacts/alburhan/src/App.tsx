@@ -16,6 +16,7 @@ import Contact from "@/pages/public/Contact";
 import { PrivacyPolicy, TermsAndConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
 import Invoice from "@/pages/public/Invoice";
 import PaymentPage from "@/pages/public/PaymentPage";
+import PublicAgreementSign from "@/pages/public/PublicAgreementSign";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import DocumentCenter from "@/pages/customer/DocumentCenter";
@@ -312,6 +313,9 @@ function Router() {
 
       {/* Public Agreement Verification */}
       <Route path="/verify-agreement/:token" component={VerifyAgreement} />
+
+      {/* Public Agreement Signing — no auth required, link sent via WhatsApp/SMS/Email */}
+      <Route path="/sign-agreement/:token" component={PublicAgreementSign} />
 
       {/* Short portal aliases — redirect to full paths */}
       <Route path="/branch" component={() => <Redirect to="/branch/dashboard" />} />

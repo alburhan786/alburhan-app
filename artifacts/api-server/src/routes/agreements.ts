@@ -303,7 +303,8 @@ export async function autoGenerateAgreement(bookingId: string): Promise<void> {
     console.log(`[Agreement] Auto-generated ${agreementNumber} for booking ${booking.booking_number}`);
 
     // Notify customer via WhatsApp — agreement_ready template (fire-and-forget)
-    const signingUrl = `https://alburhantravels.com/sign-agreement/${verificationToken}`;
+    // Use booking_number (ABT...) so the link is short, readable, and doesn't expose internal UUIDs.
+    const signingUrl = `https://alburhantravels.com/sign-agreement/${booking.booking_number}`;
     const notifyMobile = booking.customer_mobile || booking.whatsapp_number || booking.mobile_india;
     console.log(`[Agreement] Triggering agreement_generated workflow for ${booking.booking_number} | mobile=${notifyMobile ? notifyMobile.slice(-4).padStart(notifyMobile.length, "*") : "MISSING"}`);
     triggerWorkflow("agreement_generated", {
@@ -401,6 +402,266 @@ router.get("/verify/:token", async (req, res) => {
   } catch (err: any) {
     console.error(`[AgreementVerify] ❌ Exception:`, err);
     res.status(500).json({ error: "Verification failed", detail: err?.message || "Unknown error" });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PUBLIC SIGNING ROUTES — no auth required, secured by token / booking number
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Lookup an agreement from any of: booking_number (ABT...), verification_token (UUID),
+ *  internal agreement id (UUID), or agreement_number (ABT-AGR-...).
+ *  Uses RICH_SELECT so all downstream PDF/sign helpers work with the returned row. */
+async function lookupByPublicToken(token: string): Promise<any | null> {
+  // ① Booking number — most common case (link format: /sign-agreement/ABT26373792)
+  if (/^ABT\d+$/i.test(token)) {
+    const r = await pool.query(
+      RICH_SELECT +
+      `WHERE b.booking_number = $1 AND a.status != 'cancelled'
+       ORDER BY a.created_at DESC LIMIT 1`,
+      [token]
+    );
+    if (r.rows[0]) return r.rows[0];
+  }
+
+  // ② UUID — could be verification_token or internal id
+  if (isUUID(token)) {
+    const r1 = await pool.query(RICH_SELECT + `WHERE a.verification_token = $1 LIMIT 1`, [token]);
+    if (r1.rows[0]) return r1.rows[0];
+    const r2 = await pool.query(RICH_SELECT + `WHERE a.id = $1 LIMIT 1`, [token]);
+    if (r2.rows[0]) return r2.rows[0];
+  }
+
+  // ③ Agreement number (e.g. ABT-AGR-2026-000001)
+  const r3 = await pool.query(
+    RICH_SELECT + `WHERE a.agreement_number = $1 LIMIT 1`, [token]
+  );
+  return r3.rows[0] || null;
+}
+
+// ── PUBLIC: Get agreement data for the signing page ───────────────────────────
+// GET /api/agreements/sign/:token
+router.get("/sign/:token", async (req, res) => {
+  const { token } = req.params;
+  console.log(`[Agreement/Public] ▶ sign GET token="${token}"`);
+  try {
+    const ag = await lookupByPublicToken(token);
+    if (!ag) {
+      return res.status(404).json({
+        code: "AGREEMENT_NOT_FOUND",
+        error: "Agreement not found. Please check your link or contact support.",
+      });
+    }
+
+    const siteBase = getSiteBase();
+    const verificationUrl = `${siteBase}/verify-agreement/${ag.verification_token || ag.agreement_number}`;
+    const clauses = CONSENT_CATEGORIES.map(c => ({ id: c.id, title: c.title, body: c.body }));
+    const finalAmt   = Number(ag.final_amount  || 0);
+    const paidAmt    = Number(ag.paid_amount    || 0);
+
+    res.json({
+      id:             ag.id,
+      agreementNumber:ag.agreement_number,
+      bookingNumber:  ag.booking_number,
+      packageName:    ag.package_name      || "",
+      customerName:   ag.customer_name     || ag.user_name   || "Valued Customer",
+      customerMobile: ag.customer_mobile   ? `***${ag.customer_mobile.slice(-4)}` : "",
+      finalAmount:    finalAmt,
+      paidAmount:     paidAmt,
+      balanceAmount:  Math.max(0, finalAmt - paidAmt),
+      status:         ag.status,
+      signedAt:       ag.signed_at || null,
+      verificationUrl,
+      clauses,
+    });
+  } catch (err: any) {
+    console.error("[Agreement/Public] GET error:", err?.message);
+    res.status(500).json({ error: "Failed to load agreement" });
+  }
+});
+
+// ── PUBLIC: Request OTP ───────────────────────────────────────────────────────
+// POST /api/agreements/sign/:token/request-otp
+router.post("/sign/:token/request-otp", async (req, res) => {
+  const { token } = req.params;
+  console.log(`[Agreement/Public] ▶ request-otp token="${token}"`);
+  try {
+    const ag = await lookupByPublicToken(token);
+    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+    if (ag.status === "signed") return res.status(400).json({ error: "Agreement already signed" });
+
+    const mobile = ag.customer_mobile;
+    if (!mobile) return res.status(400).json({ error: "No mobile number on record for this booking. Please contact support." });
+
+    const otp    = String(Math.floor(100000 + Math.random() * 900000));
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+    await pool.query(
+      `UPDATE agreements SET signing_otp=$1, signing_otp_expires_at=$2, updated_at=NOW() WHERE id=$3`,
+      [otp, expiry, ag.id]
+    );
+
+    const smsOk = await sendOtpSMS(mobile, otp);
+    console.log(`[Agreement/Public] OTP ${smsOk ? "✅ sent" : "⚠ failed"} → ***${mobile.slice(-4)} agreement=${ag.agreement_number}`);
+
+    await logAgreementAudit(ag.id, "otp_requested_public", {
+      mobile: mobile.slice(-4).padStart(mobile.length, "*"),
+      sms_sent: smsOk,
+      booking_number: ag.booking_number,
+    }, getClientIp(req), req.headers["user-agent"] as string);
+
+    res.json({ ok: true, message: "OTP sent to your registered mobile number" });
+  } catch (err: any) {
+    console.error("[Agreement/Public] OTP error:", err?.message);
+    res.status(500).json({ error: "Failed to send OTP" });
+  }
+});
+
+// ── PUBLIC: Sign agreement ────────────────────────────────────────────────────
+// POST /api/agreements/sign/:token/sign
+router.post("/sign/:token/sign", async (req, res) => {
+  const { token } = req.params;
+  console.log(`[Agreement/Public] ▶ sign POST token="${token}"`);
+  try {
+    const { otp, signatureData, termsAccepted, signingBrowser, signingDevice, signingOS, signingGPS } = req.body;
+    if (!otp || !signatureData || !termsAccepted) {
+      return res.status(400).json({ error: "OTP, signature, and terms acceptance are required" });
+    }
+
+    const ag = await lookupByPublicToken(token);
+    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+
+    if (ag.status === "signed") {
+      return res.json({
+        ok: true, alreadySigned: true,
+        agreementNumber: ag.agreement_number,
+        message: "Agreement already signed. You can download your signed copy.",
+      });
+    }
+
+    if (!ag.signing_otp || ag.signing_otp !== String(otp)) {
+      return res.status(400).json({ error: "Invalid OTP. Please request a new one." });
+    }
+    if (!ag.signing_otp_expires_at || new Date() > new Date(ag.signing_otp_expires_at)) {
+      return res.status(400).json({ error: "OTP has expired. Please request a new one." });
+    }
+
+    const requiredConsents = CONSENT_CATEGORIES.map(c => c.id);
+    const unaccepted = requiredConsents.filter(cid => !termsAccepted[cid]);
+    if (unaccepted.length > 0) {
+      return res.status(400).json({ error: `Please accept all consent categories. Missing: ${unaccepted.join(", ")}` });
+    }
+
+    const ip        = getClientIp(req);
+    const userAgent = req.headers["user-agent"] || "";
+    const now       = new Date();
+    const siteBase  = getSiteBase();
+    const verificationUrl = `${siteBase}/verify-agreement/${ag.verification_token}`;
+
+    const signingMetadata = {
+      browser: signingBrowser || null, device: signingDevice || null,
+      os: signingOS || null, gps: signingGPS || null,
+      userAgent: userAgent.substring(0, 200), timestamp: now.toISOString(),
+    };
+    const hashInput = `${ag.id}:${ag.agreement_number}:${signatureData}:${now.toISOString()}:${ip}`;
+    const digitalHash = createHash("sha256").update(hashInput).digest("hex");
+
+    await pool.query(
+      `UPDATE agreements SET status='signed', signature_data=$1, terms_accepted=$2,
+         signed_at=$3, signed_ip=$4, signed_user_agent=$5,
+         otp_verified=true, otp_verified_at=$3,
+         signing_otp=NULL, signing_otp_expires_at=NULL,
+         signing_metadata=$6, digital_hash=$7, updated_at=NOW()
+       WHERE id=$8`,
+      [signatureData, JSON.stringify(termsAccepted), now, ip, userAgent, JSON.stringify(signingMetadata), digitalHash, ag.id]
+    );
+    await logAgreementAudit(ag.id, "agreement_signed_public", { ip, userAgent: userAgent.substring(0, 100), digitalHash: digitalHash.substring(0, 16) }, ip, userAgent);
+
+    // Notify
+    if (ag.customer_mobile) {
+      triggerWorkflow("agreement_signed", {
+        customerName: ag.customer_name || "Valued Customer",
+        customerMobile: ag.customer_mobile,
+        bookingNumber: ag.booking_number,
+        packageName: ag.package_name,
+        signedDate: now.toLocaleDateString("en-IN"),
+        bookingId: ag.booking_id,
+        customerId: ag.customer_id,
+      }).catch(e => console.error("[Agreement/Public] signed-notify failed:", e));
+    }
+
+    // Generate and deliver PDF (fire-and-forget after responding)
+    const agId = ag.id;
+    const customerId = ag.customer_id;
+    ;(async () => {
+      try {
+        const [customerPhotoBuffer, passportPhotoBuffer] = await Promise.all([
+          fetchImageBuffer(ag.photo_url).catch(() => null),
+          fetchImageBuffer(ag.passport_image_url).catch(() => null),
+        ]);
+        const pdfBuffer = await generateAgreementPdfBuffer(buildPdfOpts(ag, siteBase, {
+          signatureData, signedAt: now, signedIp: ip, userAgent,
+          otpVerified: true, otpVerifiedAt: now, verificationUrl,
+          termsAccepted, status: "signed",
+          customerPhotoBuffer: customerPhotoBuffer || null,
+          passportPhotoBuffer: passportPhotoBuffer || null,
+        }));
+        await pool.query(`UPDATE agreements SET pdf_generated=true, updated_at=NOW() WHERE id=$1`, [agId]);
+
+        const pdfFilename = `Agreement-${ag.agreement_number}.pdf`;
+        let savedFileUrl: string | null = null;
+        let savedDocId: string | null = null;
+        try {
+          savedFileUrl = await uploadToGCS(pdfBuffer, pdfFilename, "application/pdf", "agreements");
+          savedDocId = crypto.randomUUID();
+          await pool.query(
+            `INSERT INTO documents
+               (id, booking_id, document_type, file_name, file_key, file_url, uploaded_by,
+                customer_id, is_visible_to_customer, notification_sent,
+                file_size, mime_type, original_filename, created_at)
+             VALUES ($1,$2,'model_contract',$3,$4,$5,'admin',$6,true,false,$7,'application/pdf',$3,NOW())
+             ON CONFLICT DO NOTHING`,
+            [savedDocId, ag.booking_id, pdfFilename, savedFileUrl, savedFileUrl, customerId, pdfBuffer.length]
+          );
+        } catch (e: any) { console.warn("[Agreement/Public] doc save skipped:", e?.message); }
+
+        if (savedFileUrl && savedDocId) {
+          await sendDocumentToCustomer({
+            docId: savedDocId, bookingId: ag.booking_id, bookingNumber: ag.booking_number,
+            customerId, customerName: ag.customer_name || "Valued Customer",
+            customerMobile: ag.customer_mobile || "", customerEmail: ag.customer_email || ag.user_email || "",
+            documentType: "model_contract", fileName: pdfFilename, fileUrl: savedFileUrl, mimeType: "application/pdf",
+            packageName: ag.package_name || "Hajj Package",
+          }).catch(e => console.error("[Agreement/Public] PDF delivery failed:", e?.message));
+        }
+      } catch (e: any) {
+        console.error("[Agreement/Public] PDF generation failed:", e?.message);
+      }
+    })();
+
+    res.json({ ok: true, agreementNumber: ag.agreement_number, message: "Agreement signed successfully." });
+  } catch (err: any) {
+    console.error("[Agreement/Public] sign error:", err?.message);
+    res.status(500).json({ error: "Failed to sign agreement" });
+  }
+});
+
+// ── PUBLIC: Download PDF ──────────────────────────────────────────────────────
+// GET /api/agreements/sign/:token/pdf
+router.get("/sign/:token/pdf", async (req, res) => {
+  const { token } = req.params;
+  try {
+    const ag = await lookupByPublicToken(token);
+    if (!ag) return res.status(404).json({ error: "Agreement not found" });
+
+    const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
+    const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="Agreement-${safeName}.pdf"`);
+    res.send(buf);
+  } catch (err: any) {
+    console.error("[Agreement/Public] PDF error:", err?.message);
+    res.status(500).json({ error: "PDF generation failed" });
   }
 });
 
