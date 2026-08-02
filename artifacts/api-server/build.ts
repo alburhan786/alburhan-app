@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -148,6 +148,19 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy SQL migration files alongside the bundle so runtime file-reads work.
+  // The startup migration (index.ts v38 block) resolves migrations/ relative to
+  // dist/index.cjs — dist/migrations/ — using fileURLToPath(import.meta.url).
+  const migrationsDir = path.resolve(__dirname, "migrations");
+  const distMigrationsDir = path.resolve(distDir, "migrations");
+  try {
+    await cp(migrationsDir, distMigrationsDir, { recursive: true });
+    console.log("  📁 Copied migrations/ → dist/migrations/");
+  } catch (e: any) {
+    if (e.code !== "ENOENT") throw e; // ignore if migrations dir doesn't exist yet
+    console.warn("  ⚠️  migrations/ dir not found — skipping copy (no SQL migrations yet)");
+  }
 }
 
 buildAll().catch((err) => {

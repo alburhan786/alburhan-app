@@ -3839,26 +3839,37 @@ async function start() {
   // the transaction rolls back and the error surfaces here as CRITICAL.
   try {
     // ESM-compatible path: fileURLToPath(import.meta.url) gives the current file's path.
-    // In dev (tsx ESM): src/index.ts → src/ → ../migrations/
-    // On VPS (esbuild CJS bundle): dist/index.cjs → dist/ → ../migrations/
-    // esbuild injects an import.meta.url polyfill for CJS output automatically.
-    const v38SqlPath = path.join(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "migrations",
-      "v38-tenant-foundation.sql"
-    );
-    const v38Sql = fs.readFileSync(v38SqlPath, "utf8");
+    // esbuild's banner polyfill (build.ts) ensures import.meta.url resolves correctly
+    // in the CJS bundle via: __importMetaUrl = pathToFileURL(__filename).href
+    //
+    // The build step (build.ts) copies migrations/ → dist/migrations/ so both paths
+    // below exist after a production build. Try production-bundled path first, then
+    // fall back to dev source-tree path.
+    const thisDir = path.dirname(fileURLToPath(import.meta.url));
+    const v38SqlCandidates = [
+      // Production: dist/index.cjs → dist/migrations/ (build.ts copies migrations here)
+      path.join(thisDir, "migrations", "v38-tenant-foundation.sql"),
+      // Development: src/index.ts → src/../migrations/ = artifacts/api-server/migrations/
+      path.join(thisDir, "..", "migrations", "v38-tenant-foundation.sql"),
+    ];
+    let v38Sql: string | null = null;
+    for (const candidate of v38SqlCandidates) {
+      try { v38Sql = fs.readFileSync(candidate, "utf8"); break; } catch {}
+    }
+    if (!v38Sql) {
+      const tried = v38SqlCandidates.join(", ");
+      throw Object.assign(new Error(`SQL file not found in: ${tried}`), { code: "ENOENT" });
+    }
     await pool.query(v38Sql);
     console.log("[Migration] v38 tenant foundation SQL executed successfully");
   } catch (err: any) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      console.warn("[Migration] v38 SQL file not found — ensure migrations/ dir is present alongside dist/");
+      console.error("[Migration] v38 CRITICAL: SQL file not found — tenant foundation unapplied. Build did not copy migrations/.");
     } else {
-      // RAISE EXCEPTION from assertion DO block surfaces here
+      // RAISE EXCEPTION from the v38.9b assertion DO block surfaces here
       console.error("[Migration] v38 CRITICAL: tenant foundation migration failed:", err.message);
-      // Do not abort startup — Phase 3 gating will catch incomplete state before proceeding
     }
+    // Phase 3 middleware will enforce tenant_id != NULL and will surface any incomplete state
   }
 
   // ── Startup route confirmation ──────────────────────────────────────────────
