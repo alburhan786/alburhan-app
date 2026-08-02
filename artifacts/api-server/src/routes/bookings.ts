@@ -424,16 +424,86 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     } catch (_) { /* column may not exist yet on first deploy */ }
   }
 
+  // ── Customer-only supplements: group dates, invoice due date, doc tokens ────
+  // Kept behind the non-admin check so admin list requests are not slowed down
+  // by these extra queries (admin list has up to 200 rows per page).
+  let groupDates: Record<string, { departureDate: string | null; returnDate: string | null }> = {};
+  let paymentDueDates: Record<string, string | null> = {};
+  let bookingDocuments: Record<string, any[]> = {};
+
+  if (req.user?.role !== "admin" && bookingIds.length > 0) {
+    // Actual departure/return dates from the assigned hajj group
+    try {
+      const gdRes = await pool.query(
+        `SELECT b.id, hg.departure_date, hg.return_date
+         FROM   bookings b
+         JOIN   hajj_groups hg ON hg.id = b.group_id
+         WHERE  b.id = ANY($1)
+           AND  hg.departure_date IS NOT NULL`,
+        [bookingIds]
+      );
+      gdRes.rows.forEach((r: any) => {
+        groupDates[r.id] = {
+          departureDate: r.departure_date ?? null,
+          returnDate:    r.return_date    ?? null,
+        };
+      });
+    } catch (_) { /* hajj_groups may not be linked yet */ }
+
+    // Invoice payment due date
+    try {
+      const idRes = await pool.query(
+        `SELECT booking_id, due_date
+         FROM   invoices
+         WHERE  booking_id = ANY($1)`,
+        [bookingIds]
+      );
+      idRes.rows.forEach((r: any) => {
+        paymentDueDates[r.booking_id] = r.due_date ?? null;
+      });
+    } catch (_) { /* invoices table may not have due_date yet */ }
+
+    // Admin-uploaded travel documents with access tokens (latest per type)
+    try {
+      const docRes = await pool.query(
+        `SELECT DISTINCT ON (booking_id, document_type)
+                id, booking_id, document_type, file_name, mime_type, access_token, created_at
+         FROM   documents
+         WHERE  booking_id = ANY($1)
+           AND  uploaded_by = 'admin'
+           AND  is_visible_to_customer = TRUE
+           AND  (is_revoked IS NULL OR is_revoked = FALSE)
+           AND  access_token IS NOT NULL
+         ORDER  BY booking_id, document_type, created_at DESC`,
+        [bookingIds]
+      );
+      docRes.rows.forEach((r: any) => {
+        if (!bookingDocuments[r.booking_id]) bookingDocuments[r.booking_id] = [];
+        bookingDocuments[r.booking_id].push({
+          id:           r.id,
+          documentType: r.document_type,
+          fileName:     r.file_name,
+          mimeType:     r.mime_type,
+          accessToken:  r.access_token,
+        });
+      });
+    } catch (_) { /* access_token column added in v33.0 */ }
+  }
+
   res.json({
     bookings: rows.map(({ booking, package: pkg }) => ({
       ...formatBooking(booking),
-      lastPaymentDate: lastPaymentDates[booking.id] ?? null,
+      lastPaymentDate:  lastPaymentDates[booking.id]  ?? null,
+      departureDate:    groupDates[booking.id]?.departureDate ?? null,
+      returnDate:       groupDates[booking.id]?.returnDate    ?? null,
+      paymentDueDate:   paymentDueDates[booking.id]   ?? null,
+      documents:        bookingDocuments[booking.id]   ?? [],
       packageDetails: pkg ? {
-        duration: pkg.duration,
-        includes: pkg.includes,
-        highlights: pkg.highlights,
+        duration:       pkg.duration,
+        includes:       pkg.includes,
+        highlights:     pkg.highlights,
         departureDates: pkg.departureDates,
-        imageUrl: pkg.imageUrl,
+        imageUrl:       pkg.imageUrl,
       } : null,
     })),
     total: Number(totalCount),

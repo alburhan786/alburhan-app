@@ -102,11 +102,13 @@ router.post(
 
     // Use pool.query to support all enum values and new columns (avoids Drizzle type constraints)
     const docId = randomUUID();
+    const docAccessToken = randomUUID(); // secure token for public share URL (no expiry, revoke via is_revoked)
     const { rows: [doc] } = await pool.query(
       `INSERT INTO documents
          (id, booking_id, customer_id, document_type, file_name, original_filename,
-          file_key, file_url, file_size, mime_type, uploaded_by, is_visible_to_customer, notification_sent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE,FALSE)
+          file_key, file_url, file_size, mime_type, uploaded_by, is_visible_to_customer,
+          notification_sent, access_token)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE,FALSE,$12)
        RETURNING *`,
       [
         docId,
@@ -120,6 +122,7 @@ router.post(
         req.file.size,
         req.file.mimetype,
         req.user?.role === "admin" ? "admin" : "customer",
+        docAccessToken,
       ]
     );
 
@@ -311,6 +314,88 @@ router.patch("/:id/visibility", requireAuth as any, async (req: AuthenticatedReq
   }
 });
 
+// ── Public: secure shareable document link (no auth, token-gated) ────────────
+// GET /api/documents/public/:bookingNumber/:docType?token=ACCESS_TOKEN
+// Resolves and streams/redirects a document identified by an access_token.
+//
+// URL resolution by stored file_url format:
+//   • http(s)://…                     → 302 redirect (external CDN / legacy GCS signed URL)
+//   • /api/storage/objects/{prefix}/… → proxy: download from object storage, stream as attachment
+//   • /api/documents/files/{name}     → proxy: read from disk uploads directory, stream as attachment
+//
+// Never exposes raw storage paths externally — only this token-gated endpoint.
+router.get("/public/:bookingNumber/:docType", async (req, res) => {
+  const { bookingNumber, docType } = req.params;
+  const { token } = req.query as { token?: string };
+  if (!token) { res.status(401).json({ message: "Token required" }); return; }
+  try {
+    const { rows } = await pool.query(
+      `SELECT d.id, d.file_url, d.file_name, d.mime_type
+       FROM documents d
+       JOIN bookings b ON b.id = d.booking_id
+       WHERE b.booking_number = $1
+         AND d.document_type  = $2
+         AND d.access_token   = $3
+         AND d.is_visible_to_customer = TRUE
+         AND d.uploaded_by    = 'admin'
+         AND (d.is_revoked IS NULL OR d.is_revoked = FALSE)
+       ORDER BY d.created_at DESC
+       LIMIT 1`,
+      [bookingNumber, docType, token]
+    );
+    if (!rows[0]) {
+      res.status(404).json({ message: "Document not found or invalid token" });
+      return;
+    }
+    const fileUrl: string = rows[0].file_url || "";
+    const mimeType: string = rows[0].mime_type || "application/octet-stream";
+    const fileName: string = path.basename(rows[0].file_name || `document.bin`);
+
+    // ── Case 1: external/legacy HTTPS URL → redirect ──────────────────────────
+    if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+      res.redirect(302, fileUrl);
+      return;
+    }
+
+    // ── Case 2: Replit object storage → proxy (download + stream) ─────────────
+    if (fileUrl.startsWith("/api/storage/objects/")) {
+      const { objectStorageClient } = await import("../lib/objectStorage.js");
+      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+      if (!bucketId) {
+        console.error("[Documents/public] DEFAULT_OBJECT_STORAGE_BUCKET_ID not set");
+        res.status(503).json({ message: "Storage not configured" });
+        return;
+      }
+      const tail   = fileUrl.replace("/api/storage/objects/", "");
+      const gcsKey = `objects/${tail}`;
+      const [buffer] = await objectStorageClient.bucket(bucketId).file(gcsKey).download();
+      res.setHeader("Content-Type",        mimeType);
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(fileName)}"`);
+      res.setHeader("Cache-Control",       "private, max-age=3600");
+      res.status(200).send(buffer);
+      return;
+    }
+
+    // ── Case 3: disk fallback (/api/documents/files/… or bare filename) ────────
+    {
+      // path.basename strips any directory traversal components
+      const baseName = path.basename(fileUrl.replace("/api/documents/files/", "") || fileName);
+      const filePath = path.join(UPLOADS_DIR, baseName);
+      if (!fs.existsSync(filePath)) {
+        res.status(404).json({ message: "File not found on disk" });
+        return;
+      }
+      res.setHeader("Content-Type",        mimeType);
+      res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(baseName)}"`);
+      res.setHeader("Cache-Control",       "private, max-age=3600");
+      res.sendFile(filePath);
+    }
+  } catch (err: any) {
+    console.error("[Documents/public] error:", err?.message);
+    res.status(500).json({ message: "Failed to retrieve document" });
+  }
+});
+
 // ── Serve local fallback files (disk storage) ─────────────────────────────────
 router.get("/files/:filename", (req, res) => {
   const filename = path.basename(req.params.filename);
@@ -380,9 +465,26 @@ router.patch("/:id/revoke", requireAuth as any, async (req: AuthenticatedRequest
 });
 
 // ── List documents for a booking ─────────────────────────────────────────────
+// Ownership enforced: non-admin users may only list documents for bookings that
+// belong to them (customer_mobile match). access_token is included only when
+// the caller owns the booking or is an admin.
 router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
   try {
     const isAdmin = req.user?.role === "admin";
+
+    if (!isAdmin) {
+      // Verify the booking belongs to the requesting user
+      const bkRes = await pool.query(
+        `SELECT id, customer_mobile FROM bookings WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [req.params.bookingId]
+      );
+      const bk = bkRes.rows[0];
+      if (!bk) { res.status(404).json({ message: "Booking not found" }); return; }
+      if (bk.customer_mobile !== req.user?.mobile) {
+        res.status(403).json({ message: "Access denied" }); return;
+      }
+    }
+
     const { rows } = isAdmin
       ? await pool.query(
           `SELECT * FROM documents WHERE booking_id = $1 AND is_revoked = FALSE ORDER BY created_at ASC`,
@@ -393,7 +495,12 @@ router.get("/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, 
           [req.params.bookingId]
         );
 
-    res.json(rows.map(normalizeDoc));
+    // Strip access_token from admin responses (they use direct GCS URLs anyway)
+    res.json(rows.map(d => {
+      const norm = normalizeDoc(d);
+      if (isAdmin) { norm.accessToken = null; }
+      return norm;
+    }));
   } catch (err) {
     console.error("[Documents] list error:", err);
     res.json([]);
@@ -557,6 +664,7 @@ function normalizeDoc(d: any) {
     lastDownloadedAt: d.last_downloaded_at,
     isRevoked: d.is_revoked,
     createdAt: d.created_at,
+    accessToken: d.access_token ?? null,
   };
 }
 

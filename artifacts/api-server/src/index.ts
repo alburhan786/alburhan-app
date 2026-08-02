@@ -3034,6 +3034,22 @@ async function start() {
     console.log("[Migration] v32.0 notification_logs provider_message_id/failed_at/error_message ensured");
   } catch (err: any) { console.warn("[Migration] v32.0 notification_logs cols:", err.message); }
 
+  // ── v33.0 — documents: add access_token for secure public shareable links ───
+  try {
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS access_token TEXT`);
+    await pool.query(`
+      UPDATE documents
+      SET    access_token = gen_random_uuid()::text
+      WHERE  access_token IS NULL
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_docs_access_token
+      ON documents(access_token)
+      WHERE  access_token IS NOT NULL
+    `);
+    console.log("[Migration] v33.0 documents.access_token ensured + backfilled");
+  } catch (err: any) { console.warn("[Migration] v33.0 documents access_token:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
