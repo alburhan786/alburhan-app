@@ -153,9 +153,8 @@ export async function processPaymentSuccessNotifications(opts: {
 }) {
   const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef, paymentMode, paymentDate } = opts;
   const finalAmountNum = Number(booking.finalAmount || 0);
-  const siteBase = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // Never use REPLIT_DEV_DOMAIN — if accidentally set on VPS it produces malformed URLs.
+  const siteBase = (process.env.SITE_URL || "https://alburhantravels.com").trim();
   const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : undefined;
 
   // Auto receipt number: RCP-{bookingNumber}-{last6 of ms timestamp}
@@ -553,9 +552,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     console.error("[verify] processPaymentSuccessNotifications failed:", err);
   }
 
-  const siteBase = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // Never use REPLIT_DEV_DOMAIN — if accidentally set on VPS it produces malformed URLs.
+  const siteBase = (process.env.SITE_URL || "https://alburhantravels.com").trim();
   const invoiceUrl = finalInvoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
 
   res.json({

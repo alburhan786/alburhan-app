@@ -613,8 +613,10 @@ export async function sendBotBeeEventTemplate(
         customerName: (ctx.customerName || "").trim() || "Customer",
         packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        bookingNumber: ctx.bookingNumber || bookingRef,   // ABT... number for BookingID variable
         amount: ctx.finalAmount ?? ctx.amount ?? 0,
         invoiceUrl,
+        agreementUrl: (ctx as any).agreementUrl,          // agreement signing link for {{5}}
       }, opts);
 
     // ── Payments ──────────────────────────────────────────────────────────────

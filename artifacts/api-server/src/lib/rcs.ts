@@ -207,8 +207,19 @@ export async function resolveVariables(
         if (!vars.agreement_number) vars.agreement_number = agr.agreement_number || agr.id?.slice(0,8).toUpperCase() || "";
         // Use booking_number in public signing URL (short, readable, matches what WhatsApp message sends)
         if (!vars.document_url) {
-          const linkId = agr.booking_number || agr.id;
-          vars.document_url = `https://alburhantravels.com/sign-agreement/${linkId}`;
+          // Always use the booking number in the agreement URL — never the internal UUID.
+          // buildAgreementUrl validates and throws INVALID_AGREEMENT_URL if malformed.
+          if (agr.booking_number) {
+            try {
+              const { buildAgreementUrl } = await import("../routes/agreements.js");
+              vars.document_url = buildAgreementUrl(agr.booking_number);
+            } catch (urlErr) {
+              console.error("[RCS] INVALID_AGREEMENT_URL:", urlErr);
+              vars.document_url = `https://alburhantravels.com/sign-agreement/${encodeURIComponent(agr.booking_number)}`;
+            }
+          } else {
+            console.warn("[RCS] INVALID_AGREEMENT_URL: no booking_number on agreement, omitting document_url");
+          }
         }
       }
     }

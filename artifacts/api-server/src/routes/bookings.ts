@@ -28,7 +28,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
-import { autoGenerateAgreement } from "./agreements.js";
+import { autoGenerateAgreement, buildAgreementUrl } from "./agreements.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
   sendBookingApprovalNotification,
@@ -633,6 +633,13 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
   // Invoice is generated only after payment (online or offline).
   (async () => {
     try {
+      // Build agreement URL using the shared helper — never uses REPLIT_DEV_DOMAIN.
+      // This URL is passed as {{5}} (Paymenturllink) in the booking_approved WhatsApp
+      // template because customers must sign the agreement before making payment.
+      let agreementUrl: string | undefined;
+      try { agreementUrl = buildAgreementUrl(updated.bookingNumber); } catch (e) {
+        console.error("[approve] buildAgreementUrl failed:", e);
+      }
       const ctx = {
         bookingId:      updated.id,
         bookingNumber:  updated.bookingNumber,
@@ -642,6 +649,7 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
         packageName:    (updated as any).packageName ?? undefined,
         finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
         invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
+        agreementUrl,
       };
       console.log(`[PIPELINE:approve-route] ▶ booking_approved triggered | bookingId=${ctx.bookingId} | bookingNumber=${ctx.bookingNumber} | mobile=${ctx.customerMobile} | name="${ctx.customerName}" | package="${ctx.packageName}" | finalAmount=${ctx.finalAmount} | invoiceUrl=${ctx.invoiceUrl}`);
       await triggerWorkflow("booking_approved", ctx);

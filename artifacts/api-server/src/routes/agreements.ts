@@ -311,9 +311,34 @@ function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfO
 }
 
 function getSiteBase(): string {
-  return process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // IMPORTANT: Never use REPLIT_DEV_DOMAIN for notification URLs.
+  // If REPLIT_DEV_DOMAIN is set on the VPS (e.g. a leftover env var from a previous Replit
+  // deploy), it produces malformed URLs like "https://<uuid>.replit.dev/sign-agreement/..."
+  // which break on the customer's device. Always use SITE_URL (the canonical production domain).
+  return (process.env.SITE_URL || "https://alburhantravels.com").trim();
+}
+
+/**
+ * Build a clean, validated agreement signing URL using the booking number.
+ * Format: https://alburhantravels.com/sign-agreement/{bookingNumber}
+ *
+ * Rules:
+ * - Never uses REPLIT_DEV_DOMAIN.
+ * - URL-encodes the booking number.
+ * - Validates with new URL() — throws INVALID_AGREEMENT_URL if malformed.
+ * - Blocks URLs containing spaces, missing domain, or shorter than expected.
+ */
+export function buildAgreementUrl(bookingNumber: string): string {
+  const trimmed = (bookingNumber || "").trim();
+  if (!trimmed) throw new Error("INVALID_AGREEMENT_URL: bookingNumber is empty");
+  const base = (process.env.SITE_URL || "https://alburhantravels.com").trim();
+  const url = `${base}/sign-agreement/${encodeURIComponent(trimmed)}`;
+  // Structural validation
+  if (url.includes(" "))       throw new Error(`INVALID_AGREEMENT_URL: URL contains spaces — "${url}"`);
+  if (!url.startsWith("https://")) throw new Error(`INVALID_AGREEMENT_URL: URL is not HTTPS — "${url}"`);
+  if (url.length < 30)         throw new Error(`INVALID_AGREEMENT_URL: URL too short — "${url}"`);
+  try { new URL(url); } catch { throw new Error(`INVALID_AGREEMENT_URL: unparseable — "${url}"`); }
+  return url;
 }
 
 // ── Secure access-token helpers ───────────────────────────────────────────────
@@ -326,9 +351,15 @@ function genAccessToken(): string {
 /**
  * Build the public signing URL with the secure access token in the query string.
  * Format: /sign-agreement/<bookingNumber>?token=<64-hex>
+ * Validates siteBase to guard against leftover REPLIT_DEV_DOMAIN values on VPS.
  */
 function buildSigningUrl(bookingNumber: string, accessToken: string, siteBase: string): string {
-  return `${siteBase}/sign-agreement/${encodeURIComponent(bookingNumber)}?token=${accessToken}`;
+  const base = siteBase.trim();
+  if (!base.startsWith("https://") || base.includes(" ") || base.length < 10) {
+    console.error(`[Agreement] buildSigningUrl: invalid siteBase "${base}" — falling back to production URL`);
+    return `https://alburhantravels.com/sign-agreement/${encodeURIComponent(bookingNumber)}?token=${accessToken}`;
+  }
+  return `${base}/sign-agreement/${encodeURIComponent(bookingNumber)}?token=${accessToken}`;
 }
 
 /**

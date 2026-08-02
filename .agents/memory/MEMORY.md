@@ -1,3 +1,4 @@
+- [Approval notification URL and variable fix](approval-notification-url-fix.md) — REPLIT_DEV_DOMAIN on VPS causes malformed URLs; forceTemplateApi:true on booking_approved bypasses Meta Cloud API → unresolved #!Name!#
 - [Agreement access_token security](agreement-access-token.md) — token in ?token= QS, backward-compat cutoff Aug 2 2026, gen_random_uuid concat (NOT gen_random_bytes) for SQL backfill
 - [Notification bug root causes Aug 2026](notification-bug-root-causes.md) — email suspended (circuit breaker), Meta Cloud API wrong priority for ABT events, new_booking email missing from POST body, partial_payment SMS dlt_template_missing
 - [Frontend tar extraction path](frontend-tar-extraction-fix.md) — extract to /var/www/alburhan AND /root (dual-root); NOT to /root/artifacts/alburhan/dist (creates deeply nested wrong path); hotdeploy needs 2nd call after bundle swap
