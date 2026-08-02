@@ -692,41 +692,75 @@ router.post("/test-event", async (req, res) => {
 });
 
 // ── GET /notification-logs/export — CSV export of delivery log ────────────
-router.get("/notification-logs/export", async (req, res) => {
-  const channel  = req.query.channel as string | undefined;
-  const status   = req.query.status  as string | undefined;
-  const search   = req.query.search  as string | undefined;
-  const dateFrom = req.query.date_from as string | undefined;
-  const dateTo   = req.query.date_to   as string | undefined;
+// ── Secret scrubber ─────────────────────────────────────────────────────────
+// Redacts values in a JSONB payload whose keys look like credentials.
+function scrubSecrets(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  if (Array.isArray(payload)) return payload.map(scrubSecrets);
+  const SECRET_KEY = /key|password|pass|token|secret|otp|private|auth|bearer|credential/i;
+  return Object.fromEntries(
+    Object.entries(payload as Record<string, unknown>).map(([k, v]) => [
+      k,
+      SECRET_KEY.test(k) ? "[REDACTED]" : scrubSecrets(v),
+    ])
+  );
+}
 
+// ── Shared filter builder ────────────────────────────────────────────────────
+function buildLogFilters(q: Record<string, unknown>) {
+  const where: string[] = ["1=1"];
+  const params: unknown[] = [];
+  let pi = 1;
+
+  const channel       = q.channel       as string | undefined;
+  const status        = q.status        as string | undefined;
+  const search        = q.search        as string | undefined;
+  const event         = q.event         as string | undefined;
+  const bookingNumber = q.bookingNumber as string | undefined;
+  const mobile        = q.mobile        as string | undefined;
+  const dateFrom      = q.dateFrom      as string | undefined;
+  const dateTo        = q.dateTo        as string | undefined;
+
+  if (channel)       { where.push(`nl.channel = $${pi++}`);                             params.push(channel); }
+  if (status)        { where.push(`nl.status = $${pi++}`);                              params.push(status); }
+  if (event)         { where.push(`nl.event_type ILIKE $${pi++}`);                      params.push(`%${event}%`); }
+  if (bookingNumber) { where.push(`nl.booking_number ILIKE $${pi++}`);                  params.push(`%${bookingNumber}%`); }
+  if (mobile)        { where.push(`nl.recipient ILIKE $${pi++}`);                       params.push(`%${mobile}%`); }
+  if (dateFrom)      { where.push(`nl.sent_at >= $${pi++}::date`);                      params.push(dateFrom); }
+  if (dateTo)        { where.push(`nl.sent_at < ($${pi++}::date + INTERVAL '1 day')`);  params.push(dateTo); }
+  if (search)        {
+    where.push(`(nl.customer_name ILIKE $${pi} OR nl.recipient ILIKE $${pi} OR nl.booking_number ILIKE $${pi} OR nl.event_type ILIKE $${pi})`);
+    params.push(`%${search}%`); pi++;
+  }
+
+  return { where, params, pi };
+}
+
+router.get("/notification-logs/export", async (req, res) => {
   try {
-    const where: string[] = ["1=1"];
-    const params: any[]   = [];
-    let pi = 1;
-    if (channel)  { where.push(`channel = $${pi++}`); params.push(channel); }
-    if (status)   { where.push(`status = $${pi++}`);  params.push(status); }
-    if (dateFrom) { where.push(`created_at >= $${pi++}::date`); params.push(dateFrom); }
-    if (dateTo)   { where.push(`created_at < ($${pi++}::date + INTERVAL '1 day')`); params.push(dateTo); }
-    if (search)   { where.push(`(customer_name ILIKE $${pi} OR recipient ILIKE $${pi} OR booking_number ILIKE $${pi})`); params.push(`%${search}%`); pi++; }
+    const { where, params } = buildLogFilters(req.query as Record<string, unknown>);
 
     const r = await pool.query(
-      `SELECT id, event_type, channel, provider_name, customer_name, booking_number,
-              recipient, status, http_status, retry_count, error_code,
-              sent_at, delivered_at, created_at
-       FROM notification_logs
+      `SELECT nl.id, nl.event_type, nl.channel, nl.provider_name, nl.customer_name, nl.booking_number,
+              nl.recipient, nl.status, nl.http_status, nl.retry_count,
+              nl.error_code, nl.error_message, nl.wamid, nl.template, nl.provider_message_id,
+              nl.sent_at, nl.delivered_at, nl.read_at, nl.failed_at, nl.created_at
+       FROM notification_logs nl
        WHERE ${where.join(" AND ")}
-       ORDER BY created_at DESC
+       ORDER BY nl.created_at DESC
        LIMIT 5000`,
       params
     );
 
-    const headers = ["ID","Event Type","Channel","Provider","Customer","Booking #","Recipient","Status","HTTP Status","Retry Count","Error","Sent At","Delivered At","Created At"];
-    const esc = (v: any) => `"${String(v ?? "").replace(/"/g,'""')}"`;
-    const rows = r.rows.map(row => [
+    const headers = ["ID","Event","Channel","Provider","Customer","Booking #","Recipient","Status","HTTP","Retries","Error Code","Error Msg","WAMID","Template","Provider Msg ID","Sent At","Delivered At","Read At","Failed At","Created At"];
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g,'""')}"`;
+    const rows = r.rows.map((row: any) => [
       esc(row.id), esc(row.event_type), esc(row.channel), esc(row.provider_name),
       esc(row.customer_name), esc(row.booking_number), esc(row.recipient),
-      esc(row.status), esc(row.http_status), esc(row.retry_count), esc(row.error_code),
-      esc(row.sent_at), esc(row.delivered_at), esc(row.created_at),
+      esc(row.status), esc(row.http_status), esc(row.retry_count),
+      esc(row.error_code), esc(row.error_message), esc(row.wamid), esc(row.template),
+      esc(row.provider_message_id),
+      esc(row.sent_at), esc(row.delivered_at), esc(row.read_at), esc(row.failed_at), esc(row.created_at),
     ].join(","));
 
     const csv = [headers.join(","), ...rows].join("\n");
@@ -1097,36 +1131,133 @@ router.get("/monitoring", async (_req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-// ── GET /notification-logs — Full delivery log ─────────────────────────────
+// ── GET /notification-logs — Full delivery log (enhanced) ─────────────────
+// Supports: channel, status, event, bookingNumber, mobile, search, dateFrom, dateTo
+//           page (1-based), pageSize (max 200)
+// All request_payload values are secret-scrubbed before returning.
 router.get("/notification-logs", async (req, res) => {
-  const limit  = Math.min(Number(req.query.limit  || 50), 200);
-  const offset = Number(req.query.offset || 0);
-  const channel = req.query.channel as string | undefined;
-  const status  = req.query.status  as string | undefined;
-  const search  = req.query.search  as string | undefined;
+  const pageSize = Math.min(Number(req.query.pageSize || req.query.limit || 50), 200);
+  const page     = Math.max(Number(req.query.page || 1), 1);
+  const offset   = (page - 1) * pageSize;
 
   try {
-    const where: string[] = ["1=1"];
-    const params: any[]   = [];
-    let pi = 1;
-    if (channel) { where.push(`channel = $${pi++}`); params.push(channel); }
-    if (status)  { where.push(`status = $${pi++}`);  params.push(status); }
-    if (search)  { where.push(`(customer_name ILIKE $${pi} OR recipient ILIKE $${pi} OR booking_number ILIKE $${pi})`); params.push(`%${search}%`); pi++; }
+    const { where, params, pi } = buildLogFilters(req.query as Record<string, unknown>);
+    let nextPi = pi;
 
     const r = await pool.query(
-      `SELECT id, event_type, channel, provider_name, customer_name, booking_number,
-              recipient, status, http_status, retry_count, error_code,
-              sent_at, delivered_at, created_at
-       FROM notification_logs
+      `SELECT nl.id, nl.event_type, nl.channel, nl.provider_name,
+              nl.customer_name, nl.booking_number, nl.customer_id, nl.booking_id,
+              nl.recipient, nl.status, nl.http_status, nl.retry_count,
+              nl.error_code, nl.error_message, nl.wamid, nl.template,
+              nl.provider_message_id, nl.message,
+              nl.request_payload,
+              nl.sent_at, nl.delivered_at, nl.read_at, nl.failed_at, nl.created_at
+       FROM notification_logs nl
        WHERE ${where.join(" AND ")}
-       ORDER BY created_at DESC
-       LIMIT $${pi++} OFFSET $${pi++}`,
-      [...params, limit, offset]
+       ORDER BY nl.created_at DESC
+       LIMIT $${nextPi++} OFFSET $${nextPi++}`,
+      [...params, pageSize, offset]
     );
+
     const cnt = await pool.query(
-      `SELECT COUNT(*)::int AS cnt FROM notification_logs WHERE ${where.join(" AND ")}`, params
+      `SELECT COUNT(*)::int AS cnt FROM notification_logs nl WHERE ${where.join(" AND ")}`,
+      params
     );
-    res.json({ logs: r.rows, total: cnt.rows[0]?.cnt || 0, limit, offset });
+
+    // Scrub secrets from request_payload before returning
+    const logs = r.rows.map((row: any) => ({
+      ...row,
+      request_payload: row.request_payload ? scrubSecrets(row.request_payload) : null,
+    }));
+
+    res.json({ logs, total: cnt.rows[0]?.cnt || 0, page, pageSize });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /notification-logs/:id/resend — Resend a single notification ────────
+// Inserts the log row back into the retry queue with next_retry_at = NOW()
+// so the retry cron processes it immediately.
+router.post("/notification-logs/:id/resend", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const row = await pool.query(
+      `SELECT * FROM notification_logs WHERE id=$1 LIMIT 1`, [id]
+    );
+    if (!row.rows[0]) return res.status(404).json({ error: "Log row not found" });
+    const log = row.rows[0];
+
+    // Build context from the stored log row
+    const newId = `nrq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await pool.query(
+      `INSERT INTO notification_retry_queue
+       (id, notification_log_id, event_type, channel, customer_id, booking_id, recipient,
+        message, context, retry_count, status, last_error, next_retry_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,'pending','Manual admin resend',NOW())`,
+      [
+        newId, log.id, log.event_type, log.channel,
+        log.customer_id, log.booking_id, log.recipient,
+        log.message || "",
+        JSON.stringify({ eventType: log.event_type, bookingId: log.booking_id, bookingNumber: log.booking_number, customerName: log.customer_name }),
+      ]
+    );
+    // Mark original as pending so the UI shows it's being retried
+    await pool.query(
+      `UPDATE notification_logs SET status='pending', retry_count = COALESCE(retry_count,0)+1, updated_at=NOW() WHERE id=$1`,
+      [id]
+    );
+    res.json({ ok: true, queueId: newId, message: "Re-queued for delivery" });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /notification-logs/resend-failed — Bulk resend all failed for a booking
+// Re-queues every failed/permanently_failed row for a booking ID or booking number.
+router.post("/notification-logs/resend-failed", async (req, res) => {
+  const bookingId     = req.body?.bookingId     as string | undefined;
+  const bookingNumber = req.body?.bookingNumber as string | undefined;
+  if (!bookingId && !bookingNumber) {
+    return res.status(400).json({ error: "bookingId or bookingNumber required" });
+  }
+
+  try {
+    const failedRows = await pool.query(
+      `SELECT * FROM notification_logs
+       WHERE status IN ('failed','permanently_failed')
+         AND ($1::text IS NULL OR booking_id=$1)
+         AND ($2::text IS NULL OR booking_number=$2)
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [bookingId || null, bookingNumber || null]
+    );
+
+    if (failedRows.rows.length === 0) {
+      return res.json({ ok: true, queued: 0, message: "No failed notifications found" });
+    }
+
+    let queued = 0;
+    for (const log of failedRows.rows) {
+      try {
+        const newId = `nrq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await pool.query(
+          `INSERT INTO notification_retry_queue
+           (id, notification_log_id, event_type, channel, customer_id, booking_id, recipient,
+            message, context, retry_count, status, last_error, next_retry_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,'pending','Bulk admin resend',NOW())`,
+          [
+            newId, log.id, log.event_type, log.channel,
+            log.customer_id, log.booking_id, log.recipient,
+            log.message || "",
+            JSON.stringify({ eventType: log.event_type, bookingId: log.booking_id, bookingNumber: log.booking_number, customerName: log.customer_name }),
+          ]
+        );
+        await pool.query(
+          `UPDATE notification_logs SET status='pending', retry_count = COALESCE(retry_count,0)+1, updated_at=NOW() WHERE id=$1`,
+          [log.id]
+        );
+        queued++;
+      } catch {}
+    }
+
+    res.json({ ok: true, queued, total: failedRows.rows.length, message: `Re-queued ${queued} notification(s)` });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 

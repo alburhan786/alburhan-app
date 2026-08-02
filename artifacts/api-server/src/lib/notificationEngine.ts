@@ -391,11 +391,15 @@ export async function trackNotification(data: {
   customerName?: string;
   bookingNumber?: string;
   message?: string;
-  status: "sent" | "failed" | "pending";
+  status: "sent" | "failed" | "pending" | "skipped";
   providerResponse?: unknown;
   provider?: string;
   /** Optional idempotency key — prevents double-log rows when sms.ts also logs internally */
   idempotencyKey?: string;
+  /** Optional override for error_code when the caller knows it (e.g. PUSH_TOKEN_MISSING) */
+  errorCode?: string;
+  /** Optional human-readable error message */
+  errorMessage?: string;
 }): Promise<void> {
   try {
     const id = await makeLogId();
@@ -404,29 +408,48 @@ export async function trackNotification(data: {
     const apiEndpoint = pr?.endpoint || null;
     const httpStatus = pr?.httpStatus || null;
     const requestPayload = pr?.requestPayload ? JSON.stringify(pr.requestPayload) : null;
-    const errorCode = pr?.errorCode || null;
+    const errorCode = data.errorCode || pr?.errorCode || null;
+    const errorMessage = data.errorMessage || pr?.errorMessage || (pr?.responsePayload as any)?.message || null;
     // Extract wamid and template_id from the BotBee response payload
     const innerRp = pr?.responsePayload as Record<string, unknown> | null | undefined;
     const msgArr = Array.isArray(innerRp?.messages) ? (innerRp!.messages as Array<Record<string, unknown>>) : null;
     const wamid = (innerRp?.wa_message_id || innerRp?.msg_id || innerRp?.wamid || msgArr?.[0]?.id || null) as string | null;
     const templateId = (pr?.requestPayload?.template_id?.toString() || pr?.requestPayload?.template_name || null) as string | null;
-    if (wamid) console.log(`[trackNotification] ${data.eventType} → wamid=${wamid} template=${templateId}`);
+
+    // provider_message_id: canonical message ID from each provider
+    // BotBee/Meta: wamid; Fast2SMS: request_id; nodemailer: messageId; Lemin: data.id; FCM: name
+    const providerMessageId: string | null = (
+      wamid ||
+      pr?.messageId ||                               // nodemailer / generic
+      pr?.request_id ||                              // Fast2SMS
+      (pr?.responsePayload as any)?.data?.id ||      // Lemin RCS
+      (pr?.responsePayload as any)?.name ||          // FCM
+      (pr?.responsePayload as any)?.request_id ||    // Fast2SMS nested
+      null
+    ) as string | null;
+
+    if (wamid || providerMessageId) console.log(`[trackNotification] ${data.eventType} → provider_msg=${providerMessageId} template=${templateId}`);
+
+    // failed_at: set when status is failed (any variant)
+    const isFailed = data.status === "failed" || (data.status as string) === "permanently_failed";
+
     await pool.query(
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, customer_name, booking_number,
         channel, recipient, message, status,
-        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
-        wamid, template,
-        sent_at, retry_count, idempotency_key)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0,$19)
+        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code, error_message,
+        wamid, template, provider_message_id,
+        sent_at, failed_at, retry_count, idempotency_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),$21,0,$22)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
         data.channel, data.recipient, data.message || null, data.status,
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
-        providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
-        wamid, templateId,
+        providerName, apiEndpoint, httpStatus, requestPayload, errorCode, errorMessage,
+        wamid, templateId, providerMessageId,
+        isFailed ? new Date() : null,
         data.idempotencyKey || null,
       ]
     );
@@ -520,10 +543,13 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
           if (r.rows[0]?.customer_id) pushCustomerId = r.rows[0].customer_id;
         } catch {}
       }
-      if (!pushCustomerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      if (!pushCustomerId) return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No customer ID for push — push skipped" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushResult = await sendPushToCustomer(pushCustomerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        if (!pushResult.ok && pushResult.total === 0) {
+          return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No device tokens registered for this customer" } };
+        }
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
@@ -1098,11 +1124,16 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           if (r.rows[0]?.customer_id) pushCustomerId2 = r.rows[0].customer_id;
         } catch {}
       }
-      if (!pushCustomerId2) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      if (!pushCustomerId2) return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No customer ID for push — push skipped, other channels continue" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushTitle = buildEmailSubject(eventType, ctx) || "Al Burhan Tours & Travels";
         const pushResult = await sendPushToCustomer(pushCustomerId2, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        // If no device tokens exist, log PUSH_TOKEN_MISSING and treat as skipped (not failed),
+        // so other channels are not affected by the absence of a push subscription.
+        if (!pushResult.ok && pushResult.total === 0) {
+          return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No device tokens registered for this customer" } };
+        }
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };

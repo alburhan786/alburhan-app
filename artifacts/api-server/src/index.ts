@@ -3025,6 +3025,15 @@ async function start() {
     console.log("[Migration] v31.0 notification_logs RCS columns ensured");
   } catch (err: any) { console.warn("[Migration] v31.0 notification_logs cols:", err.message); }
 
+  // v32.0 — notification_logs: provider_message_id, failed_at, error_message columns (Task #327)
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS provider_message_id TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS failed_at           TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS error_message       TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_nl_provider_msg ON notification_logs(provider_message_id) WHERE provider_message_id IS NOT NULL`);
+    console.log("[Migration] v32.0 notification_logs provider_message_id/failed_at/error_message ensured");
+  } catch (err: any) { console.warn("[Migration] v32.0 notification_logs cols:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
