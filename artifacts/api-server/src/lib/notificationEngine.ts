@@ -226,8 +226,13 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `URGENT ALERT: ${name} — ${ctx.description || "An emergency has been reported."} Please contact your group leader or call +91 9893225590 immediately.\n\nAl Burhan Tours & Travels`;
     case "new_booking":
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} for ${pkg} has been received. Our team will review and approve it shortly.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
-    case "booking_approved":
-      return `Assalamu Alaikum ${name},\n\nCongratulations! Your booking ${booking} for ${pkg} has been APPROVED.\n\nPlease complete your payment at:\n${invUrl}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "booking_approved": {
+      // Use agreement URL when available — customers must sign the agreement before paying.
+      const agUrl = (ctx as any).agreementUrl as string | undefined;
+      const approvedLink = (agUrl && agUrl.startsWith("https://") && !agUrl.includes(" ")) ? agUrl : invUrl;
+      const approvedLinkLabel = (agUrl && agUrl.startsWith("https://")) ? "Please sign your agreement at:" : "Please complete your payment at:";
+      return `Assalamu Alaikum ${name},\n\nCongratulations! Your booking ${booking} for ${pkg} has been APPROVED.\n\n${approvedLinkLabel}\n${approvedLink}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    }
     case "booking_cancelled":
     case "booking_rejected":
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} has been ${eventType === "booking_rejected" ? "rejected" : "cancelled"}${ctx.reason ? `: ${ctx.reason}` : ""}. Please contact us for assistance.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
@@ -600,13 +605,18 @@ export async function sendBotBeeEventTemplate(
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────
-    case "new_booking":
+    case "new_booking": {
+      const newBkgPkg = ctx.packageName;
+      if (!newBkgPkg) {
+        console.error(`[notifEngine] MISSING_PACKAGE_DATA: new_booking for bookingId=${bookingId} — packageName is blank after DB enrichment. WhatsApp will use generic name.`);
+      }
       return sendBookingSubmittedTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
-        packageName: ctx.packageName || "Hajj/Umrah Package",
+        packageName: newBkgPkg || "Hajj/Umrah Package",
         bookingId: bookingRef,
         invoiceUrl,
       }, opts);
+    }
 
     case "booking_approved":
       return sendApprovalTemplate(ctx.customerMobile, {
@@ -1104,12 +1114,84 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
   }
 }
 
+/**
+ * Load fresh package name and financial amounts from the database when the ctx is incomplete.
+ *
+ * Prevents generic "Hajj/Umrah Package" and "₹0" values appearing in customer-facing messages.
+ * Called at the very top of fireNotificationEvent so ALL downstream channels receive real data.
+ *
+ * Spec requirement (Section 17): fetch packages.name, bookings.final_amount/total_amount via JOIN.
+ * If data is genuinely missing from DB, logs MISSING_PACKAGE_DATA and leaves ctx unchanged.
+ */
+async function enrichCtxFromDB(ctx: NotificationContext): Promise<NotificationContext> {
+  if (!ctx.bookingId) return ctx;  // no booking context — nothing to enrich
+
+  const needsPackage = !ctx.packageName
+    || ctx.packageName === "Hajj/Umrah Package"
+    || ctx.packageName === "Travel Package"
+    || ctx.packageName === "your package";
+  const needsAmount  = ctx.finalAmount == null || ctx.finalAmount === 0;
+
+  if (!needsPackage && !needsAmount) return ctx;  // already fully populated
+
+  try {
+    const row = await pool.query<{
+      package_name: string | null;
+      final_amount:  string | null;
+    }>(
+      `SELECT
+         COALESCE(NULLIF(b.package_name,''), p.name) AS package_name,
+         COALESCE(NULLIF(b.final_amount,''), NULLIF(b.total_amount,'')) AS final_amount
+       FROM bookings b
+       LEFT JOIN packages p ON p.id = b.package_id
+       WHERE b.id = $1
+       LIMIT 1`,
+      [ctx.bookingId]
+    );
+    if (!row.rows[0]) return ctx;
+
+    const r = row.rows[0];
+    const enriched = { ...ctx } as NotificationContext & { [k: string]: unknown };
+
+    if (needsPackage) {
+      if (r.package_name) {
+        enriched.packageName = r.package_name;
+      } else {
+        console.error(
+          `[notifEngine] MISSING_PACKAGE_DATA: bookingId=${ctx.bookingId} event=${ctx.bookingId} — ` +
+          `no package name found in bookings or packages tables.  ` +
+          `WhatsApp/SMS may show generic placeholder.`
+        );
+      }
+    }
+    if (needsAmount && r.final_amount && Number(r.final_amount) > 0) {
+      enriched.finalAmount = Number(r.final_amount);
+    }
+
+    const changed: string[] = [];
+    if (enriched.packageName !== ctx.packageName) changed.push(`packageName="${enriched.packageName}"`);
+    if (enriched.finalAmount  !== ctx.finalAmount)  changed.push(`finalAmount=${enriched.finalAmount}`);
+    if (changed.length) {
+      console.log(`[notifEngine] enrichCtxFromDB: bookingId=${ctx.bookingId} → ${changed.join(", ")}`);
+    }
+
+    return enriched as NotificationContext;
+  } catch (err) {
+    console.warn("[notifEngine] enrichCtxFromDB failed (non-fatal):", err instanceof Error ? err.message : err);
+    return ctx;
+  }
+}
+
 export async function fireNotificationEvent(
   eventType: EventType,
   ctx: NotificationContext,
   opts: { dedupWindowHours?: number } = {}
 ): Promise<void> {
-  console.log(`[notifEngine] ▶ fireNotificationEvent: ${eventType} | mobile=${ctx.customerMobile} | customer=${ctx.customerName} | booking=${ctx.bookingId || "none"}`);
+  // ── DATA COMPLETENESS: load real package name + amounts from DB when missing ──
+  // Must happen BEFORE dedup check and channel dispatch so every channel gets real data.
+  ctx = await enrichCtxFromDB(ctx);
+
+  console.log(`[notifEngine] ▶ fireNotificationEvent: ${eventType} | mobile=${ctx.customerMobile} | customer=${ctx.customerName} | booking=${ctx.bookingId || "none"} | pkg="${ctx.packageName}" | amount=${ctx.finalAmount}`);
 
   // ── IDEMPOTENCY: skip if this exact event+booking was sent recently ─────────
   const dedupWindow = opts.dedupWindowHours ?? defaultDedupWindow(eventType);

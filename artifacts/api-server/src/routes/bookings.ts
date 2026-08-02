@@ -510,7 +510,9 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
       customerName:   booking.customerName,
       customerMobile: booking.customerMobile,
       customerEmail,
-      packageName:    booking.packageName    ?? pkg?.name ?? "Travel Package",
+      // SPEC §17: never use generic "Travel Package" fallback in customer-facing messages.
+      // enrichCtxFromDB in fireNotificationEvent will load from packages JOIN if still missing.
+      packageName:    booking.packageName ?? pkg?.name ?? undefined,
       amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
       invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
       dashboardUrl:   `${siteBase}/customer/dashboard`,
@@ -640,14 +642,47 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
       try { agreementUrl = buildAgreementUrl(updated.bookingNumber); } catch (e) {
         console.error("[approve] buildAgreementUrl failed:", e);
       }
+
+      // Enrich packageName and finalAmount via JOIN when the Drizzle returning() row is missing them.
+      // Older or manually-created bookings may have NULL package_name or zero final_amount.
+      // SPEC §17: never send "₹0" or "Hajj/Umrah Package" fallbacks in approval notifications.
+      let packageName = (updated as any).packageName as string | undefined;
+      let finalAmount = (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined;
+      if (!packageName || !finalAmount) {
+        try {
+          const enrichRow = await pool.query<{ package_name: string | null; final_amount: string | null }>(
+            `SELECT COALESCE(NULLIF(b.package_name,''), p.name) AS package_name,
+                    COALESCE(NULLIF(b.final_amount,''), NULLIF(b.total_amount,'')) AS final_amount
+             FROM bookings b
+             LEFT JOIN packages p ON p.id = b.package_id
+             WHERE b.id = $1
+             LIMIT 1`,
+            [updated.id]
+          );
+          if (enrichRow.rows[0]) {
+            const r = enrichRow.rows[0];
+            if (!packageName && r.package_name) packageName = r.package_name;
+            if (!finalAmount && r.final_amount && Number(r.final_amount) > 0) finalAmount = Number(r.final_amount);
+          }
+        } catch (enrichErr) {
+          console.error("[approve] enrich packageName/finalAmount from JOIN failed (non-fatal):", enrichErr);
+        }
+      }
+      if (!packageName) {
+        console.error(`[approve] MISSING_PACKAGE_DATA: booking ${updated.bookingNumber} has no package name — check bookings.package_id FK and packages table`);
+      }
+      if (!finalAmount) {
+        console.warn(`[approve] ZERO_AMOUNT: booking ${updated.bookingNumber} finalAmount is 0 — check bookings.final_amount and package pricing`);
+      }
+
       const ctx = {
         bookingId:      updated.id,
         bookingNumber:  updated.bookingNumber,
         customerName:   (updated.customerName || "").trim(),
         customerMobile: updated.customerMobile,
         customerEmail:  updated.customerEmail ?? undefined,
-        packageName:    (updated as any).packageName ?? undefined,
-        finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
+        packageName,
+        finalAmount,
         invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
         agreementUrl,
       };
