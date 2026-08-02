@@ -3,15 +3,19 @@
 -- Branch: feature/saas-multitenancy
 -- Date: 2026-08-02
 --
+-- AUTHORITATIVE EXECUTION PATH
+-- This SQL file is the single source of truth for the v38 migration.
+-- It is executed at startup by the API server (index.ts v38 block).
+-- It can also be applied manually: psql $DATABASE_URL -f v38-tenant-foundation.sql
+--
 -- DESIGN
--- • Idempotent and safe for absent/optional tables throughout.
---   ADD COLUMN uses IF EXISTS + IF NOT EXISTS. Backfill and index DDL run
---   inside DO $$ blocks guarded by to_regclass() so no absent relation can
---   abort the transaction.
--- • Columns are NULLABLE — NOT NULL enforcement is Phase 3.
+-- • Idempotent: safe to re-run (IF NOT EXISTS / IF EXISTS / to_regclass guards).
+-- • All backfill and index DDL inside DO $$ blocks guarded by to_regclass()
+--   so no absent optional table can abort the transaction.
+-- • Columns are NULLABLE — NOT NULL deferred to Phase 3.
 -- • SET DEFAULT '10000000-1000-4000-8000-000000000001' on every tenant_id
---   column so ALL insert paths (ORM, raw SQL, future code) produce non-NULL
---   tenant_id without any application-level changes in Phase 2.
+--   column so ALL insert paths (Drizzle ORM, raw SQL, future code) produce
+--   non-NULL tenant_id without any application-level changes in Phase 2.
 -- • Al Burhan fixed UUID: 10000000-1000-4000-8000-000000000001
 --
 -- ROLLBACK: see saas-phase2-rollback.sql
@@ -169,8 +173,8 @@ ALTER TABLE IF EXISTS ai_automation_webhooks    ALTER COLUMN tenant_id SET DEFAU
 
 -- ── v38.8: safe backfill using to_regclass() guards ───────────────────────────
 -- Each table is individually guarded: if the relation does not exist in this
--- schema, the UPDATE is skipped. This prevents any single absent optional table
--- from aborting the transaction and rolling back the entire migration.
+-- deployment or the column was not added, the UPDATE is skipped without
+-- aborting the transaction.
 DO $$
 DECLARE
   tbl  TEXT;
@@ -178,37 +182,29 @@ DECLARE
   tot  BIGINT := 0;
   abt  CONSTANT UUID := '10000000-1000-4000-8000-000000000001';
   tbls TEXT[] := ARRAY[
-    -- core
     'users','bookings','packages','hajj_groups','pilgrims','branches','agents','staff',
-    -- financial
     'payment_transactions','invoices','receipts','refunds','offline_payments',
     'expenses','journal_entries','journal_entry_lines','payment_schedules','payment_links',
-    -- agreements / docs / support / audit
     'agreements','documents','support_tickets','support_messages',
     'feedback','inquiries','otps',
     'audit_logs','booking_audit_logs','payment_audit_logs','agreement_audit_logs','finance_audit_logs',
-    -- CRM / campaigns
     'leads','lead_followups','lead_activities','lead_audit_log',
     'lead_web_forms','lead_web_form_submissions','lead_auto_followup_log',
     'lead_assignment_rules','crm_assignment_rules',
     'broadcasts','notification_campaigns','push_campaigns',
-    -- notifications / comms / config
     'notification_templates','notification_settings','notification_logs',
     'communication_event_mappings','communication_audit_logs','communication_consents',
     'rcs_template_mappings','automation_audit_logs','automation_service_tokens',
     'provider_health_status','api_settings',
-    -- AI / automation
     'ai_conversations','ai_conversation_messages','ai_knowledge_base',
     'ai_automation_logs','ai_automation_jobs','ai_automation_schedules','ai_automation_webhooks'
   ];
 BEGIN
   FOREACH tbl IN ARRAY tbls LOOP
-    -- Skip if the table does not exist in this deployment
     IF to_regclass('public.' || tbl) IS NULL THEN
       RAISE NOTICE 'v38.8 skip backfill % (table absent)', tbl;
       CONTINUE;
     END IF;
-    -- Skip if tenant_id column was not added (ALTER TABLE IF EXISTS may have skipped it)
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'tenant_id'
@@ -219,66 +215,73 @@ BEGIN
     EXECUTE format('UPDATE %I SET tenant_id = $1 WHERE tenant_id IS NULL', tbl)
       USING abt;
     GET DIAGNOSTICS n = ROW_COUNT;
+    IF n > 0 THEN
+      RAISE NOTICE 'v38.8 backfilled % rows in %', n, tbl;
+    END IF;
     tot := tot + n;
   END LOOP;
-  RAISE NOTICE 'v38.8 backfill complete: % rows across % tables', tot, array_length(tbls,1);
+  RAISE NOTICE 'v38.8 backfill complete: % total rows across % tables', tot, array_length(tbls,1);
 END $$;
 
--- ── v38.9a: safe indexes using to_regclass() guards ───────────────────────────
+-- ── v38.9a: safe composite indexes using to_regclass() and TEXT[] parallel arrays
+-- Uses three parallel TEXT[] arrays (valid PL/pgSQL) — not RECORD[].
 DO $$
 DECLARE
-  idx_rec RECORD;
-  idxs    RECORD[] := ARRAY[
-    ROW('idx_bookings_tenant_id',     'bookings',             'tenant_id'),
-    ROW('idx_bookings_tenant_status', 'bookings',             'tenant_id, status'),
-    ROW('idx_users_tenant_id',        'users',                'tenant_id'),
-    ROW('idx_invoices_tenant_id',     'invoices',             'tenant_id'),
-    ROW('idx_payments_tenant_id',     'payment_transactions', 'tenant_id'),
-    ROW('idx_leads_tenant_id',        'leads',                'tenant_id'),
-    ROW('idx_notif_logs_tenant_id',   'notification_logs',    'tenant_id'),
-    ROW('idx_agreements_tenant_id',   'agreements',           'tenant_id'),
-    ROW('idx_pilgrims_tenant_id',     'pilgrims',             'tenant_id'),
-    ROW('idx_hajj_groups_tenant_id',  'hajj_groups',          'tenant_id'),
-    ROW('idx_documents_tenant_id',    'documents',            'tenant_id'),
-    ROW('idx_expenses_tenant_id',     'expenses',             'tenant_id')
-  ]::RECORD[];
-  idx_name  TEXT;
-  tbl_name  TEXT;
-  col_names TEXT;
+  i          INT;
+  idx_names  TEXT[] := ARRAY[
+    'idx_bookings_tenant_id',     'idx_bookings_tenant_status',
+    'idx_users_tenant_id',        'idx_invoices_tenant_id',
+    'idx_payments_tenant_id',     'idx_leads_tenant_id',
+    'idx_notif_logs_tenant_id',   'idx_agreements_tenant_id',
+    'idx_pilgrims_tenant_id',     'idx_hajj_groups_tenant_id',
+    'idx_documents_tenant_id',    'idx_expenses_tenant_id'
+  ];
+  idx_tables TEXT[] := ARRAY[
+    'bookings',            'bookings',
+    'users',               'invoices',
+    'payment_transactions','leads',
+    'notification_logs',   'agreements',
+    'pilgrims',            'hajj_groups',
+    'documents',           'expenses'
+  ];
+  idx_cols   TEXT[] := ARRAY[
+    'tenant_id',           'tenant_id, status',
+    'tenant_id',           'tenant_id',
+    'tenant_id',           'tenant_id',
+    'tenant_id',           'tenant_id',
+    'tenant_id',           'tenant_id',
+    'tenant_id',           'tenant_id'
+  ];
 BEGIN
-  FOREACH idx_rec IN ARRAY idxs LOOP
-    idx_name  := idx_rec.f1;
-    tbl_name  := idx_rec.f2;
-    col_names := idx_rec.f3;
-    IF to_regclass('public.' || tbl_name) IS NULL THEN
-      RAISE NOTICE 'v38.9 skip index % (table % absent)', idx_name, tbl_name;
+  FOR i IN 1..array_length(idx_names, 1) LOOP
+    IF to_regclass('public.' || idx_tables[i]) IS NULL THEN
+      RAISE NOTICE 'v38.9 skip index % (table % absent)', idx_names[i], idx_tables[i];
       CONTINUE;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = idx_name) THEN
-      EXECUTE format('CREATE INDEX %I ON %I (%s)', idx_name, tbl_name, col_names);
-      RAISE NOTICE 'v38.9 created index %', idx_name;
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = idx_names[i]) THEN
+      EXECUTE format('CREATE INDEX %I ON %I (%s)', idx_names[i], idx_tables[i], idx_cols[i]);
+      RAISE NOTICE 'v38.9 created index %', idx_names[i];
     ELSE
-      RAISE NOTICE 'v38.9 index % already exists', idx_name;
+      RAISE NOTICE 'v38.9 index % already exists', idx_names[i];
     END IF;
   END LOOP;
 END $$;
 
--- ── v38.9b: strict assertion — fails transaction if required tables have NULLs ─
--- Required tables are those that MUST exist in every deployment.
--- The DO block raises an exception (aborting the transaction) on any violation.
+-- ── v38.9b: strict assertion — raises EXCEPTION if required tables have NULL rows
+-- This aborts the transaction on any integrity violation so the caller knows
+-- the migration did not complete successfully.
 DO $$
 DECLARE
-  tbl         TEXT;
-  null_count  BIGINT;
-  issues      INT := 0;
-  required    TEXT[] := ARRAY[
+  tbl        TEXT;
+  null_count BIGINT;
+  issues     INT := 0;
+  required   TEXT[] := ARRAY[
     'users','bookings','packages','pilgrims',
     'payment_transactions','invoices','agreements','documents',
     'leads','notification_logs'
   ];
 BEGIN
   FOREACH tbl IN ARRAY required LOOP
-    -- Confirm column exists
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'tenant_id'
@@ -287,7 +290,6 @@ BEGIN
       issues := issues + 1;
       CONTINUE;
     END IF;
-    -- Confirm zero NULLs
     EXECUTE format('SELECT COUNT(*) FROM %I WHERE tenant_id IS NULL', tbl) INTO null_count;
     IF null_count > 0 THEN
       RAISE WARNING 'v38.9 ASSERT FAIL: % has % rows with tenant_id IS NULL', tbl, null_count;
@@ -297,7 +299,7 @@ BEGIN
 
   IF issues > 0 THEN
     RAISE EXCEPTION
-      'v38.9 assertion failed: % required table(s) have missing column or NULL tenant_id rows. '
+      'v38.9 assertion FAILED: % required table(s) have missing column or NULL tenant_id. '
       'Roll back and investigate before proceeding to Phase 3.',
       issues;
   END IF;

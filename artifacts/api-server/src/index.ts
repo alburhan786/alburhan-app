@@ -1,6 +1,8 @@
 // Load .env file before anything else (needed for VPS where PM2 doesn't auto-load .env)
 import { config as dotenvConfig } from "dotenv";
+import { fileURLToPath } from "url";
 import fs from "fs";
+import path from "path";
 
 // Try multiple candidate paths — first one that exists wins
 const ENV_CANDIDATES = [
@@ -3826,250 +3828,38 @@ async function start() {
 
   // ══════════════════════════════════════════════════════════════════════════════
   // SaaS PHASE 2 — Tenant foundation & row-level backfill (v38.1 – v38.9)
+  // AUTHORITATIVE SOURCE: migrations/v38-tenant-foundation.sql
   // Fixed tenant UUID: 10000000-1000-4000-8000-000000000001 (Al Burhan default)
-  // All columns NULLABLE — NOT NULL enforcement deferred to Phase 3
+  // Columns NULLABLE — NOT NULL enforcement deferred to Phase 3
   // ══════════════════════════════════════════════════════════════════════════════
-
-  // ── v38.1: Create tenants table + seed Al Burhan row ─────────────────────────
+  // NOTE: Everything below is delegated to the SQL file. Do NOT duplicate DDL here.
+  // ── v38: execute SQL migration file (single authoritative path) ──────────────
+  // migrations/v38-tenant-foundation.sql is the single source of truth.
+  // It runs in a transaction: if the v38.9b assertion DO block raises EXCEPTION,
+  // the transaction rolls back and the error surfaces here as CRITICAL.
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tenants (
-        id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-        slug        TEXT         UNIQUE NOT NULL,
-        name        TEXT         NOT NULL,
-        plan        TEXT         NOT NULL DEFAULT 'starter',
-        status      TEXT         NOT NULL DEFAULT 'active',
-        settings    JSONB        NOT NULL DEFAULT '{}',
-        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      INSERT INTO tenants (id, slug, name, plan, status)
-      VALUES ('10000000-1000-4000-8000-000000000001', 'alburhan', 'Al Burhan Tours & Travels', 'enterprise', 'active')
-      ON CONFLICT (id) DO NOTHING
-    `);
-    console.log("[Migration] v38.1 tenants table + Al Burhan seed OK");
-  } catch (err: any) { console.warn("[Migration] v38.1 tenants:", err.message); }
-
-  // ── v38.2: tenant_id on core booking / org tables (ADD COLUMN + SET DEFAULT) ──
-  try {
-    const v382Tables = [
-      "users", "bookings", "packages", "hajj_groups", "pilgrims",
-      "branches", "agents", "staff",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v382Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.2 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.2 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.2 core booking/org tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.2 core tables:", err.message); }
-
-  // ── v38.3: tenant_id on financial tables (ADD COLUMN + SET DEFAULT) ───────────
-  try {
-    const v383Tables = [
-      "payment_transactions", "invoices", "receipts", "refunds",
-      "offline_payments", "expenses", "journal_entries", "journal_entry_lines",
-      "payment_schedules", "payment_links",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v383Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.3 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.3 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.3 financial tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.3 financial tables:", err.message); }
-
-  // ── v38.4: agreements, documents, support, audit trails (ADD COLUMN + DEFAULT) ─
-  try {
-    const v384Tables = [
-      "agreements", "documents", "support_tickets", "support_messages",
-      "feedback", "inquiries", "otps",
-      "audit_logs", "booking_audit_logs", "payment_audit_logs",
-      "agreement_audit_logs", "finance_audit_logs",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v384Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.4 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.4 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.4 doc/support/audit tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.4 doc/audit tables:", err.message); }
-
-  // ── v38.5: CRM / lead / campaign tables (ADD COLUMN + DEFAULT) ────────────────
-  try {
-    const v385Tables = [
-      "leads", "lead_followups", "lead_activities", "lead_audit_log",
-      "lead_web_forms", "lead_web_form_submissions", "lead_auto_followup_log",
-      "lead_assignment_rules", "crm_assignment_rules",
-      "broadcasts", "notification_campaigns", "push_campaigns",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v385Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.5 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.5 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.5 CRM/lead/campaign tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.5 CRM tables:", err.message); }
-
-  // ── v38.6: notification + comms + config tables (ADD COLUMN + DEFAULT) ─────────
-  try {
-    const v386Tables = [
-      "notification_templates", "notification_settings", "notification_logs",
-      "communication_event_mappings", "communication_audit_logs", "communication_consents",
-      "rcs_template_mappings", "automation_audit_logs", "automation_service_tokens",
-      "provider_health_status", "api_settings",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v386Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.6 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.6 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.6 notification/comms/config tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.6 notif/comms tables:", err.message); }
-
-  // ── v38.7: AI / automation tables (ADD COLUMN + DEFAULT) ──────────────────────
-  try {
-    const v387Tables = [
-      "ai_conversations", "ai_conversation_messages", "ai_knowledge_base",
-      "ai_automation_logs", "ai_automation_jobs",
-      "ai_automation_schedules", "ai_automation_webhooks",
-    ];
-    const ABT_DEFAULT = "'10000000-1000-4000-8000-000000000001'";
-    for (const t of v387Tables) {
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`)
-        .catch((e: any) => console.warn(`[Migration] v38.7 ADD ${t}:`, e.message));
-      await pool.query(`ALTER TABLE IF EXISTS ${t} ALTER COLUMN tenant_id SET DEFAULT ${ABT_DEFAULT}`)
-        .catch((e: any) => console.warn(`[Migration] v38.7 DEFAULT ${t}:`, e.message));
-    }
-    console.log("[Migration] v38.7 AI/automation tables tenant_id + DEFAULT OK");
-  } catch (err: any) { console.warn("[Migration] v38.7 AI tables:", err.message); }
-
-  // ── v38.8: backfill tenant_id = Al Burhan UUID for all remaining NULL rows ─────
-  try {
-    const ABT_UUID = '10000000-1000-4000-8000-000000000001';
-    const v388Tables = [
-      // core
-      "users", "bookings", "packages", "hajj_groups", "pilgrims", "branches", "agents", "staff",
-      // financial
-      "payment_transactions", "invoices", "receipts", "refunds", "offline_payments",
-      "expenses", "journal_entries", "journal_entry_lines", "payment_schedules", "payment_links",
-      // agreements / docs / support / audit
-      "agreements", "documents", "support_tickets", "support_messages",
-      "feedback", "inquiries", "otps",
-      "audit_logs", "booking_audit_logs", "payment_audit_logs", "agreement_audit_logs", "finance_audit_logs",
-      // CRM / campaigns
-      "leads", "lead_followups", "lead_activities", "lead_audit_log",
-      "lead_web_forms", "lead_web_form_submissions", "lead_auto_followup_log",
-      "lead_assignment_rules", "crm_assignment_rules",
-      "broadcasts", "notification_campaigns", "push_campaigns",
-      // notifications / comms
-      "notification_templates", "notification_settings", "notification_logs",
-      "communication_event_mappings", "communication_audit_logs", "communication_consents",
-      "rcs_template_mappings", "automation_audit_logs", "automation_service_tokens",
-      "provider_health_status", "api_settings",
-      // AI / automation
-      "ai_conversations", "ai_conversation_messages", "ai_knowledge_base",
-      "ai_automation_logs", "ai_automation_jobs", "ai_automation_schedules", "ai_automation_webhooks",
-    ];
-    let totalBackfilled = 0;
-    let backfillErrors = 0;
-    for (const t of v388Tables) {
-      try {
-        const res = await pool.query(
-          `UPDATE ${t} SET tenant_id = $1 WHERE tenant_id IS NULL`,
-          [ABT_UUID]
-        );
-        const n = (res as any).rowCount ?? 0;
-        if (n > 0) totalBackfilled += n;
-      } catch (e: any) {
-        // Distinguish "column does not exist" (ADD COLUMN may have skipped optional table)
-        // from unexpected errors worth surfacing
-        if (!e.message?.includes("column") && !e.message?.includes("does not exist") && !e.message?.includes("relation")) {
-          console.warn(`[Migration] v38.8 backfill ${t}:`, e.message);
-          backfillErrors++;
-        }
-      }
-    }
-    if (backfillErrors > 0) {
-      console.warn(`[Migration] v38.8 backfill: ${backfillErrors} unexpected error(s) — check logs above`);
-    }
-    console.log(`[Migration] v38.8 backfill complete — ${totalBackfilled} rows across ${v388Tables.length} tables`);
-  } catch (err: any) { console.warn("[Migration] v38.8 backfill:", err.message); }
-
-  // ── v38.9: strict assertion + composite tenant indexes ────────────────────────
-  // For each required table: log CRITICAL if column exists but has NULL rows.
-  // Distinguish "column not found" (optional table absent — warn only) from
-  // "column exists but NULLs remain" (data integrity issue — error).
-  try {
-    const requiredTables = [
-      "users", "bookings", "packages", "pilgrims",
-      "payment_transactions", "invoices", "agreements", "documents",
-      "leads", "notification_logs",
-    ];
-    let criticalIssues = 0;
-    for (const t of requiredTables) {
-      try {
-        // First: confirm the column actually exists on this table
-        const colCheck = await pool.query(
-          `SELECT 1 FROM information_schema.columns
-            WHERE table_schema='public' AND table_name=$1 AND column_name='tenant_id'`,
-          [t]
-        );
-        if ((colCheck.rows?.length ?? 0) === 0) {
-          console.error(`[Migration] v38.9 CRITICAL: ${t}.tenant_id column is MISSING — ADD COLUMN failed`);
-          criticalIssues++;
-          continue;
-        }
-        // Column exists — now check for NULLs
-        const res = await pool.query(`SELECT COUNT(*) AS c FROM ${t} WHERE tenant_id IS NULL`);
-        const count = parseInt((res.rows[0] as any)?.c ?? "0", 10);
-        if (count > 0) {
-          console.error(`[Migration] v38.9 CRITICAL: ${t} has ${count} rows with tenant_id IS NULL after backfill`);
-          criticalIssues++;
-        }
-      } catch (e: any) {
-        console.warn(`[Migration] v38.9 assert ${t}:`, e.message);
-      }
-    }
-    if (criticalIssues === 0) {
-      console.log("[Migration] v38.9 assertion PASSED — all required tables have tenant_id column + zero NULLs");
+    // ESM-compatible path: fileURLToPath(import.meta.url) gives the current file's path.
+    // In dev (tsx ESM): src/index.ts → src/ → ../migrations/
+    // On VPS (esbuild CJS bundle): dist/index.cjs → dist/ → ../migrations/
+    // esbuild injects an import.meta.url polyfill for CJS output automatically.
+    const v38SqlPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "migrations",
+      "v38-tenant-foundation.sql"
+    );
+    const v38Sql = fs.readFileSync(v38SqlPath, "utf8");
+    await pool.query(v38Sql);
+    console.log("[Migration] v38 tenant foundation SQL executed successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.warn("[Migration] v38 SQL file not found — ensure migrations/ dir is present alongside dist/");
     } else {
-      console.error(`[Migration] v38.9 assertion FAILED — ${criticalIssues} issue(s); Phase 3 must not proceed until resolved`);
+      // RAISE EXCEPTION from assertion DO block surfaces here
+      console.error("[Migration] v38 CRITICAL: tenant foundation migration failed:", err.message);
+      // Do not abort startup — Phase 3 gating will catch incomplete state before proceeding
     }
-    // Composite indexes for tenant-scoped queries (Phase 3 will add WHERE tenant_id = $1)
-    const idxDefs: Array<[string, string, string]> = [
-      ["idx_bookings_tenant_id",      "bookings",             "tenant_id"],
-      ["idx_bookings_tenant_status",  "bookings",             "tenant_id, status"],
-      ["idx_users_tenant_id",         "users",                "tenant_id"],
-      ["idx_invoices_tenant_id",      "invoices",             "tenant_id"],
-      ["idx_payments_tenant_id",      "payment_transactions", "tenant_id"],
-      ["idx_leads_tenant_id",         "leads",                "tenant_id"],
-      ["idx_notif_logs_tenant_id",    "notification_logs",    "tenant_id"],
-      ["idx_agreements_tenant_id",    "agreements",           "tenant_id"],
-      ["idx_pilgrims_tenant_id",      "pilgrims",             "tenant_id"],
-      ["idx_hajj_groups_tenant_id",   "hajj_groups",          "tenant_id"],
-      ["idx_documents_tenant_id",     "documents",            "tenant_id"],
-      ["idx_expenses_tenant_id",      "expenses",             "tenant_id"],
-    ];
-    for (const [idxName, tbl, cols] of idxDefs) {
-      await pool.query(
-        `CREATE INDEX IF NOT EXISTS ${idxName} ON ${tbl} (${cols})`
-      ).catch((e: any) => console.warn(`[Migration] v38.9 index ${idxName}:`, e.message));
-    }
-    console.log("[Migration] v38.9 tenant composite indexes OK");
-  } catch (err: any) { console.warn("[Migration] v38.9 assert/indexes:", err.message); }
+  }
 
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
