@@ -333,11 +333,11 @@ router.get("/public/:bookingNumber/:docType", async (req, res) => {
       `SELECT d.id, d.file_url, d.file_name, d.mime_type
        FROM documents d
        JOIN bookings b ON b.id = d.booking_id
-       WHERE b.booking_number = $1
-         AND d.document_type  = $2
-         AND d.access_token   = $3
-         AND d.is_visible_to_customer = TRUE
-         AND d.uploaded_by    = 'admin'
+       WHERE b.booking_number          = $1
+         AND d.document_type::text     = $2
+         AND d.access_token            = $3
+         AND d.is_visible_to_customer  = TRUE
+         AND d.uploaded_by::text       = 'admin'
          AND (d.is_revoked IS NULL OR d.is_revoked = FALSE)
        ORDER BY d.created_at DESC
        LIMIT 1`,
