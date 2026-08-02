@@ -1030,10 +1030,14 @@ async function runMigrations() {
       )
     `);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS idempotency_key TEXT`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_event_idx ON notification_logs(event_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_status_idx ON notification_logs(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_created_idx ON notification_logs(created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_updated_idx ON notification_logs(updated_at)`);
+    // Partial unique index — prevents duplicate log rows for the same send
+    // (e.g. sms.ts internal log + notificationEngine log, or duplicate webhook calls)
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_logs_idempotency ON notification_logs (idempotency_key) WHERE idempotency_key IS NOT NULL`);
     console.log("[Migration] notification_logs table ensured");
   } catch (err) {
     console.error("[Migration] notification_logs failed:", err);

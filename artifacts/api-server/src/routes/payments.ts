@@ -9,7 +9,6 @@ import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendAdminPaymentAlert, sendWhatsApp, type EmailAttachment } from "../lib/notifications.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
-import { sendPaymentReceipt } from "../services/emailService.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
@@ -291,22 +290,9 @@ export async function processPaymentSuccessNotifications(opts: {
     }
   });
 
-  // ── Customer payment receipt email (fire-and-forget) ──────────────────────
-  if (booking.customerEmail) {
-    sendPaymentReceipt(booking.customerEmail, {
-      customerName:  booking.customerName,
-      bookingNumber: booking.bookingNumber,
-      packageName:   booking.packageName ?? undefined,
-      paymentAmount: thisPaymentAmount,
-      paymentDate:   new Date(),
-      totalAmount:   finalAmountNum || undefined,
-      paidSoFar:     newPaidAmount,
-      balanceDue:    remainingBalance > 0 ? remainingBalance : undefined,
-    }).then(r => {
-      if (!r.ok) console.error(`[payments] Payment receipt email failed for ${booking.bookingNumber}:`, r.error);
-      else console.log(`[payments] Payment receipt email sent to ${booking.customerEmail} for ${booking.bookingNumber}`);
-    }).catch(err => console.error(`[payments] Payment receipt email error for ${booking.bookingNumber}:`, err?.message));
-  }
+  // NOTE: Email is sent by triggerWorkflow → fireNotificationEvent → notificationEngine above,
+  // with PDF attachments included in ctx.attachments. A separate sendPaymentReceipt() call
+  // was removed to prevent the duplicate email that previously reached every customer twice.
 
   // Auto-generate/refresh Hajj Agreement on every payment (partial or full)
   if (booking.id) {

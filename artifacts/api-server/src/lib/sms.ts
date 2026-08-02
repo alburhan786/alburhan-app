@@ -241,14 +241,22 @@ async function logSMS(data: {
       || (rawResp?.status_code ? `Status code: ${rawResp.status_code}` : "")
       || data.errorMessage || "";
 
+    // Build idempotency key using Fast2SMS request_id when available, to prevent
+    // a duplicate row from notificationEngine.trackNotification() for the same send.
+    const smsIKey = (data.messageId && data.bookingId)
+      ? `sms:${data.bookingId}:${data.eventType}:${data.messageId}`
+      : null;
+
     await pool.query(
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload,
-        sent_at, retry_count, sender_id, wamid, customer_name, booking_number, error_code)
+        sent_at, retry_count, sender_id, wamid, customer_name, booking_number, error_code,
+        idempotency_key)
        VALUES ($1,$2,$3,$4,'sms',$5,$6,$7,$8,'Fast2SMS',
                'https://www.fast2sms.com/dev/bulkV2',
-               $9,$10,NOW(),$11,$12,$13,$14,$15,$16)`,
+               $9,$10,NOW(),$11,$12,$13,$14,$15,$16,$17)
+       ON CONFLICT (idempotency_key) DO NOTHING`,
       [
         id, data.eventType,
         data.customerId || null, data.bookingId || null,
@@ -285,6 +293,7 @@ async function logSMS(data: {
         data.customerName || null,
         data.bookingNumber || null,
         data.errorCode || null,
+        smsIKey,
       ]
     );
   } catch (e) {

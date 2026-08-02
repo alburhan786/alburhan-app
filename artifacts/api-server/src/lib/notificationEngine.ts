@@ -389,6 +389,8 @@ export async function trackNotification(data: {
   status: "sent" | "failed" | "pending";
   providerResponse?: unknown;
   provider?: string;
+  /** Optional idempotency key — prevents double-log rows when sms.ts also logs internally */
+  idempotencyKey?: string;
 }): Promise<void> {
   try {
     const id = await makeLogId();
@@ -410,8 +412,9 @@ export async function trackNotification(data: {
         channel, recipient, message, status,
         provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
         wamid, template,
-        sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0)`,
+        sent_at, retry_count, idempotency_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0,$19)
+       ON CONFLICT (idempotency_key) DO NOTHING`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
@@ -419,6 +422,7 @@ export async function trackNotification(data: {
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
         providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
         wamid, templateId,
+        data.idempotencyKey || null,
       ]
     );
     // ── Enqueue non-WhatsApp failures into the generic retry queue ──────────
@@ -1122,6 +1126,31 @@ export async function fireNotificationEvent(
     }
   }
 
+  // ── PAYMENT IDEMPOTENCY: skip if this exact payment (paymentRef) already triggered this event ──
+  // Prevents double-firing when both Razorpay verify and webhook endpoints call
+  // processPaymentSuccessNotifications for the same payment transaction simultaneously.
+  const paymentRefCtx = (ctx as any).paymentRef as string | undefined;
+  if (paymentRefCtx && (eventType === "payment_received" || eventType === "partial_payment")) {
+    try {
+      const recent = await pool.query(
+        `SELECT id FROM notification_logs
+         WHERE booking_id = $1
+           AND event_type = $2
+           AND idempotency_key LIKE $3
+           AND status = 'sent'
+         LIMIT 1`,
+        [ctx.bookingId, eventType, `pay:${paymentRefCtx}:%`]
+      );
+      if (recent.rows.length > 0) {
+        console.log(`[notifEngine] ⏭ PAYMENT-DEDUP-BLOCKED: ${eventType} already fired for paymentRef=${paymentRefCtx} (log=${recent.rows[0].id})`);
+        return;
+      }
+      console.log(`[notifEngine] ✓ Payment dedup OK: no prior ${eventType} send for paymentRef=${paymentRefCtx}`);
+    } catch (dedupErr: any) {
+      console.warn(`[notifEngine] ⚠ payment dedup check failed (non-fatal):`, dedupErr?.message);
+    }
+  }
+
   const enabled = await getEnabledChannels(eventType);
   const orderedChannels = CHANNEL_PRIORITY.filter(c => {
     if (!enabled.includes(c)) return false;
@@ -1153,12 +1182,26 @@ export async function fireNotificationEvent(
       ? result.value
       : { status: "failed" as const, providerResponse: { ok: false, errorMessage: (result.reason as Error)?.message } };
 
+    // Build idempotency key — prevents double-log rows (e.g. sms.ts also logs internally)
+    const pr2 = providerResponse as Record<string, unknown> | null | undefined;
+    const smsRequestId = pr2?.messageId || pr2?.request_id ||
+      (pr2?.rawResponse as Record<string, unknown>)?.request_id || null;
+    const paymentRef = (ctx as any).paymentRef as string | undefined;
+    let iKey: string | undefined;
+    if (paymentRef) {
+      // Payment events: keyed by paymentRef so each real payment fires exactly once per channel
+      iKey = `pay:${paymentRef}:${eventType}:${channel}`;
+    } else if (channel === "sms" && smsRequestId && ctx.bookingId) {
+      // SMS: keyed by Fast2SMS request_id to collapse the sms.ts internal log + notificationEngine log
+      iKey = `sms:${ctx.bookingId}:${eventType}:${smsRequestId}`;
+    }
     await trackNotification({
       eventType, channel,
       recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
       customerId: ctx.customerId, bookingId: ctx.bookingId,
       customerName: ctx.customerName, bookingNumber: ctx.bookingNumber,
       message, status, providerResponse,
+      idempotencyKey: iKey,
     });
     if (status === "sent") {
       successCount++;
