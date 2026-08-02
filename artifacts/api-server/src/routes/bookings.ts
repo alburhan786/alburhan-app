@@ -1169,47 +1169,82 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
   }
   let b = bookings[0];
 
-  // Guard: block invoice notifications for pending/unapproved bookings or zero-amount bookings.
-  // Sending invoice notifications before approval causes customers to receive premature messages
-  // with blank invoice numbers and zero amounts — a confirmed production bug (2026-08-02).
-  if (b.status === "pending" || b.status === "submitted") {
-    console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} is in status '${b.status}' — must be approved before sending invoice notification`);
-    res.status(422).json({
-      message: "DATA_VALIDATION_FAILED",
-      detail: `Booking ${b.bookingNumber} is in status '${b.status}'. Approve the booking before sending an invoice notification.`,
-    });
-    return;
-  }
-  if (!b.finalAmount || Number(b.finalAmount) <= 0) {
-    console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} has no final amount`);
-    res.status(422).json({
-      message: "DATA_VALIDATION_FAILED",
-      detail: `Booking ${b.bookingNumber} has no final amount. Set the package price before sending an invoice notification.`,
-    });
-    return;
-  }
-  // Guard: require that a real invoice record exists in the invoices table
-  // (not just an invoice_number field on the booking row). This prevents sending
-  // invoice notifications for bookings that have a number assigned but no actual invoice.
+  // ── COMPREHENSIVE INVOICE NOTIFICATION VALIDATOR ────────────────────────────
+  // All 8 conditions must pass before any channel is contacted.
+  // Returns a structured list of missing/invalid fields so the admin UI can
+  // display them precisely. Validation failure is also written to notification_logs.
   {
     const { pool: pgPool2 } = await import("@workspace/db");
-    const invCheck = await pgPool2.query(
-      `SELECT id, total, invoice_status FROM invoices WHERE booking_id=$1 AND invoice_status NOT IN ('void','cancelled') LIMIT 1`,
+
+    const invRow = await pgPool2.query(
+      `SELECT id, total, invoice_status, invoice_number FROM invoices
+       WHERE booking_id=$1 AND invoice_status NOT IN ('void','cancelled')
+       ORDER BY created_at ASC LIMIT 1`,
       [b.id]
     );
-    if (invCheck.rows.length === 0) {
-      console.error(`[send-invoice] DATA_VALIDATION_FAILED: booking ${b.bookingNumber} has no invoice record in invoices table`);
-      res.status(422).json({
-        message: "DATA_VALIDATION_FAILED",
-        detail: `Booking ${b.bookingNumber} has no invoice in the system. Generate the invoice first before sending a notification.`,
-      });
-      return;
+
+    const baseUrl = (process.env.SITE_URL || "https://alburhantravels.com").trim();
+    const candidateInvoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
+
+    type ValidationFailure = { field: string; reason: string };
+    const failures: ValidationFailure[] = [];
+
+    // 1. Booking exists — already confirmed above
+    // 2. Booking status permits invoice generation
+    const UNPAYABLE_STATUSES = ["pending", "submitted", "rejected", "cancelled"];
+    if (UNPAYABLE_STATUSES.includes(b.status ?? "")) {
+      failures.push({ field: "booking_status", reason: `Booking is in status '${b.status}' — must be approved, partially_paid, or confirmed` });
     }
-    if (!invCheck.rows[0].total || Number(invCheck.rows[0].total) <= 0) {
-      console.error(`[send-invoice] DATA_VALIDATION_FAILED: invoice for ${b.bookingNumber} has zero total`);
+    // 3. Actual invoice record exists
+    if (invRow.rows.length === 0) {
+      failures.push({ field: "invoice_record", reason: "No invoice record found in the system — generate the invoice first" });
+    }
+    // 4. Invoice number present
+    const effectiveInvoiceNumber = invRow.rows[0]?.invoice_number || b.invoiceNumber;
+    if (!effectiveInvoiceNumber || String(effectiveInvoiceNumber).trim() === "") {
+      failures.push({ field: "invoice_number", reason: "Invoice number is blank — the invoice may not have been finalised" });
+    }
+    // 5. Total amount > 0
+    const invoiceTotal = invRow.rows[0] ? Number(invRow.rows[0].total) : 0;
+    const fallbackAmount = Number(b.finalAmount || 0);
+    if (invoiceTotal <= 0 && fallbackAmount <= 0) {
+      failures.push({ field: "total_amount", reason: "Invoice total and booking final amount are both zero or missing" });
+    }
+    // 6. Customer name present
+    if (!b.customerName || String(b.customerName).trim() === "") {
+      failures.push({ field: "customer_name", reason: "Customer name is blank on this booking" });
+    }
+    // 7. Package name present
+    if (!b.packageName || String(b.packageName).trim() === "") {
+      failures.push({ field: "package_name", reason: "Package name is blank — attach a package to the booking first" });
+    }
+    // 8. Invoice URL complete and valid
+    if (!candidateInvoiceUrl.startsWith("https://") || !b.bookingNumber) {
+      failures.push({ field: "invoice_url", reason: `Invoice URL '${candidateInvoiceUrl}' is incomplete or malformed` });
+    }
+
+    if (failures.length > 0) {
+      const summary = failures.map(f => `${f.field}: ${f.reason}`).join("; ");
+      console.error(`[send-invoice] INVOICE_VALIDATION_FAILED for ${b.bookingNumber}: ${summary}`);
+      // Log to notification_logs so the admin dashboard shows the block
+      pgPool2.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, status, booking_id,
+          customer_name, booking_number, error_code, error_message, created_at, updated_at)
+         VALUES ($1,'invoice_generated','admin',$2,'failed',$3,$4,$5,'INVOICE_VALIDATION_FAILED',$6,NOW(),NOW())`,
+        [
+          `inv_val_${Date.now()}`,
+          b.customerMobile,
+          b.id,
+          b.customerName || null,
+          b.bookingNumber || null,
+          summary,
+        ]
+      ).catch(() => {/* non-fatal */});
+
       res.status(422).json({
-        message: "DATA_VALIDATION_FAILED",
-        detail: `The invoice for booking ${b.bookingNumber} has a zero total amount. Update the invoice before sending.`,
+        message: "INVOICE_VALIDATION_FAILED",
+        failures,
+        detail: `Invoice notification blocked — ${failures.length} validation error(s): ${summary}`,
       });
       return;
     }

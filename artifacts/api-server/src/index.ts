@@ -3065,6 +3065,106 @@ async function start() {
     console.log("[Migration] v33.0 documents.access_token ensured + backfilled");
   } catch (err: any) { console.warn("[Migration] v33.0 documents access_token:", err.message); }
 
+  // ── v33.1 — payment_transactions: UNIQUE index on reference_number (concurrent payment dedup) ──
+  // Without this, two concurrent verify+webhook calls for the same Razorpay paymentId can both
+  // pass the application-level WHERE NOT EXISTS check and insert duplicate payment records.
+  // The UNIQUE index is the DB-level safety net that rejects the second insert with code 23505.
+  try {
+    // Deduplicate existing rows before creating the unique index (keeps oldest row per reference_number)
+    const dupPayRows = await pool.query(
+      `SELECT reference_number, MIN(created_at) AS keep_at
+       FROM payment_transactions
+       WHERE reference_number IS NOT NULL
+       GROUP BY reference_number
+       HAVING COUNT(*) > 1`
+    );
+    let dupPayDeleted = 0;
+    for (const row of dupPayRows.rows) {
+      const d = await pool.query(
+        `DELETE FROM payment_transactions
+         WHERE reference_number=$1
+           AND ctid NOT IN (
+             SELECT ctid FROM payment_transactions
+             WHERE reference_number=$1
+             ORDER BY created_at ASC LIMIT 1
+           )`,
+        [row.reference_number]
+      );
+      dupPayDeleted += d.rowCount ?? 0;
+    }
+    if (dupPayDeleted > 0) console.log(`[Migration] v33.1 removed ${dupPayDeleted} duplicate payment_transactions rows`);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_transactions_reference_number
+      ON payment_transactions(reference_number)
+      WHERE reference_number IS NOT NULL
+    `);
+    console.log("[Migration] v33.1 payment_transactions UNIQUE(reference_number) index ensured");
+  } catch (err: any) { console.warn("[Migration] v33.1 payment_transactions unique index:", err.message); }
+
+  // ── v33.2 — notification_logs: add superseded_at/superseded_by for duplicate audit trail ──
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS superseded_at  TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS superseded_by  TEXT REFERENCES notification_logs(id) ON DELETE SET NULL`);
+    console.log("[Migration] v33.2 notification_logs superseded_at/superseded_by columns ensured");
+  } catch (err: any) { console.warn("[Migration] v33.2 notification_logs superseded cols:", err.message); }
+
+  // ── v33.3 — notification_logs: soft-mark historical duplicates (no deletes, no resends) ──
+  // For each (booking_id, event_type, channel) group with more than one 'sent' row and no
+  // idempotency_key: keep the oldest row, mark all later ones superseded_by=oldest_id.
+  // This preserves the complete audit trail while making it clear which was the canonical send.
+  try {
+    // Create audit backup table before touching anything
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_logs_dup_audit (
+        id            TEXT PRIMARY KEY,
+        snapshot_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        original_id   TEXT NOT NULL,
+        booking_id    TEXT,
+        event_type    TEXT,
+        channel       TEXT,
+        status        TEXT,
+        created_at    TIMESTAMPTZ,
+        superseded_by TEXT,
+        reason        TEXT
+      )
+    `);
+    // Identify true duplicates: same booking+event+channel, status=sent, no idempotency key
+    const dupGroups = await pool.query(`
+      SELECT booking_id, event_type, channel,
+             MIN(id) AS keep_id,
+             ARRAY_AGG(id ORDER BY created_at ASC) AS all_ids
+      FROM notification_logs
+      WHERE status = 'sent'
+        AND idempotency_key IS NULL
+        AND booking_id IS NOT NULL
+        AND superseded_at IS NULL
+      GROUP BY booking_id, event_type, channel
+      HAVING COUNT(*) > 1
+    `);
+    let markedCount = 0;
+    for (const grp of dupGroups.rows) {
+      const keepId: string = grp.keep_id;
+      const laterIds: string[] = (grp.all_ids as string[]).filter((id: string) => id !== keepId);
+      for (const dupId of laterIds) {
+        // Write to audit table first
+        await pool.query(
+          `INSERT INTO notification_logs_dup_audit (id, original_id, booking_id, event_type, channel, status, created_at, superseded_by, reason)
+           SELECT gen_random_uuid()::text, nl.id, nl.booking_id, nl.event_type, nl.channel, nl.status, nl.created_at, $2, 'historical_duplicate_no_idempotency_key'
+           FROM notification_logs nl WHERE nl.id=$1 ON CONFLICT DO NOTHING`,
+          [dupId, keepId]
+        );
+        // Soft-mark as superseded — does NOT change status (row still reads as 'sent' for history)
+        await pool.query(
+          `UPDATE notification_logs SET superseded_at=NOW(), superseded_by=$2, updated_at=NOW()
+           WHERE id=$1 AND superseded_at IS NULL`,
+          [dupId, keepId]
+        );
+        markedCount++;
+      }
+    }
+    console.log(`[Migration] v33.3 notification_logs duplicate audit: ${dupGroups.rows.length} groups, ${markedCount} rows soft-marked superseded`);
+  } catch (err: any) { console.warn("[Migration] v33.3 notification_logs dup cleanup:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

@@ -91,11 +91,27 @@ async function recordOnlinePaymentTransaction(
   const today = new Date().toISOString().slice(0, 10);
   const txnId = crypto.randomUUID();
   try {
+    // Use advisory lock keyed by hashtext(reference_number) so that concurrent verify +
+    // webhook calls for the same Razorpay payment ID never race past each other.
+    // pg_try_advisory_xact_lock is transaction-scoped and released automatically at commit/rollback.
+    const lockRes = await pool.query(
+      `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS locked`,
+      [razorpayPaymentId]
+    );
+    const gotLock = lockRes.rows[0]?.locked === true;
+    if (!gotLock) {
+      // Another concurrent request is processing the same paymentId right now — skip.
+      console.log(`[payments] payment_transactions: advisory lock not acquired for ${razorpayPaymentId} — skipping duplicate`);
+      return null;
+    }
+
     const r = await pool.query(
+      // UNIQUE INDEX on reference_number (migration v33.1) is the DB-level safety net.
+      // The application-level WHERE NOT EXISTS guard is kept as a fast pre-check.
       `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes)
        SELECT $1,$2,$3,$4,'online',$5,$6
        WHERE NOT EXISTS (
-         SELECT 1 FROM payment_transactions WHERE reference_number=$5 AND booking_id=$2
+         SELECT 1 FROM payment_transactions WHERE reference_number=$5
        )
        RETURNING id`,
       [txnId, bookingId, String(amount), today, razorpayPaymentId, note]
@@ -115,6 +131,11 @@ async function recordOnlinePaymentTransaction(
     }).catch((e: any) => console.error("[payments] postPaymentJournal failed (non-fatal):", e?.message));
     return insertedId;
   } catch (e: any) {
+    if ((e?.code === "23505") /* unique_violation */) {
+      // The UNIQUE index on reference_number caught a concurrent insert — treat as duplicate
+      console.log(`[payments] payment_transactions: UNIQUE constraint blocked duplicate insert for ${razorpayPaymentId}`);
+      return null;
+    }
     console.error("[payments] payment_transactions insert failed:", e?.message);
     return null;
   }
@@ -467,6 +488,37 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
   if (existingBooking.razorpayOrderId && existingBooking.razorpayOrderId !== razorpayOrderId) {
     res.status(400).json({ success: false, message: "Order ID mismatch" });
     return;
+  }
+
+  // ── EARLY IDEMPOTENCY CHECK: bail out before writing if this paymentId was already recorded ──
+  // Handles the "customer presses back and resubmits" and "webhook fires before verify responds" cases.
+  {
+    const dupTxn = await pool.query(
+      `SELECT id FROM payment_transactions WHERE reference_number=$1 LIMIT 1`,
+      [razorpayPaymentId]
+    );
+    if (dupTxn.rows.length > 0) {
+      console.log(`[verify] IDEMPOTENCY: paymentId ${razorpayPaymentId} already in payment_transactions — returning success without re-processing`);
+      // Return success so the customer's success page renders correctly
+      const currentBooking = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
+      const bk = mapBookingRow(currentBooking.rows[0]);
+      const siteBaseIdm = (process.env.SITE_URL || "https://alburhantravels.com").trim();
+      res.json({
+        success: true,
+        alreadyProcessed: true,
+        invoice: bk.invoiceNumber ? `${siteBaseIdm}/invoice/${bk.bookingNumber}` : null,
+        status: bk.status,
+        isFullyPaid: bk.status === "confirmed",
+        invoiceNumber: bk.invoiceNumber || null,
+        booking: {
+          ...bk,
+          totalAmount: bk.totalAmount ? Number(bk.totalAmount) : null,
+          finalAmount: bk.finalAmount ? Number(bk.finalAmount) : null,
+          paidAmount: bk.paidAmount ? Number(bk.paidAmount) : null,
+        },
+      });
+      return;
+    }
   }
 
   const finalAmount = Number(existingBooking.finalAmount || 0);
