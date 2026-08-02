@@ -7,6 +7,7 @@
  *
  * Routes:
  *   GET  /dashboard                      — Phase 1 KPI cards
+ *   GET  /health                         — Finance foundation health proof
  *   GET  /settings                       — Finance settings
  *   PUT  /settings                       — Update finance settings
  *   GET  /bookings/:id/financials        — calculateBookingFinancials
@@ -220,6 +221,62 @@ router.put("/settings", async (req: AuthenticatedRequest, res) => {
     res.json({ ok: true, settings: await getFinanceSettings() });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update finance settings" });
+  }
+});
+
+// ─── GET /health ──────────────────────────────────────────────────────────────
+// Machine-readable proof that the finance foundation is fully configured.
+// Returns the active settings, guard state, and any data quality issues.
+
+router.get("/health", async (_req: AuthenticatedRequest, res) => {
+  try {
+    const [settingsRow, nullGstCount, nullAmtCount, seqCheck] = await Promise.all([
+      pool.query(`SELECT * FROM booking_settings WHERE id='default' LIMIT 1`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE gst_rate IS NULL AND status NOT IN ('pending','cancelled')`),
+      pool.query(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE (final_amount IS NULL OR final_amount<=0) AND status='approved'`),
+      pool.query(`SELECT
+        (SELECT last_value FROM invoice_number_seq) AS inv_seq,
+        (SELECT last_value FROM receipt_number_seq) AS rec_seq,
+        (SELECT last_value FROM refund_number_seq)  AS ref_seq`).catch(() => ({ rows: [{}] })),
+    ]);
+    const s = settingsRow.rows[0] ?? {};
+    const visaGuardActive       = s.block_visa_balance_pending === true;
+    const financeDefaultsSeeded = settingsRow.rows.length > 0;
+
+    const issues: string[] = [];
+    if (!financeDefaultsSeeded)            issues.push("booking_settings id='default' row missing — finance defaults not configured");
+    if (!visaGuardActive)                  issues.push("block_visa_balance_pending=false — visa payment guard is DISABLED");
+    if (Number(nullGstCount.rows[0]?.cnt) > 0) issues.push(`${nullGstCount.rows[0].cnt} active/approved bookings still have NULL gst_rate (will use system default fallback)`);
+    if (Number(nullAmtCount.rows[0]?.cnt) > 0) issues.push(`${nullAmtCount.rows[0].cnt} approved bookings have no final_amount — invoice generation will fail`);
+
+    res.json({
+      ok:                        issues.length === 0,
+      finance_defaults_seeded:   financeDefaultsSeeded,
+      visa_guard_active:         visaGuardActive,
+      standard_advance_pct:      Number(s.standard_advance_pct ?? 50),
+      gst_rate:                  Number(s.gst_rate ?? 5),
+      tcs_rate:                  Number(s.tcs_rate ?? 2),
+      gst_enabled:               s.gst_enabled ?? true,
+      tcs_enabled:               s.tcs_enabled ?? false,
+      block_visa_balance_pending: s.block_visa_balance_pending ?? true,
+      balance_due_after_days:    Number(s.balance_due_after_days ?? 50),
+      default_currency:          s.default_currency ?? "INR",
+      sar_reference_rate:        Number(s.sar_reference_rate ?? 25.70),
+      spc_charge:                Number(s.spc_charge ?? 5500),
+      sequences: {
+        invoice_number_seq: Number(seqCheck.rows[0]?.inv_seq ?? 0),
+        receipt_number_seq: Number(seqCheck.rows[0]?.rec_seq ?? 0),
+        refund_number_seq:  Number(seqCheck.rows[0]?.ref_seq ?? 0),
+      },
+      data_quality: {
+        null_gst_rate_active_bookings:    Number(nullGstCount.rows[0]?.cnt ?? 0),
+        approved_bookings_missing_amount: Number(nullAmtCount.rows[0]?.cnt ?? 0),
+      },
+      issues,
+    });
+  } catch (err: any) {
+    console.error("[finance] health:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 

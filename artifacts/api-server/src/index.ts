@@ -3351,6 +3351,41 @@ async function start() {
     console.log("[Migration] v34.7 finance settings columns + bookings.payment_status ensured");
   } catch (err: any) { console.warn("[Migration] v34.7 finance settings:", err.message); }
 
+  // ── v34.8 — authoritative GST: backfill NULL gst_rate/tcs_rate on bookings ──
+  // The Phase 1 delivery noted ambiguity: some bookings have NULL gst_rate.
+  // These must use the system default from booking_settings, not 0.
+  // This migration writes the system default into each NULL row so the
+  // booking row itself becomes the authoritative snapshot going forward.
+  try {
+    const sysRates = await pool.query(
+      `SELECT gst_rate, tcs_rate, gst_enabled, tcs_enabled FROM booking_settings WHERE id='default' LIMIT 1`
+    );
+    const sysGst = sysRates.rows[0]?.gst_rate ?? 5;
+    const sysTcs = sysRates.rows[0]?.tcs_rate ?? 2;
+
+    // Backfill bookings with NULL gst_rate (use system default as the snapshot)
+    const gstFix = await pool.query(
+      `UPDATE bookings SET gst_rate=$1 WHERE gst_rate IS NULL RETURNING id`,
+      [sysGst]
+    );
+    // Backfill bookings with NULL tcs_rate (keep tcs = 0 if tcs not enabled, else system default)
+    const tcsEnabled = sysRates.rows[0]?.tcs_enabled ?? false;
+    const tcsFillValue = tcsEnabled ? sysTcs : 0;
+    const tcsFix = await pool.query(
+      `UPDATE bookings SET tcs_rate=$1 WHERE tcs_rate IS NULL RETURNING id`,
+      [tcsFillValue]
+    );
+
+    // Backfill existing invoices that have NULL gst_rate (snapshot forward)
+    await pool.query(
+      `UPDATE invoices i SET gst_rate=b.gst_rate, tcs_rate=b.tcs_rate
+       FROM bookings b WHERE b.id=i.booking_id
+         AND (i.gst_rate IS NULL OR i.tcs_rate IS NULL)`
+    ).catch(() => {});
+
+    console.log(`[Migration] v34.8 GST/TCS backfill: ${gstFix.rowCount} bookings fixed gst_rate=${sysGst}, ${tcsFix.rowCount} bookings fixed tcs_rate=${tcsFillValue}`);
+  } catch (err: any) { console.warn("[Migration] v34.8 GST backfill:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

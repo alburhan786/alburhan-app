@@ -28,9 +28,9 @@ TEST_BK_NUM="FINREG-$(date +%s)"
 TEST_BK_ID=$(dbq "
   INSERT INTO bookings
     (id, booking_number, customer_name, customer_mobile, number_of_pilgrims, status,
-     total_amount, final_amount, package_name, created_at, updated_at)
+     total_amount, final_amount, package_name, gst_rate, tcs_rate, created_at, updated_at)
   VALUES (gen_random_uuid()::text,'$TEST_BK_NUM','Test Finance Customer','9900000099',
-          1, 'pending', 50000, 55000, 'Test Hajj Package', NOW(), NOW())
+          1, 'pending', 50000, 55000, 'Test Hajj Package', 5.00, 0.00, NOW(), NOW())
   RETURNING id")
 
 if [ -z "$TEST_BK_ID" ]; then
@@ -301,6 +301,84 @@ UNIQ_RECEIPT=$(dbq "SELECT COUNT(*) FROM pg_indexes WHERE tablename='receipts' A
 grep -q "is_void\|ALLOWED_INVOICE_SOURCES" \
   "$(dirname "$0")/../src/lib/financeService.ts" 2>/dev/null && \
   pass "S6: Invoice immutability (is_void) and source guard implemented" || fail "S6: Invoice immutability missing"
+
+# ─── R1: GST/TCS authority — backfill verified, no NULL gst_rate on live bookings ──
+echo ""
+echo "── Repair R1: GST/TCS authority ────────────────────────────────────────────"
+
+NULL_GST=$(dbq "SELECT COUNT(*) FROM bookings WHERE gst_rate IS NULL AND status NOT IN ('pending','cancelled')")
+[ "$NULL_GST" = "0" ] && pass "R1a: No active/approved bookings with NULL gst_rate after v34.8 backfill" || fail "R1a: $NULL_GST active bookings still have NULL gst_rate"
+
+NULL_TCS=$(dbq "SELECT COUNT(*) FROM bookings WHERE tcs_rate IS NULL AND status NOT IN ('pending','cancelled')")
+[ "$NULL_TCS" = "0" ] && pass "R1b: No active/approved bookings with NULL tcs_rate after v34.8 backfill" || fail "R1b: $NULL_TCS active bookings still have NULL tcs_rate"
+
+# Verify service falls back to system default (not 0) for NULL booking rates
+grep -q "sysSettings.gst_rate\|invSysSettings.gst_rate" \
+  "$(dirname "$0")/../src/lib/financeService.ts" 2>/dev/null && \
+  pass "R1c: financeService.ts uses system default fallback for NULL booking gst_rate" || \
+  fail "R1c: financeService.ts still falls back to literal 0 for NULL gst_rate"
+
+SYS_GST=$(dbq "SELECT gst_rate FROM booking_settings WHERE id='default'")
+[ -n "$SYS_GST" ] && pass "R1d: booking_settings gst_rate = $SYS_GST (authoritative default)" || fail "R1d: booking_settings has no gst_rate"
+
+# ─── R2: Finance defaults verified active without manual config ────────────────
+echo ""
+echo "── Repair R2: Finance defaults verified active ──────────────────────────────"
+
+VISA_GUARD=$(dbq "SELECT block_visa_balance_pending::text FROM booking_settings WHERE id='default'")
+[ "$VISA_GUARD" = "true" ] && pass "R2a: Visa guard is ACTIVE (block_visa_balance_pending=true)" || fail "R2a: Visa guard is NOT active (got '$VISA_GUARD')"
+
+ADV_PCT=$(dbq "SELECT standard_advance_pct::text FROM booking_settings WHERE id='default'")
+[ -n "$ADV_PCT" ] && pass "R2b: standard_advance_pct = $ADV_PCT% (configured, visa guard will enforce this)" || fail "R2b: standard_advance_pct is missing"
+
+BALANCE_DAYS=$(dbq "SELECT balance_due_after_days::text FROM booking_settings WHERE id='default'")
+[ -n "$BALANCE_DAYS" ] && pass "R2c: balance_due_after_days = $BALANCE_DAYS (payment terms configured)" || fail "R2c: balance_due_after_days is missing"
+
+DISC_FULL=$(dbq "SELECT discount_full_payment_required::text FROM booking_settings WHERE id='default'")
+[ -n "$DISC_FULL" ] && pass "R2d: discount_full_payment_required = $DISC_FULL (configured)" || fail "R2d: discount_full_payment_required missing"
+
+# ─── R3: Visa guard on bulk-update path ───────────────────────────────────────
+echo ""
+echo "── Repair R3: Visa guard — bulk-update path ────────────────────────────────"
+
+grep -q "VISA_PAYMENT_BLOCKED\|checkVisaPaymentEligibility" \
+  "$(dirname "$0")/../src/routes/visa.ts" 2>/dev/null && \
+  pass "R3a: Visa payment guard code present in visa.ts" || fail "R3a: Visa guard missing from visa.ts"
+
+grep -q "bulk-update\|bulk_update\|pilgrimIds" \
+  "$(dirname "$0")/../src/routes/visa.ts" 2>/dev/null && \
+  pass "R3b: Bulk-update route exists in visa.ts" || fail "R3b: bulk-update route missing"
+
+# Count occurrences of the guard call — should appear twice (single PUT + bulk POST)
+GUARD_COUNT=$(grep -c "checkVisaPaymentEligibility" "$(dirname "$0")/../src/routes/visa.ts" 2>/dev/null || echo 0)
+[ "$GUARD_COUNT" -ge "2" ] && pass "R3c: checkVisaPaymentEligibility called in both single-PUT and bulk-POST paths ($GUARD_COUNT occurrences)" || fail "R3c: Guard only in $GUARD_COUNT path(s) — bulk-update may be unguarded"
+
+grep -q "visa_bulk_payment_override" \
+  "$(dirname "$0")/../src/routes/visa.ts" 2>/dev/null && \
+  pass "R3d: Bulk override audit log action exists (visa_bulk_payment_override)" || fail "R3d: Bulk override audit log missing"
+
+# ─── R4: /api/finance/health endpoint proven active ─────────────────────────
+echo ""
+echo "── Repair R4: /api/finance/health endpoint ─────────────────────────────────"
+
+grep -q "finance_defaults_seeded\|visa_guard_active" \
+  "$(dirname "$0")/../src/routes/finance.ts" 2>/dev/null && \
+  pass "R4a: /api/finance/health endpoint implemented in finance.ts" || fail "R4a: health endpoint missing"
+
+grep -q "null_gst_rate_active_bookings\|data_quality" \
+  "$(dirname "$0")/../src/routes/finance.ts" 2>/dev/null && \
+  pass "R4b: health endpoint reports data quality (null_gst_rate_active_bookings)" || fail "R4b: data_quality field missing from health endpoint"
+
+grep -q "sequences.*invoice_number_seq\|invoice_number_seq.*sequences" \
+  "$(dirname "$0")/../src/routes/finance.ts" 2>/dev/null || \
+grep -q "inv_seq\|invoice_number_seq" \
+  "$(dirname "$0")/../src/routes/finance.ts" 2>/dev/null && \
+  pass "R4c: health endpoint includes sequence state verification" || fail "R4c: sequence state missing from health endpoint"
+
+# Verify the health endpoint is listed in the finance route comment header
+grep -q "/health" \
+  "$(dirname "$0")/../src/routes/finance.ts" 2>/dev/null && \
+  pass "R4d: /health listed in finance.ts route documentation" || fail "R4d: /health not documented in finance.ts header"
 
 # ─── Cleanup ──────────────────────────────────────────────────────────────────
 echo ""

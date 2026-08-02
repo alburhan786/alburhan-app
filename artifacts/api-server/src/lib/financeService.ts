@@ -194,6 +194,13 @@ export async function generateRefundNumber(): Promise<string> {
 // ─── calculateBookingFinancials ───────────────────────────────────────────────
 // ALWAYS reads payment_transactions for payment totals.
 // Never trusts bookings.paid_amount alone as the source of truth.
+//
+// GST / TCS authority rule:
+//   1. Use the rate stored ON the booking (the snapshot when it was created).
+//   2. If the booking rate is NULL (e.g. pre-Phase-1 legacy rows), fall back
+//      to booking_settings.gst_rate / tcs_rate (the system default).
+//   3. Never fall back to the literal constant 0 — that would silently
+//      understate every legacy invoice.
 
 export async function calculateBookingFinancials(
   bookingId: string
@@ -204,6 +211,9 @@ export async function calculateBookingFinancials(
   );
   const b = bRes.rows[0];
   if (!b) return null;
+
+  // Load system defaults once (fast single-row read) for NULL-fallback below
+  const sysSettings = await getFinanceSettings();
 
   // Sum actual non-deleted payments
   const ptRes = await pool.query(
@@ -229,9 +239,10 @@ export async function calculateBookingFinancials(
       ? b.taxable_amount
       : packageBaseAmount - discountAmount
   );
-  const gstRate            = r2(b.gst_rate ?? 0);
+  // Authoritative rate: booking row first, then system default (never literal 0)
+  const gstRate            = b.gst_rate != null ? r2(b.gst_rate) : r2(Number(sysSettings.gst_rate));
   const gstAmount          = r2(b.gst_amount ?? 0);
-  const tcsRate            = r2(b.tcs_rate ?? 0);
+  const tcsRate            = b.tcs_rate != null ? r2(b.tcs_rate) : r2(Number(sysSettings.tcs_rate));
   const tcsAmount          = r2(b.tcs_amount ?? 0);
   const visaCharges        = r2(b.visa_charges ?? 0);
   const additionalCharges  = r2(b.additional_charges ?? 0);
@@ -345,12 +356,14 @@ export async function createOrUpdateBookingInvoice(opts: {
   }
 
   // ── Compute invoice amounts ────────────────────────────────────────────────
+  // Load system defaults for NULL-fallback (same authority rule as calculateBookingFinancials)
+  const invSysSettings = await getFinanceSettings();
   const subtotal     = r2(b.total_amount);
   const discount     = r2(b.discount_amount);
   const taxable      = r2(b.taxable_amount != null ? b.taxable_amount : subtotal - discount);
-  const gstRate      = r2(b.gst_rate ?? 0);
+  const gstRate      = b.gst_rate != null ? r2(b.gst_rate) : r2(Number(invSysSettings.gst_rate));
   const gstAmount    = r2(b.gst_amount ?? 0);
-  const tcsRate      = r2(b.tcs_rate ?? 0);
+  const tcsRate      = b.tcs_rate != null ? r2(b.tcs_rate) : r2(Number(invSysSettings.tcs_rate));
   const tcsAmount    = r2(b.tcs_amount ?? 0);
   const visaCharges  = r2(b.visa_charges ?? 0);
   const addlCharges  = r2(b.additional_charges ?? 0);

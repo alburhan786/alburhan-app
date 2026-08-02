@@ -5,6 +5,7 @@ import {
   RefreshCw, IndianRupee, TrendingUp, TrendingDown, CreditCard,
   FileText, Receipt, BarChart2, Users, Wallet, ArrowRight,
   Activity, AlertTriangle, Clock, CheckCircle2, Download,
+  Settings, ShieldCheck, ShieldAlert, Save, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 const BASE_API = import.meta.env.VITE_API_URL || "";
@@ -50,6 +51,183 @@ function KPI({ label, value, sub, icon: Icon, color, bg, border, trend }: {
   );
 }
 
+// ─── Finance Health Banner ─────────────────────────────────────────────────────
+function HealthBanner({ health }: { health: any }) {
+  if (!health) return null;
+  if (health.ok) {
+    return (
+      <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-sm">
+        <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
+        <span className="font-semibold">Finance foundation healthy</span>
+        <span className="text-emerald-700 ml-1">— visa guard active ({health.standard_advance_pct}% advance required), sequences ready</span>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+      <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+        <ShieldAlert size={15} /> Finance foundation has {health.issues?.length ?? 0} issue(s)
+      </div>
+      {(health.issues ?? []).map((issue: string, i: number) => (
+        <p key={i} className="text-xs text-amber-700 pl-5">• {issue}</p>
+      ))}
+    </div>
+  );
+}
+
+// ─── Finance Settings Panel ────────────────────────────────────────────────────
+function FinanceSettingsPanel({ onSaved }: { onSaved: () => void }) {
+  const [open, setOpen]       = useState(false);
+  const [settings, setSett]   = useState<any>(null);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [err, setErr]         = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    fetch(`${BASE_API}/api/finance/settings`, { credentials: "include" })
+      .then(r => r.json()).then(setSett).catch(() => {});
+  }, [open]);
+
+  const save = async () => {
+    setSaving(true); setErr(""); setSaved(false);
+    try {
+      const r = await fetch(`${BASE_API}/api/finance/settings`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+      onSaved();
+    } catch (e: any) { setErr(e.message); }
+    setSaving(false);
+  };
+
+  const set = (k: string, v: any) => setSett((prev: any) => ({ ...prev, [k]: v }));
+
+  return (
+    <div className="rounded-2xl border bg-white overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <Settings size={15} className="text-muted-foreground" />
+          <span className="text-sm font-semibold">Finance Settings</span>
+          <span className="text-xs text-muted-foreground">(tax rates, visa guard, advance %)</span>
+        </div>
+        {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+      </button>
+
+      {open && settings && (
+        <div className="border-t px-5 py-4 space-y-4">
+          {err && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{err}</p>}
+
+          {/* Tax section */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Tax Configuration</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">GST Rate (%)</span>
+                <input type="number" step="0.01" min="0" max="30"
+                  value={settings.gst_rate ?? 5}
+                  onChange={e => set("gst_rate", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">TCS Rate (%)</span>
+                <input type="number" step="0.01" min="0" max="10"
+                  value={settings.tcs_rate ?? 2}
+                  onChange={e => set("tcs_rate", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="flex items-center gap-2 pt-5">
+                <input type="checkbox" checked={!!settings.gst_enabled}
+                  onChange={e => set("gst_enabled", e.target.checked)}
+                  className="rounded" />
+                <span className="text-sm">GST enabled</span>
+              </label>
+              <label className="flex items-center gap-2 pt-5">
+                <input type="checkbox" checked={!!settings.tcs_enabled}
+                  onChange={e => set("tcs_enabled", e.target.checked)}
+                  className="rounded" />
+                <span className="text-sm">TCS enabled</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Visa guard section */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Visa Payment Guard</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">Advance Required (%)</span>
+                <input type="number" step="1" min="0" max="100"
+                  value={settings.standard_advance_pct ?? 50}
+                  onChange={e => set("standard_advance_pct", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">Balance Due (days)</span>
+                <input type="number" step="1" min="1"
+                  value={settings.balance_due_after_days ?? 50}
+                  onChange={e => set("balance_due_after_days", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="flex items-center gap-2 pt-5">
+                <input type="checkbox" checked={!!settings.block_visa_balance_pending}
+                  onChange={e => set("block_visa_balance_pending", e.target.checked)}
+                  className="rounded" />
+                <span className="text-sm font-medium">
+                  Block visa if balance pending
+                  {settings.block_visa_balance_pending
+                    ? <span className="ml-1.5 text-xs text-emerald-600 font-semibold">● ACTIVE</span>
+                    : <span className="ml-1.5 text-xs text-red-600 font-semibold">● DISABLED</span>}
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Currency section */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Currency & Charges</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">SAR Reference Rate</span>
+                <input type="number" step="0.01"
+                  value={settings.sar_reference_rate ?? 25.70}
+                  onChange={e => set("sar_reference_rate", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">SPC Charge (₹)</span>
+                <input type="number" step="100"
+                  value={settings.spc_charge ?? 5500}
+                  onChange={e => set("spc_charge", Number(e.target.value))}
+                  className="w-full border rounded-lg px-3 py-1.5 text-sm font-mono" />
+              </label>
+              <label className="flex items-center gap-2 pt-5">
+                <input type="checkbox" checked={!!settings.discount_full_payment_required}
+                  onChange={e => set("discount_full_payment_required", e.target.checked)}
+                  className="rounded" />
+                <span className="text-sm">Discount: full payment required</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <Button onClick={save} disabled={saving} size="sm" className="gap-1.5">
+              <Save size={13} /> {saving ? "Saving…" : "Save Settings"}
+            </Button>
+            {saved && <span className="text-xs text-emerald-600 font-semibold">✓ Saved</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Date range options ────────────────────────────────────────────────────────
 const RANGES = [
   { key: "today", label: "Today" },
@@ -62,6 +240,7 @@ type Range = typeof RANGES[number]["key"];
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function FinanceHub() {
   const [data, setData]       = useState<any>(null);
+  const [health, setHealth]   = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange]     = useState<Range>("month");
   const [fromDate, setFrom]   = useState("");
@@ -73,9 +252,13 @@ export default function FinanceHub() {
     try {
       let url = `${BASE_API}/api/finance/dashboard?range=${range}`;
       if (range === "custom" && fromDate && toDate) url += `&from=${fromDate}&to=${toDate}`;
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      setData(await r.json());
+      const [dashRes, healthRes] = await Promise.all([
+        fetch(url, { credentials: "include" }),
+        fetch(`${BASE_API}/api/finance/health`, { credentials: "include" }),
+      ]);
+      if (!dashRes.ok) throw new Error(`Dashboard HTTP ${dashRes.status}`);
+      setData(await dashRes.json());
+      if (healthRes.ok) setHealth(await healthRes.json());
     } catch (e: any) {
       setErr(e.message);
     }
@@ -129,6 +312,9 @@ export default function FinanceHub() {
             </Button>
           </div>
         </div>
+
+        {/* Finance Foundation Health */}
+        <HealthBanner health={health} />
 
         {err && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
@@ -195,6 +381,9 @@ export default function FinanceHub() {
             ))}
           </div>
         </div>
+
+        {/* Finance Settings Panel */}
+        <FinanceSettingsPanel onSaved={load} />
 
         {/* Quick links to finance tables */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
