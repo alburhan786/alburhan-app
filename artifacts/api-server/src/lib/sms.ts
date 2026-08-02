@@ -606,8 +606,11 @@ export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount:
   const { tids, ex, senders } = await resolveConfig();
   const vars: string[] = [ctx.customerName, ctx.bookingNumber, ctx.packageName || "your package", ctx.paidAmount, ctx.balanceAmount];
   if (ctx.invoiceUrl && ex.payment_url_in_sms === "1") vars.push(ctx.invoiceUrl);
+  // Explicit fallback: if partial_payment DLT template is not configured, reuse payment_received
+  // template (same financial event — admin only needs to configure one payment template).
+  const effectiveTid = tids.partial_payment || tids.payment_received;
   return sendDLT(
-    ctx.mobile, tids.partial_payment,
+    ctx.mobile, effectiveTid,
     vars,
     { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.partial_payment }
   );

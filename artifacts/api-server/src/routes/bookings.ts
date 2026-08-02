@@ -486,19 +486,36 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
 
   // ── Customer notifications: WhatsApp → SMS → Email via notification engine ─
   // triggerWorkflow → fireNotificationEvent logs to notification_logs (admin-visible)
+  // IMPORTANT: booking.customerEmail comes from POST body — may be null if form didn't submit it.
+  // Load email from users table when missing so the Email channel doesn't get silently skipped.
   const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
-  triggerWorkflow("new_booking", {
-    bookingId:      booking.id,
-    bookingNumber:  booking.bookingNumber,
-    customerId:     booking.customerId     ?? undefined,
-    customerName:   booking.customerName,
-    customerMobile: booking.customerMobile,
-    customerEmail:  booking.customerEmail  ?? undefined,
-    packageName:    booking.packageName    ?? pkg?.name ?? "Travel Package",
-    amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
-    invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
-    dashboardUrl:   `${siteBase}/customer/dashboard`,
-  }).catch(console.error);
+  (async () => {
+    let customerEmail = booking.customerEmail ?? undefined;
+    if (!customerEmail && booking.customerId) {
+      try {
+        const emailRow = await pool.query(
+          `SELECT email FROM users WHERE id=$1 LIMIT 1`,
+          [booking.customerId]
+        );
+        customerEmail = emailRow.rows[0]?.email ?? undefined;
+        if (customerEmail) console.log(`[bookings] Loaded customer email from users table for ${booking.bookingNumber}: ${customerEmail}`);
+      } catch (e) {
+        console.warn("[bookings] Failed to load customer email for new_booking notification:", e);
+      }
+    }
+    await triggerWorkflow("new_booking", {
+      bookingId:      booking.id,
+      bookingNumber:  booking.bookingNumber,
+      customerId:     booking.customerId     ?? undefined,
+      customerName:   booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail,
+      packageName:    booking.packageName    ?? pkg?.name ?? "Travel Package",
+      amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+      invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
+      dashboardUrl:   `${siteBase}/customer/dashboard`,
+    }).catch(console.error);
+  })().catch(console.error);
 
   // Auto-accounting: Dr Accounts Receivable / Cr Sales Revenue (non-fatal)
   if (booking.finalAmount && Number(booking.finalAmount) > 0) {

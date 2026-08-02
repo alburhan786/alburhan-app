@@ -648,6 +648,34 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   req.on("close", () => tar.kill());
 });
 
+// POST /api/migrate/reset-email-circuit — re-enables SMTP after it is suspended.
+// Uses the same migration key as all other /api/migrate/* endpoints.
+// Equivalent to the admin UI toggle at System Health → Email Circuit Breaker.
+app.post("/api/migrate/reset-email-circuit", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string | undefined;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dbPool } = await import("@workspace/db");
+    await dbPool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at, updated_by)
+       VALUES ('email_circuit_breaker','enabled','email_circuit_breaker',true,NOW(),'migration-reset')
+       ON CONFLICT (key) DO UPDATE
+         SET value='enabled', enabled=true, updated_at=NOW(), updated_by='migration-reset'`
+    );
+    // Reset stuck email retries
+    const reset = await dbPool.query(
+      `UPDATE notification_retry_queue
+       SET status='pending', next_retry_at=NOW() + interval '2 minutes',
+           last_error='Reset after email re-enabled via migration'
+       WHERE channel='email' AND status='failed' AND last_error LIKE '%suspended%'`
+    );
+    console.log(`[migrate/reset-email-circuit] Email circuit re-enabled. Reset ${reset.rowCount} pending retries.`);
+    res.json({ ok: true, message: "Email sending re-enabled. SMTP circuit breaker is now active.", resetRetries: reset.rowCount });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DIRECT UPLOAD DEPLOY ENDPOINTS
 // GitHub Actions POSTs the built artifacts directly over HTTPS — no SSH needed.

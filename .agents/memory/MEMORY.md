@@ -1,3 +1,4 @@
+- [Notification bug root causes Aug 2026](notification-bug-root-causes.md) — email suspended (circuit breaker), Meta Cloud API wrong priority for ABT events, new_booking email missing from POST body, partial_payment SMS dlt_template_missing
 - [Frontend tar extraction path](frontend-tar-extraction-fix.md) — extract to /var/www/alburhan AND /root (dual-root); NOT to /root/artifacts/alburhan/dist (creates deeply nested wrong path); hotdeploy needs 2nd call after bundle swap
 - [VPS API port](vps-api-port.md) — API process on port 5000 (NOT 3000); MIGRATION_KEY baked into bundle via esbuild define, not in PM2 env — extract with python3 regex on index.cjs
 - [Meta Cloud API language fix](meta-cloud-api-language-fix.md) — #132001 error root cause: default language was "en" but all ABT templates registered as "en_US"; full activation chain + production proof (3 wamids, 48K perm-failed = historical)

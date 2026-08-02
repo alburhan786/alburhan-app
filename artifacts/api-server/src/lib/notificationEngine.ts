@@ -786,11 +786,12 @@ export async function sendBotBeeEventTemplate(
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   console.log(`[notifEngine] sendWhatsAppForEvent: ${eventType} → ${ctx.customerMobile} | isABTTemplate=${ABT_TEMPLATE_EVENTS.has(eventType)}`);
   try {
-    // ── Priority 0: Meta WhatsApp Cloud API (primary provider) ───────────────
+    // ── Priority 0: Meta WhatsApp Cloud API (non-ABT events only) ────────────
     // Activated when META_ACCESS_TOKEN is configured in Replit Secrets.
-    // Falls back automatically to BotBee when not configured or when the
-    // template is not found / not approved in Meta Business Manager.
-    if (isMetaWapiConfigured() && META_EVENT_TEMPLATE_MAP[eventType] !== undefined) {
+    // ABT_TEMPLATE_EVENTS always use BotBee (Priority 1) directly — Meta does
+    // not have those templates approved, so trying Meta first produces
+    // permanently_failed log spam without delivering anything.
+    if (isMetaWapiConfigured() && META_EVENT_TEMPLATE_MAP[eventType] !== undefined && !ABT_TEMPLATE_EVENTS.has(eventType)) {
       console.log(`[notifEngine] ${eventType}: trying Meta Cloud API first (primary provider)…`);
       try {
         const metaResult = await sendMetaEventTemplate(eventType, ctx as Record<string, any>, { bookingId, customerId });
