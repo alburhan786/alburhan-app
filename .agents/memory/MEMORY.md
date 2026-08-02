@@ -1,3 +1,4 @@
+- [Communication Center Foundation](comms-center-foundation.md) — v35.x tables (event_mappings/status_history/provider_health/audit_logs/schedules), lib/communicationContext.ts, lib/variableResolver.ts, routes/comm-mgmt.ts, 3 new frontend tabs
 - [Approval notification URL and variable fix](approval-notification-url-fix.md) — REPLIT_DEV_DOMAIN on VPS causes malformed URLs; forceTemplateApi:true on booking_approved bypasses Meta Cloud API → unresolved #!Name!#; enrichCtxFromDB in fireNotificationEvent fetches real package/amount from DB
 - [Agreement access_token security](agreement-access-token.md) — token in ?token= QS, backward-compat cutoff Aug 2 2026, gen_random_uuid concat (NOT gen_random_bytes) for SQL backfill
 - [Notification bug root causes Aug 2026](notification-bug-root-causes.md) — email suspended (circuit breaker), Meta Cloud API wrong priority for ABT events, new_booking email missing from POST body, partial_payment SMS dlt_template_missing

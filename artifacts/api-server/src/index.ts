@@ -3386,6 +3386,210 @@ async function start() {
     console.log(`[Migration] v34.8 GST/TCS backfill: ${gstFix.rowCount} bookings fixed gst_rate=${sysGst}, ${tcsFix.rowCount} bookings fixed tcs_rate=${tcsFillValue}`);
   } catch (err: any) { console.warn("[Migration] v34.8 GST backfill:", err.message); }
 
+  // ── v35.1 — notification_logs: Communication Center required columns ────────
+  try {
+    await pool.query(`
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS canonical_event TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS is_manual_resend BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS original_log_id TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS rendered_preview TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS request_payload_safe JSONB;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS permanently_failed_at TIMESTAMPTZ;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS business_reference TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS scheduled_message_id TEXT;
+    `);
+    // Back-fill canonical_event from event_type for existing rows
+    await pool.query(`
+      UPDATE notification_logs SET canonical_event = event_type
+      WHERE canonical_event IS NULL AND event_type IS NOT NULL
+    `);
+    console.log("[Migration] v35.1 notification_logs communication columns ensured");
+  } catch (err: any) { console.warn("[Migration] v35.1 notification_logs comms cols:", err.message); }
+
+  // ── v35.2 — notification_templates: provider/approval/version columns ───────
+  try {
+    await pool.query(`
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS provider_template_id TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS provider_template_name TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS required_variables JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS optional_variables JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS fallback_template_id TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_tested_at TIMESTAMPTZ;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS created_by TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS updated_by TEXT;
+    `);
+    // Back-fill provider_template_id from existing dlt_template_id / botbee_template_id / meta_template_id
+    await pool.query(`
+      UPDATE notification_templates SET
+        provider_template_id = COALESCE(provider_template_id, dlt_template_id, botbee_template_id, meta_template_id)
+      WHERE provider_template_id IS NULL
+        AND (dlt_template_id IS NOT NULL OR botbee_template_id IS NOT NULL OR meta_template_id IS NOT NULL)
+    `).catch(() => {});
+    console.log("[Migration] v35.2 notification_templates approval/version columns ensured");
+  } catch (err: any) { console.warn("[Migration] v35.2 notification_templates:", err.message); }
+
+  // ── v35.3 — communication_event_mappings table ──────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_event_mappings (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        primary_provider TEXT,
+        fallback_provider TEXT,
+        template_id TEXT,
+        fallback_template_id TEXT,
+        retry_max INTEGER NOT NULL DEFAULT 3,
+        retry_policy JSONB NOT NULL DEFAULT '{"delays":[300,1800,7200,43200]}'::jsonb,
+        recipient_type TEXT NOT NULL DEFAULT 'customer',
+        send_timing TEXT NOT NULL DEFAULT 'immediate',
+        attachment_policy TEXT NOT NULL DEFAULT 'link_only',
+        notes TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(event_type, channel)
+      )
+    `);
+    // Seed from notification_settings for backward compat
+    await pool.query(`
+      INSERT INTO communication_event_mappings (id, event_type, channel, enabled, template_id)
+      SELECT
+        'cem_' || event_type || '_' || channel,
+        event_type, channel, enabled, template_id
+      FROM notification_settings
+      ON CONFLICT (event_type, channel) DO NOTHING
+    `).catch(() => {});
+    // Set default providers
+    await pool.query(`
+      UPDATE communication_event_mappings SET primary_provider = 'botbee'  WHERE channel='whatsapp' AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'fast2sms' WHERE channel='sms'      AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'smtp'     WHERE channel='email'    AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'lemin'    WHERE channel='rcs'      AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'fcm'      WHERE channel='push'     AND primary_provider IS NULL;
+    `).catch(() => {});
+    console.log("[Migration] v35.3 communication_event_mappings table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.3 communication_event_mappings:", err.message); }
+
+  // ── v35.4 — communication_status_history ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_status_history (
+        id SERIAL PRIMARY KEY,
+        log_id TEXT NOT NULL REFERENCES notification_logs(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        status_detail TEXT,
+        provider_message_id TEXT,
+        webhook_payload JSONB,
+        actor TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS csh_log_id_idx ON communication_status_history(log_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS csh_created_idx ON communication_status_history(created_at DESC)`);
+    console.log("[Migration] v35.4 communication_status_history table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.4 communication_status_history:", err.message); }
+
+  // ── v35.5 — provider_health_status ──────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS provider_health_status (
+        provider TEXT PRIMARY KEY,
+        channel TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        circuit_state TEXT NOT NULL DEFAULT 'closed',
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_success_at TIMESTAMPTZ,
+        last_failure_at TIMESTAMPTZ,
+        last_failure_reason TEXT,
+        last_test_at TIMESTAMPTZ,
+        last_test_result TEXT,
+        total_sent_24h INTEGER NOT NULL DEFAULT 0,
+        total_failed_24h INTEGER NOT NULL DEFAULT 0,
+        avg_response_ms INTEGER,
+        is_enabled BOOLEAN NOT NULL DEFAULT true,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    // Seed known providers
+    const providers = [
+      ["botbee",    "whatsapp", "BotBee WhatsApp"],
+      ["meta",      "whatsapp", "Meta Cloud API"],
+      ["fast2sms",  "sms",      "Fast2SMS (DLT)"],
+      ["smtp",      "email",    "SMTP Email"],
+      ["lemin",     "rcs",      "Lemin AI / Jio RCS"],
+      ["fcm",       "push",     "Firebase FCM"],
+      ["webpush",   "push",     "Web Push (VAPID)"],
+      ["telegram",  "telegram", "Telegram Bot"],
+    ];
+    for (const [p, ch, dn] of providers) {
+      await pool.query(
+        `INSERT INTO provider_health_status (provider, channel, display_name)
+         VALUES ($1,$2,$3) ON CONFLICT (provider) DO NOTHING`,
+        [p, ch, dn]
+      );
+    }
+    console.log("[Migration] v35.5 provider_health_status table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.5 provider_health_status:", err.message); }
+
+  // ── v35.6 — communication_audit_logs ────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_audit_logs (
+        id SERIAL PRIMARY KEY,
+        action TEXT NOT NULL,
+        actor_id TEXT,
+        actor_role TEXT,
+        entity_type TEXT,
+        entity_id TEXT,
+        old_values JSONB,
+        new_values JSONB,
+        reason TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_action_idx ON communication_audit_logs(action)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_actor_idx  ON communication_audit_logs(actor_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_created_idx ON communication_audit_logs(created_at DESC)`);
+    console.log("[Migration] v35.6 communication_audit_logs table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.6 communication_audit_logs:", err.message); }
+
+  // ── v35.7 — communication_schedules ─────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_schedules (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        booking_id TEXT,
+        group_id TEXT,
+        recipient TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        template_id TEXT,
+        scheduled_at TIMESTAMPTZ NOT NULL,
+        timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+        status TEXT NOT NULL DEFAULT 'pending',
+        cancellation_reason TEXT,
+        idempotency_key TEXT UNIQUE,
+        template_version INTEGER NOT NULL DEFAULT 1,
+        context JSONB,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_scheduled_idx ON communication_schedules(scheduled_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_booking_idx   ON communication_schedules(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_status_idx    ON communication_schedules(status)`);
+    console.log("[Migration] v35.7 communication_schedules table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.7 communication_schedules:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
