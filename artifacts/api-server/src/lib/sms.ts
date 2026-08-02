@@ -256,7 +256,7 @@ async function logSMS(data: {
        VALUES ($1,$2,$3,$4,'sms',$5,$6,$7,$8,'Fast2SMS',
                'https://www.fast2sms.com/dev/bulkV2',
                $9,$10,NOW(),$11,$12,$13,$14,$15,$16,$17)
-       ON CONFLICT (idempotency_key) DO NOTHING`,
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
       [
         id, data.eventType,
         data.customerId || null, data.bookingId || null,
@@ -415,19 +415,22 @@ async function sendDLT(
     customerName?: string;
     bookingNumber?: string;
     senderOverride?: string; // per-template sender ID (from senders map)
+    /** When true, skip internal logSMS call — caller (e.g. notificationEngine) will handle logging
+     *  to avoid creating two notification_logs rows for the same send. */
+    skipLog?: boolean;
   }
 ): Promise<SMSResult> {
   const { apiKey, sender_id, enabled } = getConfig();
 
   if (!enabled) {
     const msg = "Fast2SMS disabled in API Settings";
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
+    if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
   if (!apiKey) {
     const msg = "Fast2SMS API key not configured — set FAST2SMS_API_KEY in Admin → API Settings → Fast2SMS";
     console.warn("[SMS] API key not configured for", opts.eventType, "→", mobile);
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
+    if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "fast2sms_error", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
 
@@ -440,7 +443,7 @@ async function sendDLT(
   if (!approvedIds.includes(effectiveSenderId)) {
     const msg = `SMS BLOCKED — sender_id "${effectiveSenderId}" is not in the approved list [${approvedIds.join(", ")}]. Add it in Admin → SMS Settings → Sender ID Management.`;
     console.error(`[SMS][${opts.eventType}] ⛔ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "invalid_sender_id", bookingId: opts.bookingId, customerId: opts.customerId });
+    if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId, status: "failed", errorMessage: msg, errorCode: "invalid_sender_id", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId, mobile, errorMessage: msg };
   }
   // 2. Route must be DLT (hardcoded — this guard catches any future drift)
@@ -464,7 +467,7 @@ async function sendDLT(
     }
     const msg = `DLT Template not configured for event "${opts.eventType}". Register a TRAI DLT template and enter the ID in Admin → DLT Template Manager.`;
     console.warn(`[SMS][${opts.eventType}] ⛔ ${msg}`);
-    await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, errorCode: "dlt_template_missing", bookingId: opts.bookingId, customerId: opts.customerId });
+    if (!opts.skipLog) await logSMS({ eventType: opts.eventType, mobile, templateId: "not_configured", status: "failed", errorMessage: msg, errorCode: "dlt_template_missing", bookingId: opts.bookingId, customerId: opts.customerId });
     return { ok: false, provider: "Fast2SMS", templateId: "not_configured", mobile, errorMessage: msg };
   }
   console.log(`[SMS][${opts.eventType}] ✔ Validation passed — sender=${effectiveSenderId} route=DLT template=${templateId} → ${mobile}`);
@@ -507,7 +510,7 @@ async function sendDLT(
       // WhatsApp and Email continue independently via their own channels.
       const dltFailMsg = `DLT template rejected by Fast2SMS: ${respMsg}`;
       console.warn(`[SMS][${opts.eventType}] ⛔ ${dltFailMsg} — NOT falling back to Quick Route (production policy)`);
-      await logSMS({
+      if (!opts.skipLog) await logSMS({
         eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
         message: opts.message, status: "failed",
         httpStatus, responsePayload,
@@ -526,7 +529,7 @@ async function sendDLT(
     const messageId: string | null = (resp.data as any)?.request_id || null;
     if (ok && messageId) console.log(`[SMS][${opts.eventType}] Message ID: ${messageId}`);
 
-    await logSMS({
+    if (!opts.skipLog) await logSMS({
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: ok ? "sent" : "failed",
       httpStatus, responsePayload, errorMessage, messageId,
@@ -546,7 +549,7 @@ async function sendDLT(
 
     console.error(`[SMS][${opts.eventType}] ✗ after 3 retries for ${mobile}:`, errorMessage);
 
-    await logSMS({
+    if (!opts.skipLog) await logSMS({
       eventType: opts.eventType, mobile, templateId, senderId: effectiveSenderId,
       message: opts.message, status: "failed",
       httpStatus, responsePayload, errorMessage,
@@ -571,6 +574,9 @@ export interface BookingCtx {
   packageName?: string;
   bookingId?: string;
   customerId?: string;
+  /** When true, skip internal logSMS call — notificationEngine will log via trackNotification
+   *  to avoid creating two notification_logs rows (one from sms.ts, one from notificationEngine). */
+  skipLog?: boolean;
 }
 
 export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
@@ -578,7 +584,7 @@ export async function sendBookingCreated(ctx: BookingCtx): Promise<SMSResult> {
   return sendDLT(
     ctx.mobile, tids.booking_created,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah"],
-    { eventType: "new_booking", message: `Booking #${ctx.bookingNumber} created`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_created }
+    { eventType: "new_booking", message: `Booking #${ctx.bookingNumber} created`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_created, skipLog: ctx.skipLog }
   );
 }
 
@@ -587,7 +593,7 @@ export async function sendBookingConfirmed(ctx: BookingCtx & { totalAmount?: str
   return sendDLT(
     ctx.mobile, tids.booking_confirmed,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj/Umrah", ctx.totalAmount || ""],
-    { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_confirmed }
+    { eventType: "booking_approved", message: `Booking #${ctx.bookingNumber} confirmed`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_confirmed, skipLog: ctx.skipLog }
   );
 }
 
@@ -596,7 +602,7 @@ export async function sendBookingRejected(ctx: BookingCtx & { reason?: string })
   return sendDLT(
     ctx.mobile, tids.booking_rejected,
     [ctx.customerName, ctx.bookingNumber, ctx.reason || "Please contact us for details"],
-    { eventType: "booking_rejected", message: `Booking #${ctx.bookingNumber} rejected`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_rejected }
+    { eventType: "booking_rejected", message: `Booking #${ctx.bookingNumber} rejected`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.booking_rejected, skipLog: ctx.skipLog }
   );
 }
 
@@ -607,7 +613,7 @@ export async function sendPaymentReceived(ctx: BookingCtx & { amount: string; in
   return sendDLT(
     ctx.mobile, tids.payment_received,
     vars,
-    { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.payment_received }
+    { eventType: "payment_received", message: `Payment ₹${ctx.amount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.payment_received, skipLog: ctx.skipLog }
   );
 }
 
@@ -621,7 +627,7 @@ export async function sendPartialPaymentReceived(ctx: BookingCtx & { paidAmount:
   return sendDLT(
     ctx.mobile, effectiveTid,
     vars,
-    { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.partial_payment }
+    { eventType: "partial_payment", message: `Partial payment ₹${ctx.paidAmount} for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.partial_payment, skipLog: ctx.skipLog }
   );
 }
 
@@ -630,7 +636,7 @@ export async function sendPendingPaymentReminder(ctx: BookingCtx & { balance: st
   return sendDLT(
     ctx.mobile, tids.pending_payment,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj Package", ctx.balance],
-    { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.pending_payment }
+    { eventType: "balance_reminder", message: `Balance ₹${ctx.balance} due for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.pending_payment, skipLog: ctx.skipLog }
   );
 }
 
@@ -639,7 +645,7 @@ export async function sendBalanceReminder(ctx: BookingCtx & { outstandingAmount:
   return sendDLT(
     ctx.mobile, tids.balance_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.packageName || "Hajj Package", ctx.outstandingAmount],
-    { eventType: "balance_reminder", message: `Balance ₹${ctx.outstandingAmount} outstanding for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.balance_reminder }
+    { eventType: "balance_reminder", message: `Balance ₹${ctx.outstandingAmount} outstanding for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.balance_reminder, skipLog: ctx.skipLog }
   );
 }
 
@@ -648,7 +654,7 @@ export async function sendFlightAssigned(ctx: BookingCtx & { flightNumber: strin
   return sendDLT(
     ctx.mobile, tids.flight_assigned,
     [ctx.customerName, ctx.flightNumber, ctx.fromAirport, ctx.toAirport, ctx.departureDate, ctx.departureTime],
-    { eventType: "flight_assigned", message: `Flight ${ctx.flightNumber} assigned for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.flight_assigned }
+    { eventType: "flight_assigned", message: `Flight ${ctx.flightNumber} assigned for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.flight_assigned, skipLog: ctx.skipLog }
   );
 }
 
@@ -657,7 +663,7 @@ export async function sendInvoiceCreated(ctx: BookingCtx & { invoiceNumber?: str
   return sendDLT(
     ctx.mobile, tids.invoice_created,
     [ctx.customerName, ctx.bookingNumber, ctx.invoiceNumber || ctx.bookingNumber, ctx.amount || "", ctx.downloadUrl || ""],
-    { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.invoice_created }
+    { eventType: "invoice_generated", message: `Invoice for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.invoice_created, skipLog: ctx.skipLog }
   );
 }
 
@@ -666,7 +672,7 @@ export async function sendFlightTicketIssued(ctx: BookingCtx & { flightNumber?: 
   return sendDLT(
     ctx.mobile, tids.ticket_issued,
     [ctx.customerName, ctx.bookingNumber, ctx.flightNumber || "", ctx.ticketDownloadUrl || ""],
-    { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.ticket_issued }
+    { eventType: "ticket_issued", message: `Ticket issued for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.ticket_issued, skipLog: ctx.skipLog }
   );
 }
 
@@ -675,7 +681,7 @@ export async function sendVisaIssued(ctx: BookingCtx & { visaNumber?: string; vi
   return sendDLT(
     ctx.mobile, tids.visa_issued,
     [ctx.customerName, ctx.bookingNumber, ctx.visaNumber || "Approved", ctx.visaDownloadUrl || ""],
-    { eventType: "visa_ready", message: `Visa approved for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.visa_issued }
+    { eventType: "visa_ready", message: `Visa approved for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.visa_issued, skipLog: ctx.skipLog }
   );
 }
 
@@ -684,7 +690,7 @@ export async function sendDepartureReminder(ctx: BookingCtx & { departureDate: s
   return sendDLT(
     ctx.mobile, tids.departure_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.departureDate, ctx.reportingTime || "As scheduled", ctx.airportName || "Your departure airport"],
-    { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.departure_reminder }
+    { eventType: "departure_reminder", message: `Departure reminder for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.departure_reminder, skipLog: ctx.skipLog }
   );
 }
 
@@ -693,7 +699,7 @@ export async function sendHotelVoucherIssued(ctx: BookingCtx & { hotelName?: str
   return sendDLT(
     ctx.mobile, tids.hotel_voucher,
     [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel"],
-    { eventType: "hotel_voucher", message: `Hotel voucher ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.hotel_voucher }
+    { eventType: "hotel_voucher", message: `Hotel voucher ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.hotel_voucher, skipLog: ctx.skipLog }
   );
 }
 
@@ -702,7 +708,7 @@ export async function sendArrivalReminder(ctx: BookingCtx & { arrivalDate?: stri
   return sendDLT(
     ctx.mobile, tids.arrival_reminder,
     [ctx.customerName, ctx.bookingNumber, ctx.arrivalDate || "As scheduled"],
-    { eventType: "arrival_reminder", message: `Arrival welcome for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.arrival_reminder }
+    { eventType: "arrival_reminder", message: `Arrival welcome for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.arrival_reminder, skipLog: ctx.skipLog }
   );
 }
 
@@ -720,7 +726,7 @@ export async function sendAgreementReadySMS(ctx: BookingCtx & { agreementNumber?
   return sendDLT(
     ctx.mobile, tids.agreement_ready,
     [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber, ctx.agreementDownloadUrl || ctx.agreementUrl || ""],
-    { eventType: "agreement_ready", message: `Agreement ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_ready }
+    { eventType: "agreement_ready", message: `Agreement ready for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_ready, skipLog: ctx.skipLog }
   );
 }
 
@@ -729,7 +735,7 @@ export async function sendAgreementSignedSMS(ctx: BookingCtx & { agreementNumber
   return sendDLT(
     ctx.mobile, tids.agreement_signed,
     [ctx.customerName, ctx.bookingNumber, ctx.agreementNumber || ctx.bookingNumber],
-    { eventType: "agreement_signed", message: `Agreement signed for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_signed }
+    { eventType: "agreement_signed", message: `Agreement signed for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.agreement_signed, skipLog: ctx.skipLog }
   );
 }
 
@@ -738,7 +744,7 @@ export async function sendRoomAllocationSMS(ctx: BookingCtx & { hotelName?: stri
   return sendDLT(
     ctx.mobile, tids.room_allocation,
     [ctx.customerName, ctx.bookingNumber, ctx.hotelName || "Your Hotel", ctx.roomNumber || "-"],
-    { eventType: "room_allocation", message: `Room allocated for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.room_allocation }
+    { eventType: "room_allocation", message: `Room allocated for #${ctx.bookingNumber}`, bookingId: ctx.bookingId, customerId: ctx.customerId, senderOverride: senders.room_allocation, skipLog: ctx.skipLog }
   );
 }
 

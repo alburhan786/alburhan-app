@@ -414,7 +414,7 @@ export async function trackNotification(data: {
         wamid, template,
         sent_at, retry_count, idempotency_key)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0,$19)
-       ON CONFLICT (idempotency_key) DO NOTHING`,
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
@@ -922,6 +922,9 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           packageName: ctx.packageName,
           bookingId: ctx.bookingId,
           customerId: ctx.customerId,
+          // Skip sms.ts's internal logSMS — notificationEngine handles logging via trackNotification.
+          // Without this, each send creates TWO notification_logs rows (one from sms.ts, one here).
+          skipLog: true,
         };
         let result: import("./sms.js").SMSResult;
         switch (eventType) {
@@ -1061,6 +1064,9 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           customerId: ctx.customerId,
           bookingNumber: ctx.bookingNumber,
           customerName: ctx.customerName,
+          // Skip rcs.ts's internal logRCSNotification — notificationEngine handles logging
+          // via trackNotification to avoid two notification_logs rows per send.
+          skipLog: true,
         });
         return { status: rcsResult.ok ? "sent" : "failed", providerResponse: rcsResult };
       } catch (rcsErr: any) {

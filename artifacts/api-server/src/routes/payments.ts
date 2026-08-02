@@ -216,33 +216,10 @@ export async function processPaymentSuccessNotifications(opts: {
     console.error("[payments] Payment Receipt PDF generation failed (notifications will still send):", err);
   }
 
-  // ── Auto-send Tax Invoice PDF + Receipt PDF via WhatsApp (fire-and-forget) ─
-  if (attachments.length > 0) {
-    const _attachments   = [...attachments];
-    const _bookingMobile = booking.customerMobile;
-    const _bookingNumber = booking.bookingNumber;
-    const _bookingId     = booking.id;
-    const _customerId    = booking.customerId ?? undefined;
-    (async () => {
-      try {
-        const { sendPDFDocument } = await import("../lib/botbee.js");
-        const waOpts = { eventType: "payment_received", bookingId: _bookingId, customerId: _customerId };
-        for (const att of _attachments) {
-          const label = att.filename.startsWith("TaxInvoice") ? "Tax Invoice" : "Payment Receipt";
-          const r = await sendPDFDocument(
-            _bookingMobile,
-            att.content as Buffer,
-            att.filename,
-            `Your ${label} – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
-            waOpts,
-          );
-          console.log(`[payments] WhatsApp ${label} PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
-        }
-      } catch (pdfWaErr: any) {
-        console.error("[payments] WhatsApp PDF delivery failed (non-fatal):", pdfWaErr?.message);
-      }
-    })();
-  }
+  // NOTE: WhatsApp PDF delivery (Tax Invoice + Receipt) is handled by notificationEngine's
+  // WhatsApp attachment IIFE (sendOnChannelWithType → ctx.attachments loop). The attachments
+  // array is passed in triggerWorkflow ctx below. Do NOT add a separate PDF IIFE here — it
+  // would create a second delivery path and the customer would receive duplicate PDFs.
 
   const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";
   const displayAmount = (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN");

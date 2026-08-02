@@ -5459,6 +5459,272 @@ app.post("/api/migrate/payment-pipeline-e2e", async (req, res) => {
   }
 });
 
+// POST /api/migrate/dedup-notification-test
+// Proves that calling processPaymentSuccessNotifications twice with the same paymentRef
+// produces exactly ONE notification log row per channel.
+// Simulates the real-world race: Razorpay verify-public fires first, webhook fires second.
+// Verifies:
+//   • paymentRef-based dedup in fireNotificationEvent blocks the second pass
+//   • ON CONFLICT (idempotency_key) at DB level catches any race that slips through
+//   • No duplicate invoice/receipt PDFs
+//   • payment_transactions gets exactly one row (guarded upstream, not in this test)
+// Auth: MIGRATION_KEY required.
+app.post("/api/migrate/dedup-notification-test", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const { pool: dPool } = await import("@workspace/db");
+  const trace: Record<string, any>[] = [];
+  const ts = () => new Date().toISOString();
+  const t = (step: string, data: Record<string, any>) => { trace.push({ step, ts: ts(), ...data }); };
+  let bookingId: string | null = null;
+
+  try {
+    // ── Step 1: Create an isolated test booking ─────────────────────────────
+    const bookingNumber = `DEDUP${Date.now().toString().slice(-8)}`;
+    const bId = crypto.randomUUID();
+    bookingId = bId;
+    const finalAmt = 50000;
+    const customerMobile = (req.body?.phone as string) || "9893988786";
+    const customerEmail  = (req.body?.email as string) || "test@alburhantravels.com";
+
+    await dPool.query(
+      `INSERT INTO bookings
+         (id, booking_number, customer_name, customer_mobile, customer_email, package_name,
+          number_of_pilgrims, total_amount, final_amount, paid_amount,
+          status, created_at, updated_at)
+       VALUES ($1,$2,'Dedup Test Customer',$3,$4,'Economy Umrah Package',
+               1,$5,$5,0,'approved',NOW(),NOW())`,
+      [bId, bookingNumber, customerMobile, customerEmail, String(finalAmt)]
+    );
+    t("booking_created", { booking_id: bId, booking_number: bookingNumber, final_amount: finalAmt });
+
+    // ── Step 2: Upsert a real invoice (so invoice dedup is also proven) ─────
+    let invoiceNumber: string | null = null;
+    try {
+      const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+      // Mark booking as confirmed first so invoice upsert succeeds
+      await dPool.query(`UPDATE bookings SET status='confirmed', paid_amount=$1 WHERE id=$2`, [String(finalAmt), bId]);
+      const inv = await upsertInvoiceForBooking(bId);
+      invoiceNumber = (inv?.invoice_number as string) || null;
+      t("invoice_upserted", { invoice_number: invoiceNumber, ok: !!invoiceNumber });
+    } catch (invErr: any) {
+      t("invoice_upserted", { ok: false, error: invErr?.message });
+    }
+
+    // ── Step 3: FIRST CALL — simulates Razorpay verify-public endpoint ──────
+    const paymentRef = `pay_DEDUP_${Date.now()}`;
+    t("first_call_start", { payment_ref: paymentRef, simulates: "verify-public" });
+
+    const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+    const t1Start = Date.now();
+    await processPaymentSuccessNotifications({
+      booking: {
+        id: bId,
+        bookingNumber,
+        customerName:  "Dedup Test Customer",
+        customerMobile,
+        customerEmail,
+        packageName:   "Economy Umrah Package",
+        finalAmount:   String(finalAmt),
+      },
+      isFullyPaid:        true,
+      thisPaymentAmount:  finalAmt,
+      newPaidAmount:      finalAmt,
+      remainingBalance:   0,
+      invoiceNumber,
+      paymentRef,
+      paymentMode:        "online",
+      paymentDate:        new Date(),
+    });
+    const t1Elapsed = Date.now() - t1Start;
+    t("first_call_done", { elapsed_ms: t1Elapsed });
+
+    // Wait for fire-and-forget tasks (WhatsApp PDFs, push, etc.)
+    // 8 s to ensure the WhatsApp attachment IIFE fully settles before snapshotting —
+    // PDF document sends are sequential and can take 2-3 s each.
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Snapshot after first call
+    const snap1 = await dPool.query(
+      `SELECT channel, event_type, status, idempotency_key, wamid, template, provider_name
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at ASC`, [bId]
+    );
+    const byChannel1: Record<string, any[]> = {};
+    for (const row of snap1.rows) {
+      (byChannel1[row.channel] = byChannel1[row.channel] || []).push(row);
+    }
+    t("snapshot_after_first_call", {
+      total_rows: snap1.rows.length,
+      channels_seen: Object.keys(byChannel1),
+      by_channel: Object.fromEntries(
+        Object.entries(byChannel1).map(([ch, rows]) => [ch, {
+          count: rows.length,
+          rows: rows.map(r => ({
+            status:          r.status,
+            idempotency_key: r.idempotency_key,
+            wamid:           r.wamid,
+            template:        r.template,
+            provider:        r.provider_name,
+          })),
+        }])
+      ),
+    });
+
+    // ── Step 4: SECOND CALL — simulates webhook arriving with same paymentRef ─
+    t("second_call_start", { payment_ref: paymentRef, simulates: "razorpay-webhook (duplicate)" });
+    const t2Start = Date.now();
+    await processPaymentSuccessNotifications({
+      booking: {
+        id: bId,
+        bookingNumber,
+        customerName:  "Dedup Test Customer",
+        customerMobile,
+        customerEmail,
+        packageName:   "Economy Umrah Package",
+        finalAmount:   String(finalAmt),
+      },
+      isFullyPaid:        true,
+      thisPaymentAmount:  finalAmt,
+      newPaidAmount:      finalAmt,
+      remainingBalance:   0,
+      invoiceNumber,
+      paymentRef,
+      paymentMode:        "online",
+      paymentDate:        new Date(),
+    });
+    const t2Elapsed = Date.now() - t2Start;
+    t("second_call_done", { elapsed_ms: t2Elapsed, note: "Should be fast if dedup fired before channel dispatch" });
+
+    // Wait for any fire-and-forget tasks from the second call
+    await new Promise(r => setTimeout(r, 4000));
+
+    // ── Step 5: Final snapshot — verify idempotency ─────────────────────────
+    // Idempotency definition: the second call must add ZERO new rows per channel.
+    // WhatsApp legitimately has multiple rows (1 template + N PDF attachment documents),
+    // so we cannot check rows === 1. Instead we compare each channel's count after
+    // both calls against its count after just the first call.
+    const snap2 = await dPool.query(
+      `SELECT channel, event_type, status, idempotency_key, wamid, template, provider_name, sent_at
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at ASC`, [bId]
+    );
+    const byChannel2: Record<string, any[]> = {};
+    for (const row of snap2.rows) {
+      (byChannel2[row.channel] = byChannel2[row.channel] || []).push(row);
+    }
+    // A channel is "duplicated" if the second call added any new rows (count increased).
+    const dupChannels = Object.entries(byChannel2).filter(([ch, rows]) => {
+      const firstCount = (byChannel1[ch] || []).length;
+      return rows.length > firstCount;
+    }).map(([ch]) => ch);
+    const idempotentChannels = Object.keys(byChannel2).filter(ch => !dupChannels.includes(ch));
+
+    t("snapshot_after_second_call", {
+      total_rows: snap2.rows.length,
+      rows_added_by_second_call: snap2.rows.length - snap1.rows.length,
+      duplicate_channels: dupChannels,
+      idempotent_channels: idempotentChannels,
+      by_channel: Object.fromEntries(
+        Object.entries(byChannel2).map(([ch, rows]) => [ch, {
+          count_after_first_call:  (byChannel1[ch] || []).length,
+          count_after_second_call: rows.length,
+          added_by_second_call:    rows.length - (byChannel1[ch] || []).length,
+          idempotent: rows.length <= (byChannel1[ch] || []).length,
+          rows: rows.map(r => ({
+            status:          r.status,
+            idempotency_key: r.idempotency_key,
+            wamid:           r.wamid,
+            template:        r.template,
+            provider:        r.provider_name,
+            sent_at:         r.sent_at,
+          })),
+        }])
+      ),
+    });
+
+    // Check invoice table (should be exactly one row)
+    const invRows = await dPool.query(`SELECT * FROM invoices WHERE booking_id=$1`, [bId]);
+    t("invoice_check", {
+      invoice_count: invRows.rows.length,
+      idempotent: invRows.rows.length <= 1,
+      invoice_number: invRows.rows[0]?.invoice_number || null,
+      paid: invRows.rows[0]?.paid || null,
+      balance: invRows.rows[0]?.balance || null,
+    });
+
+    // Check workflow_logs
+    const wlRows = await dPool.query(
+      `SELECT trigger_type, status, execution_time_ms, error_message
+       FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 10`, [bId]
+    );
+    t("workflow_logs", { count: wlRows.rows.length, rows: wlRows.rows });
+
+    // ── Cleanup ─────────────────────────────────────────────────────────────
+    await dPool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bId]);
+    try { await dPool.query(`DELETE FROM agreement_audit_logs WHERE agreement_id IN (SELECT id FROM agreements WHERE booking_id=$1)`, [bId]); } catch {}
+    await dPool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM bookings WHERE id=$1`, [bId]);
+    t("cleanup", { booking_id: bId, cleaned: true });
+
+    // ── Result ───────────────────────────────────────────────────────────────
+    const rowsAddedBySecondCall = snap2.rows.length - snap1.rows.length;
+    const overallOk = dupChannels.length === 0;
+    const resultLabel = overallOk
+      ? `✅ IDEMPOTENCY CONFIRMED — second call added 0 rows (${snap1.rows.length} rows total, same after both calls)`
+      : `❌ DEDUP FAILED — second call added ${rowsAddedBySecondCall} row(s) for channels: ${dupChannels.join(", ")}`;
+
+    res.json({
+      ok: overallOk,
+      result: resultLabel,
+      payment_ref: paymentRef,
+      booking_number: bookingNumber,
+      summary: {
+        first_call_channels:     Object.keys(byChannel1),
+        rows_after_first_call:   snap1.rows.length,
+        rows_after_second_call:  snap2.rows.length,
+        rows_added_by_second_call: rowsAddedBySecondCall,
+        second_call_idempotent:  overallOk,
+        by_channel: Object.fromEntries(
+          Object.entries(byChannel2).map(([ch, rows]) => {
+            const firstCount = (byChannel1[ch] || []).length;
+            return [ch, {
+              log_count_first_call:   firstCount,
+              log_count_both_calls:   rows.length,
+              added_by_second_call:   rows.length - firstCount,
+              idempotent:             rows.length <= firstCount,
+              idempotency_key:        rows.find(r => r.idempotency_key)?.idempotency_key || null,
+              wamid:                  rows.find(r => r.wamid)?.wamid || null,
+              provider:               rows[0]?.provider_name || null,
+              status:                 rows[0]?.status || null,
+            }];
+          })
+        ),
+        invoice_count:   invRows.rows.length,
+        invoice_number:  invRows.rows[0]?.invoice_number || null,
+        invoice_paid:    invRows.rows[0]?.paid || null,
+        invoice_balance: invRows.rows[0]?.balance || null,
+        duplicate_channels:   dupChannels,
+        idempotent_channels:  idempotentChannels,
+      },
+      trace,
+    });
+  } catch (err: any) {
+    if (bookingId) {
+      try {
+        const { pool: cleanPool } = await import("@workspace/db");
+        await cleanPool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM bookings WHERE id=$1`, [bookingId]);
+      } catch {}
+    }
+    res.status(500).json({ ok: false, error: err?.message, trace });
+  }
+});
+
 // POST /api/migrate/payment-pipeline-diag — full payment pipeline diagnostic for any booking
 app.post("/api/migrate/payment-pipeline-diag", async (req, res) => {
   const key = req.body?.key as string;

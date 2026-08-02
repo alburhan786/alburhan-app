@@ -427,7 +427,15 @@ export async function sendRCSForEvent(
   mobile: string,
   bookingId?: string,
   ctx: Partial<ResolvedVars> = {},
-  opts: { skipIdempotency?: boolean; customerId?: string; bookingNumber?: string; customerName?: string } = {}
+  opts: {
+    skipIdempotency?: boolean;
+    customerId?: string;
+    bookingNumber?: string;
+    customerName?: string;
+    /** When true, skip internal logRCSNotification call — notificationEngine will log via trackNotification
+     *  to avoid creating two notification_logs rows for the same send. */
+    skipLog?: boolean;
+  } = {}
 ): Promise<RCSResult> {
   const endpoint = getSendEndpoint();
 
@@ -558,10 +566,10 @@ export async function sendRCSForEvent(
     }
   }
 
-  // 8. Log result
+  // 8. Log result — skip if caller (notificationEngine) will handle logging to avoid duplicate rows
   const customerName  = resolved.customer_name || opts.customerName || "";
   const bookingNumber = resolved.booking_id     || opts.bookingNumber || bookingId || "";
-  const logId = await logRCSNotification({
+  const logId = opts.skipLog ? null : await logRCSNotification({
     event, mobile: phone, templateId, templateName, variables: resolved as Record<string,string>,
     status: lastResult.ok ? "sent" : "failed",
     httpStatus: lastResult.httpStatus,
