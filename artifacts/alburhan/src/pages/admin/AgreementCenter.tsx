@@ -24,6 +24,8 @@ interface Agreement {
   verification_token?: string;
   verification_url?: string;
   cancelled_reason?: string;
+  signed_ip?: string;
+  signed_user_agent?: string;
   hotel_info?: Record<string, string>;
   flight_info?: Record<string, string>;
   // KYC
@@ -98,6 +100,16 @@ export default function AgreementCenter() {
   const [auditLoading,  setAuditLoading]  = useState(false);
   const [cancelModal,   setCancelModal]   = useState<{ id: string } | null>(null);
   const [cancelReason,  setCancelReason]  = useState("");
+  const [reviseModal,   setReviseModal]   = useState<{ id: string } | null>(null);
+  const [reviseReason,  setReviseReason]  = useState("");
+  const [revisingId,    setRevisingId]    = useState<string | null>(null);
+  const [reviseCorrections, setReviseCorrections] = useState<{
+    hotel_info: Record<string,string>;
+    flight_info: Record<string,string>;
+    tcs_amount: string;
+    gst_amount: string;
+    discount_amount: string;
+  }>({ hotel_info: {}, flight_info: {}, tcs_amount: "", gst_amount: "", discount_amount: "" });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusUpdating,setStatusUpdating]= useState(false);
   const [backfilling,   setBackfilling]   = useState(false);
@@ -264,11 +276,31 @@ export default function AgreementCenter() {
     } finally { setBackfilling(false); }
   };
 
-  const downloadPdf = (id: string, number: string) => {
-    const a = document.createElement("a");
-    a.href = `${API}/api/agreements/${id}/pdf`;
-    a.download = `Agreement-${number}.pdf`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const downloadPdf = async (id: string, number: string, bookingId?: string) => {
+    setActionLoading("pdf" + id);
+    setKycAlert(null);
+    try {
+      const r = await fetch(`${API}/api/agreements/${id}/pdf`, { credentials: "include" });
+      if (r.status === 422) {
+        const d = await r.json();
+        if (d.missingFields) {
+          setKycAlert({ message: d.error, missingFields: d.missingFields, bookingId });
+          return;
+        }
+        throw new Error(d.error || "PDF blocked — missing data");
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `Agreement-${number}.pdf`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "PDF Error", description: err?.message || "Failed to generate PDF", variant: "destructive" });
+    } finally { setActionLoading(null); }
   };
 
   const isLoading = (key: string) => actionLoading === key;
@@ -427,7 +459,7 @@ export default function AgreementCenter() {
                         <td style={{ padding: "10px 12px" }}>
                           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                             <button onClick={e => { e.stopPropagation(); loadDetail(ag); }} style={btnStyle(G)}>👁</button>
-                            <button onClick={e => { e.stopPropagation(); downloadPdf(ag.id, ag.agreement_number); }} style={btnStyle("#1a5276")}>⬇ PDF</button>
+                            <button onClick={e => { e.stopPropagation(); downloadPdf(ag.id, ag.agreement_number, ag.booking_id); }} disabled={isLoading("pdf" + ag.id)} style={btnStyle("#1a5276")}>⬇ PDF</button>
                             <button onClick={e => { e.stopPropagation(); openDetailsModal(ag); }} title="Edit Hotel & Flight" style={btnStyle(GOLD, "#1a0a00")}>✏ Details</button>
                             <button onClick={e => { e.stopPropagation(); doAction("resend_email", ag.id); }} disabled={isLoading("resend_email" + ag.id)} style={btnStyle("#1565C0")}>✉</button>
                             <button onClick={e => { e.stopPropagation(); doAction("resend_whatsapp", ag.id); }} disabled={isLoading("resend_whatsapp" + ag.id)} style={btnStyle("#25D366")}>📱</button>
@@ -595,8 +627,9 @@ export default function AgreementCenter() {
 
                 {/* Action buttons */}
                 <div style={{ marginTop: 16, display: "flex", flexDirection: "column" as const, gap: 8 }}>
-                  <button onClick={() => downloadPdf(selected.id, selected.agreement_number)} style={panelBtnStyle(G)}>
-                    ⬇ Download Premium PDF (4-Page)
+                  <button onClick={() => downloadPdf(selected.id, selected.agreement_number, (selected as any).booking_id)}
+                    disabled={isLoading("pdf" + selected.id)} style={panelBtnStyle(G)}>
+                    {isLoading("pdf" + selected.id) ? "⏳ Checking data…" : "⬇ Download Premium PDF (6-Page)"}
                   </button>
                   <button onClick={() => openDetailsModal(selected)} style={panelBtnStyle(GOLD, "#1a0a00")}>
                     ✏ Edit Hotel & Flight Details
@@ -607,6 +640,11 @@ export default function AgreementCenter() {
                   <button onClick={() => doAction("resend_whatsapp", selected.id)} disabled={!!actionLoading} style={panelBtnStyle("#25D366")}>
                     📱 Send WhatsApp with PDF
                   </button>
+                  {selected.status !== "cancelled" && selected.status !== "superseded" && (
+                    <button onClick={() => setReviseModal({ id: selected.id })} disabled={!!actionLoading} style={panelBtnStyle("#5c35a0")}>
+                      🔄 Issue Correction (Revise)
+                    </button>
+                  )}
                   {selected.status !== "cancelled" ? (
                     <button onClick={() => setCancelModal({ id: selected.id })} disabled={!!actionLoading} style={panelBtnStyle("#CC0000")}>
                       ✕ Cancel Agreement
@@ -671,6 +709,132 @@ export default function AgreementCenter() {
                 disabled={!cancelReason.trim()}
                 style={{ flex: 1, background: "#CC0000", color: "white", border: "none", borderRadius: 6, padding: "9px", cursor: cancelReason.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, opacity: cancelReason.trim() ? 1 : 0.5 }}>
                 Confirm Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Revise (Correction) Modal ── */}
+      {reviseModal && (
+        <div onClick={() => { setReviseModal(null); setReviseReason(""); setReviseCorrections({ hotel_info: {}, flight_info: {}, tcs_amount: "", gst_amount: "", discount_amount: "" }); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: "white", borderRadius: 10, padding: 28, width: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ color: "#5c35a0", marginBottom: 8, fontSize: 16 }}>🔄 Issue Agreement Correction</h3>
+            <p style={{ color: "#555", fontSize: 13, marginBottom: 4 }}>
+              This supersedes the current agreement and issues a corrected revision. The customer receives
+              a fresh signing link. The old agreement is preserved in audit history.
+            </p>
+            <p style={{ color: "#856404", background: "#FFF3CD", borderRadius: 6, padding: "8px 12px", fontSize: 12, marginBottom: 14 }}>
+              ⚠️ Supports hotel, flight, and financial (TCS/GST/discount) corrections.
+              For name or package amount changes, update the booking/customer profile first, then use Regenerate.
+            </p>
+
+            <label style={{ display: "block", fontWeight: 600, fontSize: 13, color: "#333", marginBottom: 4 }}>
+              Correction reason <span style={{ color: "#CC0000" }}>*</span>
+            </label>
+            <textarea value={reviseReason} onChange={e => setReviseReason(e.target.value)}
+              placeholder="e.g. Hotel changed from Hilton to Marriott, departure date corrected from 10 Jun to 12 Jun…" rows={3}
+              style={{ width: "100%", border: "1px solid #ddd", borderRadius: 6, padding: "8px", fontSize: 13, boxSizing: "border-box" as const, resize: "vertical" as const, marginBottom: 14 }} />
+
+            {/* Hotel corrections */}
+            <div style={{ fontWeight: 700, color: "#0B3D2E", fontSize: 12, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: 0.8 }}>🕌 Hotel Corrections (leave blank to keep current)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              {[
+                ["makkahHotel", "Makkah Hotel"], ["madinahHotel", "Madinah Hotel"],
+                ["makkahCheckIn", "Makkah Check-in"], ["makkahCheckOut", "Makkah Check-out"],
+                ["madinahCheckIn", "Madinah Check-in"], ["madinahCheckOut", "Madinah Check-out"],
+                ["makkahDistance", "Makkah Distance"], ["madinahDistance", "Madinah Distance"],
+                ["roomSharing", "Room Sharing"],
+              ].map(([k, label]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>{label}</div>
+                  <input placeholder={label}
+                    value={reviseCorrections.hotel_info[k] || ""}
+                    onChange={e => setReviseCorrections(p => ({ ...p, hotel_info: { ...p.hotel_info, [k]: e.target.value } }))}
+                    style={{ width: "100%", border: "1px solid #ddd", borderRadius: 4, padding: "5px 8px", fontSize: 12, boxSizing: "border-box" as const }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Flight corrections */}
+            <div style={{ fontWeight: 700, color: "#0B3D2E", fontSize: 12, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: 0.8 }}>✈️ Flight Corrections (leave blank to keep current)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {[
+                ["airline", "Airline"], ["flightNumber", "Flight No."],
+                ["departure", "Departure"], ["arrival", "Arrival"],
+                ["transit", "Transit"], ["baggage", "Baggage"],
+              ].map(([k, label]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>{label}</div>
+                  <input placeholder={label}
+                    value={reviseCorrections.flight_info[k] || ""}
+                    onChange={e => setReviseCorrections(p => ({ ...p, flight_info: { ...p.flight_info, [k]: e.target.value } }))}
+                    style={{ width: "100%", border: "1px solid #ddd", borderRadius: 4, padding: "5px 8px", fontSize: 12, boxSizing: "border-box" as const }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Financial corrections */}
+            <div style={{ fontWeight: 700, color: "#0B3D2E", fontSize: 12, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: 0.8 }}>💰 Financial Corrections (leave blank to keep current)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {([["tcs_amount","TCS Amount (₹)"],["gst_amount","GST Amount (₹)"],["discount_amount","Discount (₹)"]] as [keyof typeof reviseCorrections, string][]).map(([k, label]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 11, color: "#666", marginBottom: 2 }}>{label}</div>
+                  <input type="number" min="0" placeholder="0"
+                    value={reviseCorrections[k] as string}
+                    onChange={e => setReviseCorrections(p => ({ ...p, [k]: e.target.value }))}
+                    style={{ width: "100%", border: "1px solid #ddd", borderRadius: 4, padding: "5px 8px", fontSize: 12, boxSizing: "border-box" as const }} />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setReviseModal(null); setReviseReason(""); setReviseCorrections({ hotel_info: {}, flight_info: {}, tcs_amount: "", gst_amount: "", discount_amount: "" }); }}
+                style={{ flex: 1, background: "#f5f5f5", color: "#555", border: "1px solid #ddd", borderRadius: 6, padding: "9px", cursor: "pointer", fontSize: 13 }}>
+                Go Back
+              </button>
+              <button
+                disabled={!reviseReason.trim() || !!revisingId}
+                onClick={async () => {
+                  if (!reviseReason.trim()) return;
+                  setRevisingId(reviseModal.id);
+                  // Build corrections — only include fields that were changed
+                  const cleanHotel  = Object.fromEntries(Object.entries(reviseCorrections.hotel_info).filter(([, v]) => v.trim()));
+                  const cleanFlight = Object.fromEntries(Object.entries(reviseCorrections.flight_info).filter(([, v]) => v.trim()));
+                  const corrections: Record<string, unknown> = {};
+                  if (Object.keys(cleanHotel).length)  corrections.hotel_info  = cleanHotel;
+                  if (Object.keys(cleanFlight).length) corrections.flight_info = cleanFlight;
+                  // Financial: include when non-empty (0 is a valid correction)
+                  if (reviseCorrections.tcs_amount.trim()      !== "") corrections.tcs_amount      = Number(reviseCorrections.tcs_amount);
+                  if (reviseCorrections.gst_amount.trim()      !== "") corrections.gst_amount      = Number(reviseCorrections.gst_amount);
+                  if (reviseCorrections.discount_amount.trim() !== "") corrections.discount_amount = Number(reviseCorrections.discount_amount);
+                  try {
+                    const r = await fetch(`${API}/api/agreements/${reviseModal.id}/revise`, {
+                      method: "POST", credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        correctionReason: reviseReason,
+                        corrections: Object.keys(corrections).length ? corrections : undefined,
+                      }),
+                    });
+                    const d = await r.json();
+                    if (d.ok) {
+                      toast({ title: "Correction issued", description: "New revision created. Customer notified with a fresh signing link." });
+                      setReviseModal(null); setReviseReason("");
+                      setReviseCorrections({ hotel_info: {}, flight_info: {}, tcs_amount: "", gst_amount: "", discount_amount: "" });
+                      loadAgreements(page);
+                      if (selected) setSelected(null);
+                    } else {
+                      toast({ title: "Revise failed", description: d.error || "Unknown error", variant: "destructive" });
+                    }
+                  } catch {
+                    toast({ title: "Error", description: "Network error", variant: "destructive" });
+                  } finally { setRevisingId(null); }
+                }}
+                style={{ flex: 1, background: revisingId ? "#aaa" : "#5c35a0", color: "white", border: "none", borderRadius: 6, padding: "9px", cursor: reviseReason.trim() && !revisingId ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13 }}>
+                {revisingId ? "⏳ Revising…" : "🔄 Issue Correction"}
               </button>
             </div>
           </div>

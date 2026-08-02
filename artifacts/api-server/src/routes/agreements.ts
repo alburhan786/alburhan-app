@@ -123,7 +123,12 @@ const router = Router();
     // Superseded tracking — allows reissue history to be stored
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS superseded_reason TEXT`);
-    console.log("[Agreement] superseded columns ensured");
+    // Revision snapshot columns — store who corrected, why, and what changed
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS superseded_by_admin_id TEXT`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS correction_reason TEXT`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS old_data_snapshot JSONB`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS new_data_snapshot JSONB`);
+    console.log("[Agreement] superseded + revision snapshot columns ensured");
     // Financial override columns — stored on the agreement row so reissues carry values forward
     // and PDF generation never fabricates amounts.
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS tcs_amount      NUMERIC(12,2)`);
@@ -159,11 +164,17 @@ export async function logAgreementAudit(agreementId: string, action: string, det
 }
 
 // ── Enriched SQL query fragment ───────────────────────────────────────────────
+// Joins payment_transactions for real paid amounts (bookings.paid_amount can lag).
+// LATERAL subquery gets latest invoice total; falls back to bookings.final_amount.
 const RICH_SELECT = `
   SELECT a.*, a.hotel_info, a.flight_info, a.signing_metadata, a.digital_hash, a.revision_number,
          a.superseded_at, a.superseded_reason,
+         a.superseded_by_admin_id, a.correction_reason,
          b.booking_number, b.customer_name, b.customer_mobile, b.customer_email,
-         b.package_name, b.final_amount, b.paid_amount, b.number_of_pilgrims,
+         b.package_name,
+         COALESCE(NULLIF(inv_lat.invoice_total::text,''), NULLIF(b.final_amount::text,''), '0')::numeric AS final_amount,
+         COALESCE(pt_agg.verified_paid, b.paid_amount::numeric, 0) AS paid_amount,
+         b.number_of_pilgrims,
          b.created_at AS booking_date, b.status AS booking_status,
          hg.group_name, hg.departure_date, hg.return_date,
          u.name AS user_name, u.email AS user_email,
@@ -174,13 +185,30 @@ const RICH_SELECT = `
          cp.passport_issue_date, cp.passport_expiry,
          cp.nominee, cp.nominee_relation, cp.whatsapp_number,
          cp.address, cp.photo_url, cp.aadhar_image_url, cp.pan_image_url, cp.passport_image_url,
-         pkg.type AS pkg_type, pkg.name AS pkg_db_name
+         pkg.type AS pkg_type, pkg.name AS pkg_db_name,
+         inv_lat.invoice_number, inv_lat.invoice_status
   FROM agreements a
   LEFT JOIN bookings b  ON b.id  = a.booking_id
   LEFT JOIN hajj_groups hg ON hg.id = b.group_id
   LEFT JOIN users u     ON u.id  = a.customer_id
   LEFT JOIN customer_profiles cp ON cp.user_id = a.customer_id
   LEFT JOIN packages pkg ON pkg.id = b.package_id
+  LEFT JOIN LATERAL (
+    SELECT i.total          AS invoice_total,
+           i.paid           AS invoice_paid,
+           i.invoice_number,
+           i.invoice_status
+    FROM   invoices i
+    WHERE  i.booking_id = b.id
+    ORDER  BY i.created_at DESC
+    LIMIT  1
+  ) inv_lat ON true
+  LEFT JOIN LATERAL (
+    SELECT SUM(pt.amount) AS verified_paid
+    FROM   payment_transactions pt
+    WHERE  pt.booking_id  = b.id
+      AND  (pt.is_deleted IS NULL OR pt.is_deleted = false)
+  ) pt_agg ON true
 `;
 
 // ── Build PDF options from enriched DB row ────────────────────────────────────
@@ -277,10 +305,13 @@ function buildPdfOpts(ag: any, siteBase: string, override: Partial<AgreementPdfO
     totalAmount:            totalAmt,
     paidAmount:             paidAmt,
     balanceAmount:          totalAmt - paidAmt,
-    discountAmount:         Number(ag.discount_amount || 0) || undefined,
-    gstAmount:              Number(ag.gst_amount || hi.gstAmount || 0) || undefined,
+    // Financial overrides: nullish checks so explicit 0 is preserved, not treated as falsy.
+    // ag.discount_amount / gst_amount / tcs_amount are set by /revise corrections; fall back
+    // to hotel_info legacy values only when no DB row override exists (null/undefined).
+    discountAmount:         ag.discount_amount != null ? Number(ag.discount_amount) : (hi.discountAmount != null ? Number(hi.discountAmount) : undefined),
+    gstAmount:              ag.gst_amount      != null ? Number(ag.gst_amount)      : (hi.gstAmount      != null ? Number(hi.gstAmount)      : undefined),
     // TCS: only use explicitly stored values — never fabricate a charge that was not recorded
-    tcsAmount:              Number(ag.tcs_amount || hi.tcsAmount || 0),
+    tcsAmount:              ag.tcs_amount      != null ? Number(ag.tcs_amount)      : Number(hi.tcsAmount ?? 0),
     tcsPercentage:          hi.tcsPercentage != null ? Number(hi.tcsPercentage) : null,
     tcsApplicable:          !!hi.tcsApplicable,
     govtCharges:            Number(hi.govtCharges || 0) || undefined,
@@ -462,6 +493,21 @@ async function fetchImageBuffer(url: string | null | undefined): Promise<Buffer 
     console.warn("[fetchImageBuffer] Could not fetch", url?.substring(0, 60), e?.message);
     return null;
   }
+}
+
+// ── Mandatory-field validation before PDF generation ─────────────────────────
+// Returns { ok, missingFields } — callers check ok before rendering the PDF.
+// Signed agreements skip this check (the PDF must always be downloadable after signing).
+function validateMandatoryFields(ag: any): { ok: boolean; missingFields: string[] } {
+  if (ag.status === "signed") return { ok: true, missingFields: [] };
+  const missing: string[] = [];
+  const name = (ag.customer_name || ag.user_name || "").trim();
+  if (!name)                                    missing.push("Customer full name");
+  if (!(ag.customer_mobile || "").trim())       missing.push("Mobile number");
+  if (!(ag.package_name || "").trim())          missing.push("Package name");
+  const total = Number(ag.final_amount || 0);
+  if (total <= 0)                               missing.push("Package amount (must be > ₹0)");
+  return { ok: missing.length === 0, missingFields: missing };
 }
 
 // ── Build PDF opts enriched with fetched photo buffers (async) ───────────────
@@ -1567,6 +1613,17 @@ router.get("/:id/pdf", requireAdmin, async (req: any, res) => {
     const agRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [id]);
     if (!agRes.rows.length) return res.status(404).json({ error: "Not found" });
     const ag = agRes.rows[0];
+
+    // Mandatory-field gate — block PDF when critical data is missing
+    const validation = validateMandatoryFields(ag);
+    if (!validation.ok) {
+      return res.status(422).json({
+        error: `Agreement cannot be generated. Missing fields: ${validation.missingFields.join(", ")}`,
+        code: "AGREEMENT_DATA_INCOMPLETE",
+        missingFields: validation.missingFields,
+      });
+    }
+
     const buf = await generateAgreementPdfBuffer(await buildEnrichedPdfOpts(ag, getSiteBase()));
     await logAgreementAudit(id, "pdf_downloaded_admin", { adminId: req.user?.id }, getClientIp(req));
     const safeName = ag.agreement_number.replace(/[^A-Za-z0-9-]/g, "-");
@@ -1662,6 +1719,7 @@ async function performImmutableReissue(
   reasonArg: string | undefined,
   adminId: string | undefined,
   ip: string,
+  opts?: { supersedeSigned?: boolean },
 ): Promise<{ newId: string; newAccessToken: string; agreementNumber: string }> {
   const newId = crypto.randomUUID();
   const newAccessToken = genAccessToken();
@@ -1675,7 +1733,22 @@ async function performImmutableReissue(
   try {
     await client.query("BEGIN");
 
-    // Lock the source row so concurrent reissues cannot race on the same agreement.
+    // Step A: Non-locking read to obtain booking_id for the advisory lock.
+    // MUST acquire the advisory lock BEFORE any FOR UPDATE row lock to prevent deadlock:
+    // two concurrent revisions on different rows of the same booking could each hold
+    // a FOR UPDATE lock and then block waiting for the other's advisory lock.
+    const bkIdRes = await client.query(
+      `SELECT booking_id FROM agreements WHERE id=$1`, [oldId]
+    );
+    if (!bkIdRes.rows.length) {
+      await client.query("ROLLBACK");
+      throw Object.assign(new Error("Not found"), { statusCode: 404 });
+    }
+
+    // Step B: Acquire advisory lock first. hashtext() accepts any text ID format.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [bkIdRes.rows[0].booking_id]);
+
+    // Step C: Now safe to row-lock — advisory lock serialises concurrent reissues for this booking.
     const agRes = await client.query(
       `SELECT * FROM agreements WHERE id=$1 FOR UPDATE`, [oldId]
     );
@@ -1691,12 +1764,6 @@ async function performImmutableReissue(
       throw Object.assign(new Error("This agreement has already been superseded — reissue the current revision instead"), { statusCode: 409 });
     }
 
-    // Advisory lock on the booking_id (hashed to bigint) serializes ALL concurrent reissues
-    // for the same booking, so two admins cannot allocate the same revision simultaneously.
-    // pg_advisory_xact_lock is automatically released at COMMIT/ROLLBACK.
-    const lockKey = BigInt("0x" + old.booking_id.replace(/-/g, "").slice(0, 15)) % BigInt(2147483647);
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [lockKey.toString()]);
-
     // Family-wide revision allocation: derive next rev from MAX across the entire booking family.
     // This prevents a reissue from a cancelled/voided original creating BASE-R2 when an R2 already exists.
     const maxRevRes = await client.query(
@@ -1711,12 +1778,16 @@ async function performImmutableReissue(
     const baseNum = String(old.agreement_number).replace(/-R\d+$/, "");
     newAgreementNumber = `${baseNum}-R${rev}`;
 
-    // Step 1: Freeze ALL currently-pending revisions for this booking (not just the selected source).
-    // This enforces the single-active-revision invariant: reissuing an old cancelled/voided agreement
-    // while a newer revision is pending_signature would otherwise leave two signable rows.
+    // Step 1: Freeze ALL currently-active revisions for this booking.
+    // When supersedeSigned=true (correction flow), also freeze signed rows so the prior
+    // signed agreement is no longer publicly accessible once a correction is issued.
+    // For normal reissue, only pending_signature rows are frozen.
+    const supersededStatuses = opts?.supersedeSigned
+      ? `'pending_signature','signed'`
+      : `'pending_signature'`;
     await client.query(
       `UPDATE agreements SET status='superseded', superseded_at=NOW(), superseded_reason=$1, updated_at=NOW()
-       WHERE booking_id=$2 AND status='pending_signature'`,
+       WHERE booking_id=$2 AND status IN (${supersededStatuses})`,
       [reason, old.booking_id]
     );
 
@@ -1733,9 +1804,9 @@ async function performImmutableReissue(
         newId, newAgreementNumber, old.booking_id, old.customer_id,
         old.hotel_info   ? JSON.stringify(old.hotel_info)   : null,
         old.flight_info  ? JSON.stringify(old.flight_info)  : null,
-        old.tcs_amount   || null,
-        old.gst_amount   || null,
-        old.discount_amount || null,
+        old.tcs_amount      ?? null,
+        old.gst_amount      ?? null,
+        old.discount_amount ?? null,
         newVerificationToken, newAccessToken,
         rev,
       ]
@@ -1784,6 +1855,216 @@ router.post("/:id/reissue", requireAdmin, async (req: any, res) => {
   } catch (err: any) {
     console.error("[Agreement] Reissue error:", err);
     res.status(err?.statusCode || 500).json({ error: err?.statusCode === 404 ? "Not found" : "Failed to reissue" });
+  }
+});
+
+// ── ADMIN: Revise agreement (correction with snapshot history) ─────────────────
+// Issues a new revision superseding ALL active rows for this booking (pending and signed).
+// Supported corrections (persisted on agreement row): hotel_info, flight_info,
+// tcs_amount, gst_amount, discount_amount. Customer name/package/total amount corrections
+// must be made at the booking/customer-profile level; those fields derive from source tables.
+//
+// Everything — supersession, revision creation, snapshots, audit record — is written in
+// ONE transaction so there is never a live revision without its correction history.
+router.post("/:id/revise", requireAdmin, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { correctionReason, corrections } = req.body;
+    // corrections: { hotel_info?, flight_info?, tcs_amount?, gst_amount?, discount_amount? }
+    if (!correctionReason?.trim()) {
+      return res.status(400).json({ error: "correctionReason is required" });
+    }
+
+    const adminId: string | null = req.user?.id || null;
+    const ip = getClientIp(req);
+    const newId = crypto.randomUUID();
+    const newAccessToken = genAccessToken();
+    const newVerificationToken = crypto.randomUUID();
+
+    let newAgreementNumber = "";
+    let oldAgreementNumber = "";
+    let oldBookingId       = "";
+    let oldCustomerId      = "";
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1A. Non-locking read to get booking_id for advisory lock.
+      //     Advisory lock MUST be acquired BEFORE any FOR UPDATE row lock to prevent deadlock:
+      //     two concurrent /revise calls on different rows of the same booking could each hold
+      //     a row lock and then block waiting for the other's advisory lock.
+      const bkIdRes = await client.query(
+        `SELECT booking_id FROM agreements WHERE id = $1`, [id]
+      );
+      if (!bkIdRes.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Agreement not found" });
+      }
+
+      // 1B. Acquire booking-level advisory lock first. hashtext() accepts any text ID format.
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [bkIdRes.rows[0].booking_id]);
+
+      // 1C. Now safe to row-lock the source agreement.
+      const lockRes = await client.query(
+        `SELECT * FROM agreements WHERE id = $1 FOR UPDATE`, [id]
+      );
+      if (!lockRes.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Agreement not found" });
+      }
+      const old = lockRes.rows[0];
+      oldAgreementNumber = old.agreement_number;
+      oldBookingId       = old.booking_id;
+      oldCustomerId      = old.customer_id;
+
+      if (old.status === "superseded") {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "This agreement is already superseded — revise the current active revision instead." });
+      }
+      if (old.status === "cancelled" || old.status === "void") {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "Cannot revise a cancelled or voided agreement." });
+      }
+
+      // 3. Derive next revision number from the family-wide MAX.
+      const maxRevRes = await client.query(
+        `SELECT COALESCE(MAX(revision_number), 1) AS max_rev FROM agreements WHERE booking_id = $1`,
+        [old.booking_id]
+      );
+      const rev = (Number(maxRevRes.rows[0]?.max_rev) || 1) + 1;
+      const baseNum = String(old.agreement_number).replace(/-R\d+$/, "");
+      newAgreementNumber = `${baseNum}-R${rev}`;
+
+      // 4. Build old snapshot from actual locked source values (not request payload).
+      const oldSnapshot = {
+        agreement_number: old.agreement_number,
+        revision_number:  old.revision_number,
+        status:           old.status,
+        hotel_info:       old.hotel_info  || null,
+        flight_info:      old.flight_info || null,
+        tcs_amount:       old.tcs_amount       ?? null,
+        gst_amount:       old.gst_amount       ?? null,
+        discount_amount:  old.discount_amount  ?? null,
+        signed_at:        old.signed_at   || null,
+      };
+
+      // 5. Resolve corrected values (merge corrections onto old agreement-row values).
+      //    Customer name, package, total amount are NOT stored on the agreement row — they
+      //    are derived at PDF generation from bookings/customer_profiles.
+      const newHotelInfo  = corrections?.hotel_info
+        ? { ...(old.hotel_info  || {}), ...(corrections.hotel_info)  }
+        : (old.hotel_info  || null);
+      const newFlightInfo = corrections?.flight_info
+        ? { ...(old.flight_info || {}), ...(corrections.flight_info) }
+        : (old.flight_info || null);
+      const newTcs        = corrections?.tcs_amount        !== undefined ? corrections.tcs_amount        : old.tcs_amount;
+      const newGst        = corrections?.gst_amount         !== undefined ? corrections.gst_amount         : old.gst_amount;
+      const newDiscount   = corrections?.discount_amount    !== undefined ? corrections.discount_amount    : old.discount_amount;
+
+      // 6. Build new snapshot from the values actually being persisted.
+      const newSnapshot = {
+        agreement_number: newAgreementNumber,
+        revision_number:  rev,
+        status:           "pending_signature",
+        hotel_info:       newHotelInfo,
+        flight_info:      newFlightInfo,
+        tcs_amount:       newTcs       ?? null,
+        gst_amount:       newGst       ?? null,
+        discount_amount:  newDiscount  ?? null,
+      };
+
+      // 7. Supersede ALL currently-active rows for this booking (pending + signed).
+      //    This ensures the prior signed agreement is no longer publicly accessible.
+      await client.query(
+        `UPDATE agreements
+            SET status                 = 'superseded',
+                superseded_at          = NOW(),
+                superseded_reason      = $1,
+                superseded_by_admin_id = $2,
+                correction_reason      = $3,
+                updated_at             = NOW()
+          WHERE booking_id = $4
+            AND status IN ('pending_signature', 'signed')`,
+        [correctionReason, adminId, correctionReason, old.booking_id]
+      );
+
+      // 8. Insert the new revision with corrections + snapshots in ONE statement.
+      await client.query(
+        `INSERT INTO agreements
+           (id, agreement_number, booking_id, customer_id, status,
+            hotel_info, flight_info, tcs_amount, gst_amount, discount_amount,
+            verification_token, access_token, access_token_expires_at,
+            revision_number, correction_reason, old_data_snapshot, new_data_snapshot,
+            superseded_by_admin_id, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,'pending_signature',
+                 $5,$6,$7,$8,$9,
+                 $10,$11, NOW() + INTERVAL '72 hours',
+                 $12,$13,$14,$15,
+                 $16, NOW(), NOW())`,
+        [
+          newId, newAgreementNumber, old.booking_id, old.customer_id,
+          newHotelInfo  ? JSON.stringify(newHotelInfo)  : null,
+          newFlightInfo ? JSON.stringify(newFlightInfo) : null,
+          newTcs ?? null, newGst ?? null, newDiscount ?? null,
+          newVerificationToken, newAccessToken,
+          rev,
+          correctionReason,
+          JSON.stringify(oldSnapshot),
+          JSON.stringify(newSnapshot),
+          adminId,
+        ]
+      );
+
+      // 9. Audit record inside the same transaction — cannot be orphaned.
+      await client.query(
+        `INSERT INTO agreement_audit_logs
+           (id, agreement_id, action, details, ip_address, user_agent, created_at)
+         VALUES (gen_random_uuid(), $1, 'agreement_revised', $2, $3, $4, NOW())`,
+        [
+          newId,
+          JSON.stringify({
+            correctionReason,
+            previousAgreementId:     id,
+            previousAgreementNumber: old.agreement_number,
+            adminId,
+          }),
+          ip,
+          req.headers?.["user-agent"] || null,
+        ]
+      );
+
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    // Post-transaction: fetch enriched new row, notify customer
+    const newAgRes = await pool.query(RICH_SELECT + `WHERE a.id = $1`, [newId]);
+    const newAg = newAgRes.rows[0];
+    const bkNum  = newAg?.booking_number || "";
+    const sigUrl = bkNum ? buildSigningUrl(bkNum, newAccessToken, getSiteBase()) : null;
+
+    if (newAg?.customer_mobile && sigUrl) {
+      triggerWorkflow("agreement_generated", {
+        customerName:   newAg.customer_name || "Valued Customer",
+        customerMobile: newAg.customer_mobile,
+        bookingNumber:  newAg.booking_number,
+        packageName:    newAg.package_name,
+        agreementUrl:   sigUrl,
+        bookingId:      newAg.booking_id,
+        customerId:     newAg.customer_id,
+      }).catch((e: any) => console.error("[Agreement] Revise notify failed:", e));
+    }
+
+    console.log(`[Agreement] ✅ Revised: ${oldAgreementNumber} → ${newAgreementNumber} | reason="${correctionReason}"`);
+    res.json({ ok: true, newAgreement: newAg, signingUrl: sigUrl, correctionReason });
+  } catch (err: any) {
+    console.error("[Agreement] Revise error:", err);
+    res.status(err?.statusCode || 500).json({ error: err?.message || "Failed to revise agreement" });
   }
 });
 
