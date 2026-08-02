@@ -25,14 +25,54 @@ const router = Router();
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS signing_metadata JSONB`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS digital_hash TEXT`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS revision_number INTEGER DEFAULT 1`);
-    // Enforce revision uniqueness only for the one truly-active signable state.
-    // Predicate = 'pending_signature' so old cancelled/voided rows (which all default
-    // to revision_number=1) are excluded and legacy regenerate history never conflicts.
+
+    // ── Safe revision unique index ──────────────────────────────────────────
+    // Step 1: backfill NULLs (rows created before the column existed)
+    await pool.query(`UPDATE agreements SET revision_number = 1 WHERE revision_number IS NULL`);
+
+    // Step 2: fix any (booking_id, revision_number) duplicates among pending_signature rows.
+    // Old "regenerate" behaviour could leave two pending_signature rows both with revision_number=1.
+    // Assign sequential revision numbers within each booking family so the unique index can be
+    // created without conflict.
+    await pool.query(`
+      UPDATE agreements a
+         SET revision_number = sub.rn
+        FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (PARTITION BY booking_id ORDER BY created_at) AS rn
+            FROM agreements
+           WHERE status = 'pending_signature'
+        ) sub
+       WHERE a.id = sub.id
+         AND a.revision_number IS DISTINCT FROM sub.rn
+    `);
+
+    // Step 3: drop stale index if predicate is wrong (old runs used status!='superseded').
+    // We compare the stored predicate text; if the index doesn't exist this is a no-op.
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE tablename = 'agreements'
+            AND indexname  = 'agreements_booking_revision_uniq'
+            AND indexdef NOT LIKE '%pending_signature%'
+        ) THEN
+          DROP INDEX agreements_booking_revision_uniq;
+        END IF;
+      END
+      $$
+    `);
+
+    // Step 4: create with the correct predicate — pending_signature only.
+    // This excludes cancelled/voided/superseded rows so legacy regenerate history
+    // (where two rows share revision_number=1 but one is cancelled) never conflicts.
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS agreements_booking_revision_uniq
       ON agreements(booking_id, revision_number)
       WHERE status = 'pending_signature'
     `);
+    console.log("[Agreement] revision unique index ensured (predicate: pending_signature)");
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_at TIMESTAMPTZ`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS void_reason TEXT`);
     console.log("[Agreement] agreements columns ensured");
@@ -84,6 +124,12 @@ const router = Router();
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ`);
     await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS superseded_reason TEXT`);
     console.log("[Agreement] superseded columns ensured");
+    // Financial override columns — stored on the agreement row so reissues carry values forward
+    // and PDF generation never fabricates amounts.
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS tcs_amount      NUMERIC(12,2)`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS gst_amount      NUMERIC(12,2)`);
+    await pool.query(`ALTER TABLE agreements ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2)`);
+    console.log("[Agreement] financial columns ensured (tcs/gst/discount)");
   } catch (e) { console.error("[Agreement] Migration error:", e); }
 })();
 
