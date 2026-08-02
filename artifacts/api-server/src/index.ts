@@ -3165,6 +3165,192 @@ async function start() {
     console.log(`[Migration] v33.3 notification_logs duplicate audit: ${dupGroups.rows.length} groups, ${markedCount} rows soft-marked superseded`);
   } catch (err: any) { console.warn("[Migration] v33.3 notification_logs dup cleanup:", err.message); }
 
+  // ── v34.1 — invoices: tax snapshot + payment_status + immutability columns ──
+  try {
+    const cols = [
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS taxable_amount NUMERIC(12,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS visa_charges NUMERIC(12,2) DEFAULT 0`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS additional_charges NUMERIC(12,2) DEFAULT 0`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS grand_total NUMERIC(12,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS issue_date TIMESTAMPTZ`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_name TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS package_name TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS package_type TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS actor_id TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS void_reason TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_by TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_void BOOLEAN DEFAULT false`,
+    ];
+    for (const s of cols) await pool.query(s).catch(() => {});
+    // Backfill derived columns for existing rows
+    await pool.query(`UPDATE invoices SET grand_total=total WHERE grand_total IS NULL`).catch(() => {});
+    await pool.query(`UPDATE invoices SET issue_date=invoice_date WHERE issue_date IS NULL`).catch(() => {});
+    await pool.query(`
+      UPDATE invoices SET payment_status=CASE
+        WHEN paid >= total-0.01 THEN 'paid'
+        WHEN paid > 0 THEN 'partially_paid'
+        ELSE 'unpaid'
+      END WHERE payment_status='unpaid' OR payment_status IS NULL`).catch(() => {});
+    // Backfill customer_name / package_name from bookings
+    await pool.query(`
+      UPDATE invoices i SET
+        customer_name=COALESCE(i.customer_name, b.customer_name),
+        package_name=COALESCE(i.package_name, b.package_name)
+      FROM bookings b WHERE b.id=i.booking_id
+        AND (i.customer_name IS NULL OR i.package_name IS NULL)`).catch(() => {});
+    console.log("[Migration] v34.1 invoices extended columns ensured");
+  } catch (err: any) { console.warn("[Migration] v34.1 invoices extension:", err.message); }
+
+  // ── v34.2 — invoice_number_seq + receipt_number_seq + refund_number_seq ───────
+  try {
+    const maxInvRes = await pool.query(`
+      SELECT COALESCE(MAX(CAST(SPLIT_PART(invoice_number,'/',3) AS BIGINT)),0) AS m
+      FROM invoices WHERE invoice_number ~ '^ABT/[0-9]{4}/[0-9]+'`);
+    const invStart = Number(maxInvRes.rows[0]?.m ?? 0) + 1;
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS invoice_number_seq MINVALUE 1`);
+    // Ensure sequence is at least at invStart (setval with is_called=false sets NEXT value)
+    await pool.query(`SELECT setval('invoice_number_seq', GREATEST((SELECT last_value FROM invoice_number_seq), $1), true)`, [invStart]).catch(() => {});
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS receipt_number_seq MINVALUE 1`);
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS refund_number_seq MINVALUE 1`);
+    console.log("[Migration] v34.2 financial sequences ensured (inv_start=%d)", invStart);
+  } catch (err: any) { console.warn("[Migration] v34.2 sequences:", err.message); }
+
+  // ── v34.3 — receipts table ────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id TEXT PRIMARY KEY,
+        receipt_number TEXT UNIQUE NOT NULL,
+        payment_id TEXT UNIQUE NOT NULL,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
+        customer_name TEXT,
+        booking_number TEXT,
+        package_name TEXT,
+        payment_date TEXT,
+        payment_method TEXT,
+        reference_number TEXT,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total_paid NUMERIC(12,2) NOT NULL DEFAULT 0,
+        outstanding_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        received_by TEXT,
+        company_name TEXT NOT NULL DEFAULT 'Al Burhan Tours & Travels',
+        pdf_path TEXT,
+        is_void BOOLEAN NOT NULL DEFAULT false,
+        void_reason TEXT,
+        voided_at TIMESTAMPTZ,
+        voided_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS rec_booking_idx ON receipts(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS rec_payment_idx ON receipts(payment_id)`);
+    console.log("[Migration] v34.3 receipts table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.3 receipts:", err.message); }
+
+  // ── v34.4 — refunds table ─────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS refunds (
+        id TEXT PRIMARY KEY,
+        refund_number TEXT UNIQUE NOT NULL,
+        booking_id TEXT NOT NULL,
+        payment_id TEXT,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        refund_method TEXT NOT NULL DEFAULT 'bank_transfer',
+        refund_reason TEXT NOT NULL,
+        reference_number TEXT,
+        requested_by TEXT,
+        approved_by TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        approved_at TIMESTAMPTZ,
+        processed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ref_booking_idx ON refunds(booking_id)`);
+    console.log("[Migration] v34.4 refunds table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.4 refunds:", err.message); }
+
+  // ── v34.5 — finance_audit_logs table ──────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS finance_audit_logs (
+        id TEXT PRIMARY KEY,
+        action TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT,
+        booking_id TEXT,
+        actor_id TEXT,
+        actor_name TEXT,
+        actor_role TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        old_values JSONB,
+        new_values JSONB,
+        reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_booking_idx ON finance_audit_logs(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_action_idx ON finance_audit_logs(action)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_created_idx ON finance_audit_logs(created_at DESC)`);
+    console.log("[Migration] v34.5 finance_audit_logs table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.5 finance_audit_logs:", err.message); }
+
+  // ── v34.6 — customer_ledger_entries table ──────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_ledger_entries (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        entry_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        doc_type TEXT NOT NULL,
+        doc_number TEXT,
+        doc_id TEXT,
+        description TEXT NOT NULL,
+        debit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        credit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        running_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        source TEXT,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cle_booking_idx ON customer_ledger_entries(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cle_date_idx ON customer_ledger_entries(booking_id, entry_date ASC)`);
+    console.log("[Migration] v34.6 customer_ledger_entries table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.6 customer_ledger_entries:", err.message); }
+
+  // ── v34.7 — booking_settings: finance columns + bookings.payment_status ───────
+  try {
+    const fCols = [
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS standard_advance_pct NUMERIC(5,2) DEFAULT 50`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS balance_due_after_days INTEGER DEFAULT 50`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS discount_full_payment_required BOOLEAN DEFAULT true`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS block_visa_balance_pending BOOLEAN DEFAULT true`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS default_currency TEXT DEFAULT 'INR'`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS sar_reference_rate NUMERIC(8,2) DEFAULT 25.70`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS spc_charge NUMERIC(10,2) DEFAULT 5500`,
+    ];
+    for (const s of fCols) await pool.query(s).catch(() => {});
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'`).catch(() => {});
+    // Backfill payment_status from paid_amount vs final_amount
+    await pool.query(`
+      UPDATE bookings SET payment_status = CASE
+        WHEN final_amount IS NULL OR final_amount <= 0 THEN 'unpaid'
+        WHEN COALESCE(paid_amount,0) <= 0 THEN 'unpaid'
+        WHEN COALESCE(paid_amount,0) >= final_amount - 0.01 THEN 'paid'
+        ELSE 'partially_paid'
+      END WHERE payment_status='unpaid' OR payment_status IS NULL`).catch(() => {});
+    console.log("[Migration] v34.7 finance settings columns + bookings.payment_status ensured");
+  } catch (err: any) { console.warn("[Migration] v34.7 finance settings:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

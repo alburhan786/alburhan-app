@@ -3,6 +3,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { checkVisaPaymentEligibility } from "../lib/financeService.js";
 
 const router = Router();
 router.use(requireModuleAccess("pilgrims") as any);
@@ -63,11 +64,55 @@ router.get("/stats", requireAdmin as any, async (req, res) => {
 
 // PUT update visa for a pilgrim
 router.put("/:pilgrimId", requireAdmin as any, async (req, res) => {
-  const { visaStatus, visaNumber, visaType, visaAppliedDate, visaReceivedDate } = req.body;
+  const { visaStatus, visaNumber, visaType, visaAppliedDate, visaReceivedDate, overrideReason } = req.body;
   if (visaStatus && !VISA_STATUSES.includes(visaStatus)) {
     return void res.status(400).json({ error: "Invalid visa status" });
   }
   try {
+    // ── Payment guard: block visa issuance when balance is pending ────────────
+    if (visaStatus === "received" || visaStatus === "approved") {
+      // Resolve the booking for this pilgrim
+      const pilgrimRow = await pool.query(
+        `SELECT p.group_id,
+           (SELECT b.id FROM bookings b WHERE b.group_id=p.group_id
+            AND (b.is_deleted IS NULL OR b.is_deleted=false)
+            ORDER BY b.created_at DESC LIMIT 1) AS booking_id
+         FROM pilgrims p WHERE p.id=$1`,
+        [req.params.pilgrimId]
+      );
+      const bookingId = pilgrimRow.rows[0]?.booking_id;
+      if (bookingId) {
+        const eligibility = await checkVisaPaymentEligibility(bookingId);
+        if (!eligibility.eligible) {
+          // Allow super_admin override with a reason
+          const actor = (req as any).user;
+          if (!overrideReason?.trim() || actor?.role !== "super_admin") {
+            return void res.status(402).json({
+              error: "VISA_PAYMENT_BLOCKED",
+              message: eligibility.reason,
+              outstanding: eligibility.outstanding,
+              required_advance: eligibility.required_advance,
+              current_paid: eligibility.current_paid,
+              override_hint: "Super admin can override by supplying overrideReason in the request body",
+            });
+          }
+          // Log the override
+          await pool.query(
+            `INSERT INTO finance_audit_logs
+               (id, action, entity_type, entity_id, booking_id, actor_id, actor_name, actor_role, reason, new_values, created_at)
+             VALUES (gen_random_uuid()::text,'visa_payment_override','pilgrim',$1,$2,$3,$4,$5,$6,$7,NOW())`,
+            [
+              req.params.pilgrimId, bookingId,
+              actor?.id, actor?.name, actor?.role,
+              overrideReason,
+              JSON.stringify({ visa_status: visaStatus, outstanding: eligibility.outstanding }),
+            ]
+          ).catch(() => {});
+          console.log(`[visa] ⚠️  payment override by ${actor?.name} for pilgrim ${req.params.pilgrimId} | reason: ${overrideReason}`);
+        }
+      }
+    }
+
     await pool.query(
       `UPDATE pilgrims SET visa_status=$1, visa_number=$2, visa_type=$3,
         visa_applied_date=$4, visa_received_date=$5, updated_at=NOW()
