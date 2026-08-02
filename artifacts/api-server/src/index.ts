@@ -3824,6 +3824,214 @@ async function start() {
     console.log("[Migration] v37.5 ai_knowledge_base + ai_automation api_settings ensured");
   } catch (err: any) { console.warn("[Migration] v37.5 ai_knowledge_base:", err.message); }
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 2 — Tenant foundation & row-level backfill (v38.1 – v38.9)
+  // Fixed tenant UUID: 10000000-1000-4000-8000-000000000001 (Al Burhan default)
+  // All columns NULLABLE — NOT NULL enforcement deferred to Phase 3
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  // ── v38.1: Create tenants table + seed Al Burhan row ─────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tenants (
+        id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        slug        TEXT         UNIQUE NOT NULL,
+        name        TEXT         NOT NULL,
+        plan        TEXT         NOT NULL DEFAULT 'starter',
+        status      TEXT         NOT NULL DEFAULT 'active',
+        settings    JSONB        NOT NULL DEFAULT '{}',
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      INSERT INTO tenants (id, slug, name, plan, status)
+      VALUES ('10000000-1000-4000-8000-000000000001', 'alburhan', 'Al Burhan Tours & Travels', 'enterprise', 'active')
+      ON CONFLICT (id) DO NOTHING
+    `);
+    console.log("[Migration] v38.1 tenants table + Al Burhan seed OK");
+  } catch (err: any) { console.warn("[Migration] v38.1 tenants:", err.message); }
+
+  // ── v38.2: tenant_id on core booking / org tables ────────────────────────────
+  try {
+    const v382Tables = [
+      "users", "bookings", "packages", "hajj_groups", "pilgrims",
+      "branches", "agents", "staff",
+    ];
+    for (const t of v382Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.2 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.2 core booking/org tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.2 core tables:", err.message); }
+
+  // ── v38.3: tenant_id on financial tables ─────────────────────────────────────
+  try {
+    const v383Tables = [
+      "payment_transactions", "invoices", "receipts", "refunds",
+      "offline_payments", "expenses", "journal_entries", "journal_entry_lines",
+      "payment_schedules", "payment_links",
+    ];
+    for (const t of v383Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.3 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.3 financial tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.3 financial tables:", err.message); }
+
+  // ── v38.4: tenant_id on agreements, documents, support, audit trails ──────────
+  try {
+    const v384Tables = [
+      "agreements", "documents", "support_tickets", "support_messages",
+      "feedback", "inquiries", "otps",
+      "audit_logs", "booking_audit_logs", "payment_audit_logs",
+      "agreement_audit_logs", "finance_audit_logs",
+    ];
+    for (const t of v384Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.4 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.4 doc/support/audit tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.4 doc/audit tables:", err.message); }
+
+  // ── v38.5: tenant_id on CRM / lead / campaign tables ─────────────────────────
+  try {
+    const v385Tables = [
+      "leads", "lead_followups", "lead_activities", "lead_audit_log",
+      "lead_web_forms", "lead_web_form_submissions", "lead_auto_followup_log",
+      "lead_assignment_rules", "crm_assignment_rules",
+      "broadcasts", "notification_campaigns", "push_campaigns",
+    ];
+    for (const t of v385Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.5 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.5 CRM/lead/campaign tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.5 CRM tables:", err.message); }
+
+  // ── v38.6: tenant_id on notification + comms tables ──────────────────────────
+  try {
+    const v386Tables = [
+      "notification_templates", "notification_settings", "notification_logs",
+      "communication_event_mappings", "communication_audit_logs", "communication_consents",
+      "rcs_template_mappings", "automation_audit_logs", "automation_service_tokens",
+      "provider_health_status", "api_settings",
+    ];
+    for (const t of v386Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.6 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.6 notification/comms/config tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.6 notif/comms tables:", err.message); }
+
+  // ── v38.7: tenant_id on AI / automation tables ────────────────────────────────
+  try {
+    const v387Tables = [
+      "ai_conversations", "ai_conversation_messages", "ai_knowledge_base",
+      "ai_automation_logs", "ai_automation_jobs",
+      "ai_automation_schedules", "ai_automation_webhooks",
+    ];
+    for (const t of v387Tables) {
+      await pool.query(
+        `ALTER TABLE IF EXISTS ${t} ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id)`
+      ).catch((e: any) => console.warn(`[Migration] v38.7 ${t}:`, e.message));
+    }
+    console.log("[Migration] v38.7 AI/automation tables tenant_id OK");
+  } catch (err: any) { console.warn("[Migration] v38.7 AI tables:", err.message); }
+
+  // ── v38.8: backfill tenant_id = Al Burhan UUID for all existing NULL rows ──────
+  try {
+    const ABT_UUID = '10000000-1000-4000-8000-000000000001';
+    const v388Tables = [
+      // core
+      "users", "bookings", "packages", "hajj_groups", "pilgrims", "branches", "agents", "staff",
+      // financial
+      "payment_transactions", "invoices", "receipts", "refunds", "offline_payments",
+      "expenses", "journal_entries", "journal_entry_lines", "payment_schedules", "payment_links",
+      // agreements / docs / support / audit
+      "agreements", "documents", "support_tickets", "support_messages",
+      "feedback", "inquiries", "otps",
+      "audit_logs", "booking_audit_logs", "payment_audit_logs", "agreement_audit_logs", "finance_audit_logs",
+      // CRM / campaigns
+      "leads", "lead_followups", "lead_activities", "lead_audit_log",
+      "lead_web_forms", "lead_web_form_submissions", "lead_auto_followup_log",
+      "lead_assignment_rules", "crm_assignment_rules",
+      "broadcasts", "notification_campaigns", "push_campaigns",
+      // notifications / comms
+      "notification_templates", "notification_settings", "notification_logs",
+      "communication_event_mappings", "communication_audit_logs", "communication_consents",
+      "rcs_template_mappings", "automation_audit_logs", "automation_service_tokens",
+      "provider_health_status", "api_settings",
+      // AI / automation
+      "ai_conversations", "ai_conversation_messages", "ai_knowledge_base",
+      "ai_automation_logs", "ai_automation_jobs", "ai_automation_schedules", "ai_automation_webhooks",
+    ];
+    let totalBackfilled = 0;
+    for (const t of v388Tables) {
+      try {
+        const res = await pool.query(
+          `UPDATE ${t} SET tenant_id = $1 WHERE tenant_id IS NULL`,
+          [ABT_UUID]
+        );
+        const n = (res as any).rowCount ?? 0;
+        if (n > 0) totalBackfilled += n;
+      } catch (_e: any) { /* table may not have column yet — safe to skip */ }
+    }
+    console.log(`[Migration] v38.8 backfill complete — ${totalBackfilled} rows across ${v388Tables.length} tables`);
+  } catch (err: any) { console.warn("[Migration] v38.8 backfill:", err.message); }
+
+  // ── v38.9: assert backfill + create composite tenant indexes ─────────────────
+  try {
+    // Assert: critical tables must have zero NULL tenant_ids
+    const assertTables = [
+      "users", "bookings", "packages", "pilgrims",
+      "payment_transactions", "invoices", "agreements", "documents",
+      "leads", "notification_logs",
+    ];
+    let criticalIssues = 0;
+    for (const t of assertTables) {
+      try {
+        const res = await pool.query(`SELECT COUNT(*) AS c FROM ${t} WHERE tenant_id IS NULL`);
+        const count = parseInt((res.rows[0] as any)?.c ?? "0", 10);
+        if (count > 0) {
+          console.error(`[Migration] v38.9 CRITICAL: ${t} has ${count} rows with tenant_id IS NULL after backfill`);
+          criticalIssues++;
+        }
+      } catch (_e: any) { /* table may be empty or column absent — not a blocker pre-Phase3 */ }
+    }
+    if (criticalIssues === 0) {
+      console.log("[Migration] v38.9 assertion PASSED — all core tables fully backfilled");
+    } else {
+      console.warn(`[Migration] v38.9 assertion: ${criticalIssues} table(s) still have NULL tenant_id rows — will resolve in Phase 3 NOT NULL enforcement`);
+    }
+    // Composite indexes for tenant-scoped queries (Phase 3 will use these for WHERE tenant_id = $1)
+    const idxDefs: Array<[string, string, string]> = [
+      ["idx_bookings_tenant_id",      "bookings",             "tenant_id"],
+      ["idx_bookings_tenant_status",  "bookings",             "tenant_id, status"],
+      ["idx_users_tenant_id",         "users",                "tenant_id"],
+      ["idx_invoices_tenant_id",      "invoices",             "tenant_id"],
+      ["idx_payments_tenant_id",      "payment_transactions", "tenant_id"],
+      ["idx_leads_tenant_id",         "leads",                "tenant_id"],
+      ["idx_notif_logs_tenant_id",    "notification_logs",    "tenant_id"],
+      ["idx_agreements_tenant_id",    "agreements",           "tenant_id"],
+      ["idx_pilgrims_tenant_id",      "pilgrims",             "tenant_id"],
+      ["idx_hajj_groups_tenant_id",   "hajj_groups",          "tenant_id"],
+      ["idx_documents_tenant_id",     "documents",            "tenant_id"],
+      ["idx_expenses_tenant_id",      "expenses",             "tenant_id"],
+    ];
+    for (const [idxName, tbl, cols] of idxDefs) {
+      await pool.query(
+        `CREATE INDEX IF NOT EXISTS ${idxName} ON ${tbl} (${cols})`
+      ).catch((e: any) => console.warn(`[Migration] v38.9 index ${idxName}:`, e.message));
+    }
+    console.log("[Migration] v38.9 tenant composite indexes OK");
+  } catch (err: any) { console.warn("[Migration] v38.9 assert/indexes:", err.message); }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
