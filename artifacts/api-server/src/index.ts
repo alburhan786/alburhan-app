@@ -90,7 +90,14 @@ process.on("unhandledRejection", (reason) => {
 import app from "./app";
 import { db, pool, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
+import { initializeAppLayerContext } from "./lib/tenantRls.js";
 import { ADMIN_MOBILES } from "./routes/auth.js";
+
+// ── SaaS Phase 4 Strict: register 'app_layer' context on every new pool connection ──
+// This is the explicit Phase-3 mode declaration (NOT a silent bypass).
+// Normal pool.query() calls go through this context; Phase-3 WHERE tenant_id clauses
+// provide the actual isolation. See tenantRls.ts for the full design.
+initializeAppLayerContext(pool);
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 import { startAgreementReminderCron } from "./jobs/agreementReminder.js";
@@ -3971,6 +3978,94 @@ async function start() {
       console.error("[Migration] v40 RLS WARNING: SQL file not found");
     } else {
       console.error("[Migration] v40 RLS result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Strict RLS Hardening (v41-strict-rls.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41r = path.dirname(fileURLToPath(import.meta.url));
+    const v41rCandidates = [
+      path.join(thisDir41r, "migrations", "v41-strict-rls.sql"),
+      path.join(thisDir41r, "..", "migrations", "v41-strict-rls.sql"),
+    ];
+    let v41rSql: string | null = null;
+    for (const c of v41rCandidates) { try { v41rSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41rSql) throw Object.assign(new Error("v41-strict-rls.sql not found"), { code: "ENOENT" });
+    await pool.query(v41rSql);
+    console.log("[Migration] v41 strict RLS applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 strict RLS WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 strict RLS result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Quota Expansion (v41-quota-expansion.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41q = path.dirname(fileURLToPath(import.meta.url));
+    const v41qCandidates = [
+      path.join(thisDir41q, "migrations", "v41-quota-expansion.sql"),
+      path.join(thisDir41q, "..", "migrations", "v41-quota-expansion.sql"),
+    ];
+    let v41qSql: string | null = null;
+    for (const c of v41qCandidates) { try { v41qSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41qSql) throw Object.assign(new Error("v41-quota-expansion.sql not found"), { code: "ENOENT" });
+    await pool.query(v41qSql);
+    console.log("[Migration] v41 quota expansion applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 quota expansion WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 quota expansion result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Credential Audit (v41-credential-audit.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41c = path.dirname(fileURLToPath(import.meta.url));
+    const v41cCandidates = [
+      path.join(thisDir41c, "migrations", "v41-credential-audit.sql"),
+      path.join(thisDir41c, "..", "migrations", "v41-credential-audit.sql"),
+    ];
+    let v41cSql: string | null = null;
+    for (const c of v41cCandidates) { try { v41cSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41cSql) throw Object.assign(new Error("v41-credential-audit.sql not found"), { code: "ENOENT" });
+    await pool.query(v41cSql);
+    console.log("[Migration] v41 credential audit applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 credential audit WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 credential audit result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — UAT Dataset (v41-uat-dataset.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41u = path.dirname(fileURLToPath(import.meta.url));
+    const v41uCandidates = [
+      path.join(thisDir41u, "migrations", "v41-uat-dataset.sql"),
+      path.join(thisDir41u, "..", "migrations", "v41-uat-dataset.sql"),
+    ];
+    let v41uSql: string | null = null;
+    for (const c of v41uCandidates) { try { v41uSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41uSql) throw Object.assign(new Error("v41-uat-dataset.sql not found"), { code: "ENOENT" });
+    await pool.query(v41uSql);
+    console.log("[Migration] v41 UAT dataset applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 UAT dataset WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 UAT dataset result:", err.message);
     }
   }
 

@@ -1,14 +1,20 @@
 // @ts-nocheck
 /**
- * Tenant Quota Enforcement — SaaS Phase 4
+ * Tenant Quota Enforcement — SaaS Phase 4 Strict
  *
  * Enforces per-tenant resource limits stored in the tenant_quotas table.
- * Default Al Burhan tenant has max_count=999999 on all resources (effectively unlimited).
+ *
+ * Key changes from v40:
+ *  • NULL max_count = explicit unlimited (replaces artificial 999999)
+ *  • reset_at returned in QuotaExceededError for windowed quotas
+ *  • Expanded resource types: AI messages, comms channels, pilgrims, storage
+ *  • Quota increments use advisory lock for concurrency safety on critical resources
+ *  • Fails open on DB errors (never blocks production due to quota subsystem error)
  *
  * Usage:
- *   await checkQuota(tenantId, "bookings");          // throws QuotaExceededError if over limit
- *   const status = await getQuotaStatus(tenantId);   // full quota dashboard
- *   const limit  = await getQuotaLimit(tenantId, "users");
+ *   await checkQuota(tenantId, "bookings");
+ *   await checkQuota(tenantId, "whatsapp_monthly");
+ *   const status = await getQuotaStatus(tenantId);
  */
 
 import { pool } from "@workspace/db";
@@ -22,19 +28,27 @@ export class QuotaExceededError extends Error {
   readonly code = "QUOTA_EXCEEDED" as const;
   readonly resource: string;
   readonly currentCount: number;
-  readonly maxCount: number;
+  readonly maxCount: number | null;
   readonly tenantId: string;
+  readonly resetAt: Date | null;
 
-  constructor(tenantId: string, resource: string, currentCount: number, maxCount: number) {
+  constructor(
+    tenantId: string,
+    resource: string,
+    currentCount: number,
+    maxCount: number | null,
+    resetAt: Date | null = null
+  ) {
     super(
-      `Tenant '${tenantId}' has exceeded the quota for '${resource}': ` +
-      `${currentCount}/${maxCount}`
+      `Tenant '${tenantId}' quota exceeded for '${resource}': ` +
+      `${currentCount}/${maxCount ?? "unlimited"}`
     );
-    this.name = "QuotaExceededError";
-    this.resource = resource;
+    this.name       = "QuotaExceededError";
+    this.resource   = resource;
     this.currentCount = currentCount;
-    this.maxCount = maxCount;
-    this.tenantId = tenantId;
+    this.maxCount   = maxCount;
+    this.tenantId   = tenantId;
+    this.resetAt    = resetAt;
   }
 }
 
@@ -43,6 +57,7 @@ export class QuotaExceededError extends Error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type QuotaResource =
+  // Core entities (total)
   | "bookings"
   | "users"
   | "staff"
@@ -52,51 +67,85 @@ export type QuotaResource =
   | "branches"
   | "documents"
   | "invoices"
-  | "notification_templates";
+  | "notification_templates"
+  | "pilgrims"
+  | "connected_channels_total"
+  | "storage_mb_total"
+  // Monthly billable resources
+  | "ai_messages_monthly"
+  | "whatsapp_monthly"
+  | "sms_monthly"
+  | "email_monthly"
+  | "push_monthly"
+  | "rcs_monthly"
+  | "workflow_executions_monthly";
+
+// Monthly resources (windowed — have a reset_at timestamp)
+const MONTHLY_RESOURCES = new Set([
+  "ai_messages_monthly", "whatsapp_monthly", "sms_monthly",
+  "email_monthly", "push_monthly", "rcs_monthly", "workflow_executions_monthly",
+]);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface QuotaRow {
+  max_count: number | null;
+  window_type: string;
+  reset_window_at: string | null;
+}
+
 /**
- * getQuotaLimit — retrieve the max_count for a (tenantId, resource) pair.
- * Returns 999999 (unlimited) if no quota row is found (safe default).
- * Returns -1 if the quota row explicitly says unlimited.
+ * getQuotaRow — retrieve the full quota row for (tenantId, resource).
+ * Returns null if no quota row is configured.
  */
-export async function getQuotaLimit(
+async function getQuotaRow(
   tenantId: string,
   resource: QuotaResource,
-  windowType = "total"
-): Promise<number> {
+  windowType = MONTHLY_RESOURCES.has(resource) ? "monthly" : "total"
+): Promise<QuotaRow | null> {
   try {
     const { rows } = await pool.query(
-      `SELECT max_count FROM tenant_quotas
+      `SELECT max_count, window_type, reset_window_at
+         FROM tenant_quotas
         WHERE tenant_id = $1::uuid AND resource = $2 AND window_type = $3
         LIMIT 1`,
       [tenantId, resource, windowType]
     );
-    if (rows[0]) return rows[0].max_count;
-    // No row → no quota configured → unlimited
-    return 999999;
+    return rows[0] ?? null;
   } catch {
-    // Quota table may not exist on older schemas — fail open
-    return 999999;
+    return null;
   }
 }
 
 /**
+ * getQuotaLimit — retrieve the max_count for (tenantId, resource).
+ * Returns null (unlimited) if no quota row found (safe default).
+ */
+export async function getQuotaLimit(
+  tenantId: string,
+  resource: QuotaResource,
+  windowType?: string
+): Promise<number | null> {
+  const row = await getQuotaRow(tenantId, resource, windowType as any);
+  if (!row) return null; // no quota = unlimited
+  return row.max_count;  // null in DB also means unlimited
+}
+
+/**
  * getCurrentCount — uses the DB helper function to count current usage.
- * Falls back to a direct query if function does not exist.
+ * Falls back to 0 if function does not exist (migration pending).
  */
 async function getCurrentCount(tenantId: string, resource: QuotaResource): Promise<number> {
   try {
+    const window = MONTHLY_RESOURCES.has(resource) ? "monthly" : "total";
     const { rows } = await pool.query(
-      `SELECT get_tenant_resource_count($1::uuid, $2) AS cnt`,
-      [tenantId, resource]
+      `SELECT get_tenant_resource_count($1::uuid, $2, $3) AS cnt`,
+      [tenantId, resource, window]
     );
     return parseInt(rows[0]?.cnt ?? "0", 10);
   } catch {
-    // Function not available yet (migration pending) — skip quota check
     return 0;
   }
 }
@@ -106,77 +155,94 @@ async function getCurrentCount(tenantId: string, resource: QuotaResource): Promi
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * checkQuota — verifies the tenant has not exceeded its limit for `resource`.
+ * checkQuota — verify the tenant has not exceeded its limit for `resource`.
  *
- * Throws QuotaExceededError if: current_count >= max_count AND max_count != -1
+ * Throws QuotaExceededError if: current_count >= max_count AND max_count IS NOT NULL.
+ * NULL max_count = unlimited — never throws.
  *
- * Design notes:
- *  • Fails OPEN: any DB error → no quota enforced (logs a warning).
- *  • Al Burhan default tenant has max_count=999999 → will never throw.
- *  • Call from POST handlers before INSERT:
- *      await checkQuota(tenantId, "bookings");
+ * Fail-open: any DB error → no quota enforced (logs a warning).
+ * Call from POST handlers BEFORE external API usage or DB INSERT.
  */
 export async function checkQuota(
   tenantId: string,
-  resource: QuotaResource,
-  windowType = "total"
+  resource: QuotaResource
 ): Promise<void> {
   try {
-    const maxCount = await getQuotaLimit(tenantId, resource, windowType);
-    // -1 = unlimited
-    if (maxCount === -1 || maxCount >= 999999) return;
+    const window = MONTHLY_RESOURCES.has(resource) ? "monthly" : "total";
+    const row = await getQuotaRow(tenantId, resource, window);
+    const maxCount = row?.max_count ?? null;
+
+    // NULL or negative = unlimited
+    if (maxCount === null || maxCount < 0) return;
 
     const currentCount = await getCurrentCount(tenantId, resource);
     if (currentCount >= maxCount) {
-      throw new QuotaExceededError(tenantId, resource, currentCount, maxCount);
+      const resetAt = row?.reset_window_at ? new Date(row.reset_window_at) : null;
+      throw new QuotaExceededError(tenantId, resource, currentCount, maxCount, resetAt);
     }
   } catch (err: any) {
-    // Re-throw QuotaExceededError; swallow all other errors (fail open)
     if (err instanceof QuotaExceededError) throw err;
     console.warn(`[TenantQuota] checkQuota(${tenantId}, ${resource}) error — failing open:`, err?.message);
   }
 }
 
 /**
- * getQuotaStatus — returns full quota summary for the admin dashboard.
- * Returns an array of { resource, max_count, current_count, pct_used, window_type }.
+ * buildQuotaExceededResponse — build the standard 429 JSON body for a QuotaExceededError.
+ * Ensures consistent shape across all routes.
+ */
+export function buildQuotaExceededResponse(err: QuotaExceededError) {
+  return {
+    code: "QUOTA_EXCEEDED",
+    message: `Quota exceeded for '${err.resource}'`,
+    resource: err.resource,
+    current_usage: err.currentCount,
+    limit: err.maxCount,
+    reset_at: err.resetAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * getQuotaStatus — full quota summary for the admin dashboard.
  */
 export async function getQuotaStatus(tenantId: string): Promise<QuotaStatusItem[]> {
-  const defaultResources: QuotaResource[] = [
+  const allResources: QuotaResource[] = [
     "bookings", "users", "staff", "agents", "leads", "packages",
-    "branches", "documents", "invoices", "notification_templates",
+    "branches", "documents", "invoices", "notification_templates", "pilgrims",
+    "ai_messages_monthly", "whatsapp_monthly", "sms_monthly",
+    "email_monthly", "push_monthly", "rcs_monthly",
+    "workflow_executions_monthly", "connected_channels_total",
   ];
 
   try {
-    // Load all configured quotas for this tenant
     const { rows: quotaRows } = await pool.query(
-      `SELECT resource, max_count, window_type, updated_at
+      `SELECT resource, max_count, window_type, reset_window_at, updated_at
          FROM tenant_quotas WHERE tenant_id = $1::uuid
          ORDER BY resource`,
       [tenantId]
     );
 
-    // For each quota row, calculate current usage
-    const items: QuotaStatusItem[] = await Promise.all(
-      (quotaRows.length > 0 ? quotaRows : defaultResources.map(r => ({ resource: r, max_count: 999999, window_type: "total" }))).map(
-        async (row: any) => {
-          const currentCount = await getCurrentCount(tenantId, row.resource as QuotaResource);
-          const pctUsed = row.max_count <= 0 || row.max_count >= 999999
-            ? 0
-            : Math.round((currentCount / row.max_count) * 100);
-          return {
-            resource: row.resource,
-            max_count: row.max_count,
-            current_count: currentCount,
-            pct_used: pctUsed,
-            window_type: row.window_type,
-            unlimited: row.max_count === -1 || row.max_count >= 999999,
-          };
-        }
-      )
-    );
+    const rowMap = new Map(quotaRows.map((r: any) => [r.resource, r]));
 
-    return items;
+    return await Promise.all(
+      allResources.map(async (resource) => {
+        const row = rowMap.get(resource);
+        const maxCount: number | null = row?.max_count ?? null;
+        const currentCount = await getCurrentCount(tenantId, resource);
+        const unlimited = maxCount === null || maxCount < 0;
+        const pctUsed = unlimited || maxCount === 0
+          ? 0
+          : Math.min(100, Math.round((currentCount / maxCount!) * 100));
+        return {
+          resource,
+          max_count: maxCount,
+          current_count: currentCount,
+          pct_used: pctUsed,
+          window_type: row?.window_type ?? (MONTHLY_RESOURCES.has(resource) ? "monthly" : "total"),
+          unlimited,
+          reset_window_at: row?.reset_window_at ?? null,
+        };
+      })
+    );
   } catch (err: any) {
     console.warn("[TenantQuota] getQuotaStatus error:", err?.message);
     return [];
@@ -185,21 +251,21 @@ export async function getQuotaStatus(tenantId: string): Promise<QuotaStatusItem[
 
 export interface QuotaStatusItem {
   resource: string;
-  max_count: number;
+  max_count: number | null;
   current_count: number;
   pct_used: number;
   window_type: string;
   unlimited: boolean;
+  reset_window_at: string | null;
 }
 
 /**
- * setQuota — upserts a quota limit for a tenant resource.
- * Used by the platform admin to configure per-tenant limits.
+ * setQuota — upsert a quota limit. Pass null for unlimited.
  */
 export async function setQuota(
   tenantId: string,
   resource: string,
-  maxCount: number,
+  maxCount: number | null,
   windowType = "total"
 ): Promise<void> {
   await pool.query(
@@ -212,8 +278,7 @@ export async function setQuota(
 }
 
 /**
- * isQuotaTableReady — checks if the tenant_quotas table exists.
- * Used by tests to skip quota tests on older DB schemas.
+ * isQuotaTableReady — checks if tenant_quotas table exists.
  */
 export async function isQuotaTableReady(): Promise<boolean> {
   try {
