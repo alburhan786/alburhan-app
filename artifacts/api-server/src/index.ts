@@ -3902,6 +3902,78 @@ async function start() {
     }
   }
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.1 — Tenant Quota Enforcement (v40-tenant-quotas.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40q = path.dirname(fileURLToPath(import.meta.url));
+    const v40qCandidates = [
+      path.join(thisDir40q, "migrations", "v40-tenant-quotas.sql"),
+      path.join(thisDir40q, "..", "migrations", "v40-tenant-quotas.sql"),
+    ];
+    let v40qSql: string | null = null;
+    for (const c of v40qCandidates) {
+      try { v40qSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40qSql) throw Object.assign(new Error("v40-tenant-quotas.sql not found"), { code: "ENOENT" });
+    await pool.query(v40qSql);
+    console.log("[Migration] v40 tenant quotas applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 quotas WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 quotas result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.2 — Tenant Credential Isolation (v40-tenant-credentials.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40c = path.dirname(fileURLToPath(import.meta.url));
+    const v40cCandidates = [
+      path.join(thisDir40c, "migrations", "v40-tenant-credentials.sql"),
+      path.join(thisDir40c, "..", "migrations", "v40-tenant-credentials.sql"),
+    ];
+    let v40cSql: string | null = null;
+    for (const c of v40cCandidates) {
+      try { v40cSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40cSql) throw Object.assign(new Error("v40-tenant-credentials.sql not found"), { code: "ENOENT" });
+    await pool.query(v40cSql);
+    console.log("[Migration] v40 tenant credentials applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 credentials WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 credentials result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.3 — PostgreSQL Row Level Security (v40-rls.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40r = path.dirname(fileURLToPath(import.meta.url));
+    const v40rCandidates = [
+      path.join(thisDir40r, "migrations", "v40-rls.sql"),
+      path.join(thisDir40r, "..", "migrations", "v40-rls.sql"),
+    ];
+    let v40rSql: string | null = null;
+    for (const c of v40rCandidates) {
+      try { v40rSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40rSql) throw Object.assign(new Error("v40-rls.sql not found"), { code: "ENOENT" });
+    await pool.query(v40rSql);
+    console.log("[Migration] v40 RLS policies applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 RLS WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 RLS result:", err.message);
+    }
+  }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.

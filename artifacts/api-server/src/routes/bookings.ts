@@ -29,6 +29,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
+import { checkQuota, QuotaExceededError } from "../lib/tenantQuota.js";
 import { autoGenerateAgreement, buildAgreementUrl } from "./agreements.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
@@ -531,6 +532,23 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     return;
   }
   const data = parsed.data;
+
+  // ── Phase 4: Tenant quota enforcement (fail-open; Al Burhan has unlimited quota) ─
+  try {
+    const tenantId = getTenantId(req);
+    await checkQuota(tenantId, "bookings");
+  } catch (err: any) {
+    if (err instanceof QuotaExceededError) {
+      return void res.status(429).json({
+        message: "Booking quota exceeded for this tenant",
+        code: "QUOTA_EXCEEDED",
+        resource: err.resource,
+        limit: err.maxCount,
+        current: err.currentCount,
+      });
+    }
+    console.warn("[bookings] quota check error (fail-open):", err?.message);
+  }
 
   const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
   const pkg = pkgs[0];
