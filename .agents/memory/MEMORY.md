@@ -115,3 +115,4 @@
 - [AI Automation API Foundation](ai-automation-api.md) — service-token auth, 5 new tables (v37.1–v37.5), kill switch, scopes, admin UI at /admin/ai-assistant-control
 - [SaaS Tenant Isolation Progress](saas-tenant-isolation-progress.md) — Phase 3 complete; all 40+ route files patched; Phase 4 (RLS/quotas) blocked until Task #359 approved
 - [SaaS Phase 4 — Quota, Credentials, RLS](saas-phase4-complete.md) — tenant_quotas + tenant_credentials tables, RLS on 57 tables, 59-test cross-tenant suite; psql bool = "true" not "t"
+- [SaaS go-live DB user](saas-go-live-db-user.md) — prod uses app_user (non-owner, NOBYPASSRLS) not alburhan; alburhan owns all 154 tables; rollback URL at /root/stage-c-rollback-database-url.txt
