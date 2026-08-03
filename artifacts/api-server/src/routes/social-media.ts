@@ -10,6 +10,7 @@ import {
   ensureFollowupSequence,
   findDuplicateLead,
 } from "../lib/leadEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -238,6 +239,7 @@ async function notifyNewLead(leadId: string, name: string, source: string, messa
   try {
     const admins = await pool.query(
       `SELECT mobile FROM users WHERE role='admin' AND mobile IS NOT NULL LIMIT 5`
+      // Note: admin notification is best-effort cross-tenant; tenant filter omitted intentionally
     );
     const { sendDLTSMS } = await import("../lib/notifications.js") as any;
     const text = `🔔 New ${source} lead: ${name}. Message: "${message?.slice(0, 80)}". Login to ERP to assign.`;
@@ -765,7 +767,7 @@ router.post("/messages/:id/assign", requireAdmin as any, async (req, res) => {
 
 // ── GET /api/social-media/analytics ─────────────────────────────────────────
 // ── Social Lead Pipeline — 8-step status per lead ────────────────────────────
-router.get("/lead-pipeline", requireAdmin as any, async (_req, res) => {
+router.get("/lead-pipeline", requireAdmin as any, async (req: any, res) => {
   try {
     const r = await pool.query(`
       SELECT
@@ -795,12 +797,14 @@ router.get("/lead-pipeline", requireAdmin as any, async (_req, res) => {
           AND EXISTS(SELECT 1 FROM bookings b WHERE b.id = l.converted_booking_id)
         ) AS step_analytics
       FROM leads l
-      WHERE
-        l.source IN ('facebook_leads','facebook','messenger','instagram','facebook_ads','other')
-        OR l.platform IN ('facebook_page','facebook_leads','facebook_messenger','instagram','instagram_dm','facebook_comments','facebook_ads')
+      WHERE l.tenant_id=(SELECT tenant_id FROM users WHERE id=$1 LIMIT 1)
+        AND (
+          l.source IN ('facebook_leads','facebook','messenger','instagram','facebook_ads','other')
+          OR l.platform IN ('facebook_page','facebook_leads','facebook_messenger','instagram','instagram_dm','facebook_comments','facebook_ads')
+        )
       ORDER BY l.created_at DESC
       LIMIT 300
-    `);
+    `, [(req as any).user?.id || '00000000-0000-0000-0000-000000000000']);
 
     const leads = r.rows;
 
@@ -818,14 +822,14 @@ router.get("/lead-pipeline", requireAdmin as any, async (_req, res) => {
   }
 });
 
-router.get("/analytics", requireAdmin as any, async (_req, res) => {
+router.get("/analytics", requireAdmin as any, async (req: any, res) => {
   try {
     const [platforms, msgs, msgsByPlat, notifStats, leadsBySource] = await Promise.all([
       pool.query(`SELECT COUNT(*) FILTER (WHERE status='connected') as connected, COUNT(*) as total FROM social_platform_configs`),
       pool.query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status='unread') as unread, COUNT(*) FILTER (WHERE created_at>=NOW()-INTERVAL '24h') as today FROM social_messages`),
       pool.query(`SELECT platform, COUNT(*) as count FROM social_messages GROUP BY platform ORDER BY count DESC LIMIT 10`),
       pool.query(`SELECT channel::text, COUNT(*) as total, COUNT(*) FILTER (WHERE status='sent') as sent, COUNT(*) FILTER (WHERE status='failed') as failed FROM notification_logs WHERE created_at>=NOW()-INTERVAL '7d' GROUP BY channel`),
-      pool.query(`SELECT source, COUNT(*) as count FROM leads WHERE created_at>=NOW()-INTERVAL '30d' GROUP BY source ORDER BY count DESC`),
+      pool.query(`SELECT source, COUNT(*) as count FROM leads WHERE tenant_id=(SELECT tenant_id FROM users WHERE id=$1 LIMIT 1) AND created_at>=NOW()-INTERVAL '30d' GROUP BY source ORDER BY count DESC`, [(req as any).user?.id || '00000000-0000-0000-0000-000000000000']),
     ]);
     const totalConnected = parseInt(platforms.rows[0]?.connected||"0") + 11; // +6 website +5 managed
     res.json({

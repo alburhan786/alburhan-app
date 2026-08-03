@@ -7,6 +7,7 @@ import {
   removeCustomerSseClient,
   broadcastCustomerJourneyUpdate,
 } from "../lib/customerJourney.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 export { broadcastCustomerJourneyUpdate };
 

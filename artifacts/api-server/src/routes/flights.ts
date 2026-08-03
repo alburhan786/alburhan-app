@@ -7,6 +7,7 @@ import { auditLog } from "../lib/audit.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendEmail } from "../lib/notifications.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);

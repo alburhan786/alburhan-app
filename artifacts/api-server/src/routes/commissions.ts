@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -100,14 +101,15 @@ export async function autoCreateCommission(bookingId: string): Promise<void> {
 // ── GET /api/commissions — list all commissions ───────────────────────────
 router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { agent_id, status, from, to } = req.query as Record<string, string>;
-    const params: any[] = [];
-    const filters: string[] = [];
+    const params: any[] = [tenantId];
+    const filters: string[] = [`a.tenant_id=$1::uuid`];
     if (agent_id) { params.push(agent_id); filters.push(`ac.agent_id=$${params.length}`); }
     if (status)   { params.push(status);   filters.push(`ac.status=$${params.length}`); }
     if (from)     { params.push(from);     filters.push(`ac.created_at::date >= $${params.length}`); }
     if (to)       { params.push(to);       filters.push(`ac.created_at::date <= $${params.length}`); }
-    const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const where = `WHERE ${filters.join(" AND ")}`;
     const rows = await q(
       `SELECT ac.*, a.mobile AS agent_mobile, a.email AS agent_email, a.city AS agent_city
        FROM agent_commissions ac
@@ -120,8 +122,9 @@ router.get("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
 });
 
 // ── GET /api/commissions/summary — totals by agent ────────────────────────
-router.get("/summary", requireAdmin as any, async (_req, res) => {
+router.get("/summary", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT a.id, a.name, a.commission_rate,
         COUNT(ac.id)::int AS total_entries,
@@ -131,10 +134,10 @@ router.get("/summary", requireAdmin as any, async (_req, res) => {
         COALESCE(SUM(ac.commission_amount),0)::numeric AS total_earned
       FROM agents a
       LEFT JOIN agent_commissions ac ON ac.agent_id = a.id
-      WHERE a.is_active = true
+      WHERE a.tenant_id=$1::uuid AND a.is_active = true
       GROUP BY a.id, a.name, a.commission_rate
       ORDER BY total_earned DESC
-    `);
+    `, [tenantId]);
 
     // Fetch wallet balances
     const balances = await q(

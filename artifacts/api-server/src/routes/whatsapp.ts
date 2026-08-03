@@ -3,6 +3,7 @@ import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendText, sendTemplate, sendInteractiveButtons, fetchTemplates, type BotBeeResult } from "../lib/botbee.js";
 import { pool } from "@workspace/db";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 // Ensure wa_templates has the template_id column
 ;(async () => {

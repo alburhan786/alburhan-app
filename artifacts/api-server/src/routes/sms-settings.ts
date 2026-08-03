@@ -4,6 +4,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { getCachedConfig } from "../lib/apiSettingsProvider.js";
 import axios from "axios";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireAdmin as any);

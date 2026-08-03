@@ -5,12 +5,14 @@ import { eq, count, sum, desc, and, sql, max } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 import { decrypt } from "../lib/encryption.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("reports") as any);
 
-router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     // Use pool.query() directly — bypasses drizzle wrapper to avoid bundling quirks
     const countsRes = await pool.query(`
       SELECT
@@ -23,13 +25,13 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
           THEN NULLIF(TRIM(final_amount::text), '')::numeric ELSE 0 END), 0)::float AS revenue,
         COALESCE(SUM(NULLIF(TRIM(discount_amount::text), '')::numeric), 0)::float AS total_discount,
         COUNT(*) FILTER (WHERE discount_amount IS NOT NULL AND NULLIF(TRIM(discount_amount::text),'')::numeric > 0)::int AS discounted_bookings
-      FROM bookings
-    `);
+      FROM bookings WHERE tenant_id=$1::uuid
+    `, [tenantId]);
     const counts = countsRes.rows[0] ?? {};
 
     const [custRes, pkgRes, recentRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer'`),
-      pool.query(`SELECT COUNT(*)::int AS total FROM packages`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role = 'customer' AND tenant_id=$1::uuid`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int AS total FROM packages WHERE tenant_id=$1::uuid`, [tenantId]),
       pool.query(`
         SELECT id,
                COALESCE(booking_number, '') AS booking_number,
@@ -40,8 +42,8 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
                NULLIF(TRIM(gst_amount::text), '') AS gst_amount,
                NULLIF(TRIM(final_amount::text), '') AS final_amount,
                created_at, updated_at
-        FROM bookings ORDER BY created_at DESC LIMIT 5
-      `),
+        FROM bookings WHERE tenant_id=$1::uuid ORDER BY created_at DESC LIMIT 5
+      `, [tenantId]),
     ]);
     const custRow = custRes.rows[0] ?? {};
     const pkgRow = pkgRes.rows[0] ?? {};
@@ -425,8 +427,9 @@ router.get("/reports/outstanding", requireAdmin as any, async (req: Authenticate
 });
 
 // ── Super Admin Dashboard Stats ───────────────────────────────────────────────
-router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/super-stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const [
       todayRes, pendingRes, agreementRes, pilgrimRes, notifRes, supportRes, feedbackRes, flightRes, hotelRes, overallRes, guidesRes,
     ] = await Promise.all([
@@ -434,23 +437,23 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
       pool.query(`
         SELECT
           COALESCE(
-            (SELECT SUM(amount) FROM payment_transactions WHERE payment_date::date = CURRENT_DATE),
+            (SELECT SUM(amount) FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date = CURRENT_DATE),
             0
           )::float AS today_revenue,
           COUNT(DISTINCT id) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS today_bookings,
-          (SELECT COUNT(*)::int FROM payment_transactions WHERE payment_date::date = CURRENT_DATE) AS today_payments
-        FROM bookings
-      `).catch(() => ({ rows: [{ today_revenue: 0, today_bookings: 0, today_payments: 0 }] })),
+          (SELECT COUNT(*)::int FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date = CURRENT_DATE) AS today_payments
+        FROM bookings WHERE tenant_id=$1::uuid
+      `, [tenantId]).catch(() => ({ rows: [{ today_revenue: 0, today_bookings: 0, today_payments: 0 }] })),
       // Pending counts
       pool.query(`
         SELECT
           COUNT(*) FILTER (WHERE status IN ('approved','pending'))::int AS pending_approvals,
           COUNT(*) FILTER (WHERE status = 'confirmed' AND COALESCE(paid_amount,0) < COALESCE(final_amount,0))::int AS pending_payments,
           COUNT(*)::int AS total_confirmed
-        FROM bookings
-      `).catch(() => ({ rows: [{ pending_approvals: 0, pending_payments: 0, total_confirmed: 0 }] })),
+        FROM bookings WHERE tenant_id=$1::uuid
+      `, [tenantId]).catch(() => ({ rows: [{ pending_approvals: 0, pending_payments: 0, total_confirmed: 0 }] })),
       // Pending agreements
-      pool.query(`SELECT COUNT(*)::int AS pending FROM agreements WHERE status = 'pending_signature'`).catch(() => ({ rows: [{ pending: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS pending FROM agreements WHERE tenant_id=$1::uuid AND status = 'pending_signature'`, [tenantId]).catch(() => ({ rows: [{ pending: 0 }] })),
       // Pilgrims: pending visas
       pool.query(`
         SELECT
@@ -458,8 +461,8 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
           COUNT(*) FILTER (WHERE visa_status IS NULL OR visa_status = 'not_applied')::int AS pending_visas,
           COUNT(*) FILTER (WHERE visa_status = 'applied' OR visa_status = 'processing')::int AS processing_visas,
           COUNT(*) FILTER (WHERE visa_status = 'received')::int AS received_visas
-        FROM pilgrims
-      `).catch(() => ({ rows: [{ total_pilgrims: 0, pending_visas: 0, processing_visas: 0, received_visas: 0 }] })),
+        FROM pilgrims WHERE tenant_id=$1::uuid
+      `, [tenantId]).catch(() => ({ rows: [{ total_pilgrims: 0, pending_visas: 0, processing_visas: 0, received_visas: 0 }] })),
       // Notification delivery rates (last 7 days)
       pool.query(`
         SELECT
@@ -468,9 +471,9 @@ router.get("/super-stats", requireAdmin as any, async (_req: AuthenticatedReques
           COUNT(*) FILTER (WHERE status = 'sent' OR status = 'delivered')::int AS delivered,
           COUNT(*) FILTER (WHERE status = 'failed')::int AS failed
         FROM notification_logs
-        WHERE created_at > NOW() - INTERVAL '7 days'
+        WHERE tenant_id=$1::uuid AND created_at > NOW() - INTERVAL '7 days'
         GROUP BY channel
-      `).catch(() => ({ rows: [] })),
+      `, [tenantId]).catch(() => ({ rows: [] })),
       // Support tickets
       pool.query(`
         SELECT

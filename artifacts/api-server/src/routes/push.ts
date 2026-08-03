@@ -8,6 +8,7 @@ import {
   removeSubscription,
   getSubscriptionCount,
 } from "../lib/webPush.js";
+import { getTenantId } from "../lib/tenantContext.js";
 import {
   isFirebaseConfigured,
   getFirebaseWebConfig,
@@ -215,8 +216,9 @@ router.get("/fcm-status", requireAdmin as any, async (_req, res) => {
 });
 
 // ── Admin: Stats ──────────────────────────────────────────────────────────────
-router.get("/admin/stats", requireAdmin as any, async (_req, res) => {
+router.get("/admin/stats", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const [subCount, byPlatform, byType, recentSent, campaigns] = await Promise.all([
       pool.query(`
         SELECT COUNT(DISTINCT COALESCE(user_id,customer_id))::int AS unique_subscribers,
@@ -236,9 +238,12 @@ router.get("/admin/stats", requireAdmin as any, async (_req, res) => {
       pool.query(`
         SELECT COUNT(*)::int AS sent_24h,
                COUNT(*) FILTER (WHERE status='failed')::int AS failed_24h
-        FROM notification_logs WHERE channel='push' AND created_at >= NOW() - INTERVAL '24 hours'
-      `).catch(() => ({ rows: [{ sent_24h: 0, failed_24h: 0 }] })),
-      pool.query(`SELECT COUNT(*)::int AS total, SUM(sent)::int AS total_sent FROM push_campaigns`).catch(() => ({ rows: [{ total: 0, total_sent: 0 }] })),
+        FROM notification_logs WHERE channel='push' AND tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '24 hours'
+      `, [tenantId]).catch(() => ({ rows: [{ sent_24h: 0, failed_24h: 0 }] })),
+      pool.query(
+        `SELECT COUNT(*)::int AS total, SUM(sent)::int AS total_sent FROM push_campaigns WHERE tenant_id=$1::uuid`,
+        [tenantId]
+      ).catch(() => ({ rows: [{ total: 0, total_sent: 0 }] })),
     ]);
     res.json({
       unique_subscribers: subCount.rows[0]?.unique_subscribers || 0,
@@ -260,13 +265,17 @@ router.get("/campaigns", requireAdmin as any, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 30, 100);
     const offset = Number(req.query.offset) || 0;
+    const tenantId = getTenantId(req);
     const [rows, total] = await Promise.all([
       pool.query(
         `SELECT id, title, body, url, filter, total_tokens, sent, failed, status, error, sent_at
-         FROM push_campaigns ORDER BY sent_at DESC LIMIT $1 OFFSET $2`,
-        [limit, offset]
+         FROM push_campaigns WHERE tenant_id=$3::uuid ORDER BY sent_at DESC LIMIT $1 OFFSET $2`,
+        [limit, offset, tenantId]
       ).catch(() => ({ rows: [] })),
-      pool.query(`SELECT COUNT(*)::int AS cnt FROM push_campaigns`).catch(() => ({ rows: [{ cnt: 0 }] })),
+      pool.query(
+        `SELECT COUNT(*)::int AS cnt FROM push_campaigns WHERE tenant_id=$1::uuid`,
+        [tenantId]
+      ).catch(() => ({ rows: [{ cnt: 0 }] })),
     ]);
     res.json({ campaigns: rows.rows, total: total.rows[0]?.cnt || 0 });
   } catch (err: any) {
@@ -399,7 +408,11 @@ router.post("/retry/:id", requireAdmin as any, async (req, res) => {
   const adminId = (req.session as any)?.userId;
   const { id } = req.params;
   try {
-    const campRes = await pool.query(`SELECT * FROM push_campaigns WHERE id = $1`, [id]);
+    const tenantId = getTenantId(req);
+    const campRes = await pool.query(
+      `SELECT * FROM push_campaigns WHERE id = $1 AND tenant_id=$2::uuid`,
+      [id, tenantId]
+    );
     if (!campRes.rows.length) return res.status(404).json({ error: "Campaign not found" });
     const camp = campRes.rows[0];
     const newId = randomUUID();

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { retryWorkflowLog, addTimeline, triggerWorkflow } from "../lib/workflowEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

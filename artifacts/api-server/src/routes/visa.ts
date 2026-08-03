@@ -4,6 +4,7 @@ import { requireAdmin, requireModuleAccess } from "../lib/auth.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { checkVisaPaymentEligibility } from "../lib/financeService.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("pilgrims") as any);
@@ -12,12 +13,13 @@ const VISA_STATUSES = ["not_applied", "applied", "in_process", "received", "reje
 
 // GET visa list for all pilgrims
 router.get("/", requireAdmin as any, async (req, res) => {
+  const tenantId = getTenantId(req);
   const { groupId, status } = req.query as Record<string, string>;
-  const params: unknown[] = [];
-  const conds: string[] = [];
+  const params: unknown[] = [tenantId];
+  const conds: string[] = [`p.tenant_id = $1::uuid`];
   if (groupId) { params.push(groupId); conds.push(`p.group_id = $${params.length}`); }
   if (status) { params.push(status); conds.push(`COALESCE(p.visa_status,'not_applied') = $${params.length}`); }
-  const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+  const where = "WHERE " + conds.join(" AND ");
   try {
     const result = await pool.query(
       `SELECT p.id, p.full_name, p.mobile_india, p.gender, p.serial_number,
@@ -39,11 +41,12 @@ router.get("/", requireAdmin as any, async (req, res) => {
 
 // GET visa stats
 router.get("/stats", requireAdmin as any, async (req, res) => {
+  const tenantId = getTenantId(req);
   const { groupId } = req.query as Record<string, string>;
-  const params: unknown[] = [];
-  const conds: string[] = [];
+  const params: unknown[] = [tenantId];
+  const conds: string[] = [`tenant_id = $1::uuid`];
   if (groupId) { params.push(groupId); conds.push(`group_id = $${params.length}`); }
-  const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
+  const where = "WHERE " + conds.join(" AND ");
   try {
     const result = await pool.query(
       `SELECT

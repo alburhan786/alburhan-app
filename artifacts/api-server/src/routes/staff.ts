@@ -7,6 +7,7 @@ import { auditLog } from "../lib/audit.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
 import * as XLSX from "xlsx";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -54,9 +55,12 @@ async function generateStaffId(companyId: string): Promise<string> {
   return `${prefix}-STAFF-${String(n).padStart(3, "0")}`;
 }
 
-router.get("/", requireAdmin, async (_req, res) => {
+router.get("/", requireAdmin, async (req, res) => {
   try {
-    const staff = await db.select().from(staffTable).orderBy(desc(staffTable.createdAt));
+    const tenantId = getTenantId(req);
+    // Use pool.query for tenant filter since staffTable Drizzle schema may lack tenantId column
+    const r = await pool.query(`SELECT * FROM staff WHERE tenant_id=$1::uuid ORDER BY created_at DESC`, [tenantId]);
+    const staff = r.rows;
     res.json(staff);
   } catch (err) {
     console.error("[staff] GET /", err);

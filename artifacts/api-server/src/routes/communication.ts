@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { getCachedConfig } from "../lib/apiSettingsProvider.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -9,15 +10,17 @@ router.use(requireAdmin as any);
 // ── Export logs as CSV ───────────────────────────────────────────────────────
 router.get("/logs/export", async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { bookingId, customer, channel, status } = req.query as Record<string, string>;
-    const conditions: string[] = [];
-    const params: any[] = [];
-    let idx = 1;
-    if (bookingId) { conditions.push(`booking_id = $${idx++}`); params.push(bookingId); }
-    if (customer) { conditions.push(`recipient ILIKE $${idx++}`); params.push(`%${customer}%`); }
-    if (channel) { conditions.push(`channel = $${idx++}`); params.push(channel); }
-    if (status) { conditions.push(`status = $${idx++}`); params.push(status); }
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    // tenant_id is always first condition
+    const conditions: string[] = [`nl.tenant_id=$1::uuid`];
+    const params: any[] = [tenantId];
+    let idx = 2;
+    if (bookingId) { conditions.push(`nl.booking_id = $${idx++}`); params.push(bookingId); }
+    if (customer) { conditions.push(`nl.recipient ILIKE $${idx++}`); params.push(`%${customer}%`); }
+    if (channel) { conditions.push(`nl.channel = $${idx++}`); params.push(channel); }
+    if (status) { conditions.push(`nl.status = $${idx++}`); params.push(status); }
+    const where = `WHERE ${conditions.join(" AND ")}`;
 
     const rows = await pool.query(
       `SELECT nl.event_type, b.booking_number, nl.recipient, nl.channel,

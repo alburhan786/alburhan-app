@@ -13,6 +13,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth } from "../lib/auth.js";
 import crypto from "crypto";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -43,10 +44,12 @@ router.get("/status", async (req: any, res) => {
       if (rows[0]) dbEnabled = rows[0].value !== "false";
     } catch {}
 
-    // Token count
+    // Token count (tenant-scoped)
+    const tenantId = getTenantId(req);
     const { rows: tc } = await pool.query(
       `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_active=true AND revoked_at IS NULL)::int AS active
-       FROM automation_service_tokens`
+       FROM automation_service_tokens WHERE tenant_id=$1::uuid`,
+      [tenantId]
     );
 
     res.json({
@@ -109,10 +112,12 @@ router.post("/toggle", async (req: any, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/tokens", async (req: any, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { rows } = await pool.query(
       `SELECT id, token_name, scopes, allowed_ips, is_active, last_used_at, expires_at, revoked_at, notes, created_at
-       FROM automation_service_tokens
-       ORDER BY created_at DESC`
+       FROM automation_service_tokens WHERE tenant_id=$1::uuid
+       ORDER BY created_at DESC`,
+      [tenantId]
     );
     res.json({ tokens: rows });
   } catch (err: any) {
@@ -222,13 +227,13 @@ router.get("/conversations", async (req: any, res) => {
     const limitN = Math.min(parseInt(limit) || 50, 200);
     const offsetN = Math.max(parseInt(offset) || 0, 0);
 
-    const params: any[] = [];
-    const conds: string[] = [];
-    if (status) { params.push(status); conds.push(`c.status = $${params.length}`); }
-    if (channel) { params.push(channel); conds.push(`c.channel = $${params.length}`); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const tenantId = getTenantId(req);
+    const filterParams: any[] = [tenantId]; // $1 = tenantId always
+    const conds: string[] = [`c.tenant_id=$1::uuid`];
+    if (status) { filterParams.push(status); conds.push(`c.status = $${filterParams.length}`); }
+    if (channel) { filterParams.push(channel); conds.push(`c.channel = $${filterParams.length}`); }
+    const where = `WHERE ${conds.join(" AND ")}`;
 
-    params.push(limitN, offsetN);
     const [statsR, convsR] = await Promise.all([
       pool.query(`
         SELECT
@@ -238,14 +243,14 @@ router.get("/conversations", async (req: any, res) => {
           COUNT(*) FILTER (WHERE status='human_active')::int AS human_active,
           COUNT(*) FILTER (WHERE status='closed')::int AS closed,
           COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day')::int AS today
-        FROM ai_conversations`),
+        FROM ai_conversations WHERE tenant_id=$1::uuid`, [tenantId]),
       pool.query(
         `SELECT c.id, c.conversation_key, c.channel, c.customer_name, c.mobile_masked,
                 c.language, c.status, c.last_ai_message_at, c.last_customer_message_at, c.created_at
          FROM ai_conversations c ${where}
          ORDER BY c.updated_at DESC
-         LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params
+         LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}`,
+        [...filterParams, limitN, offsetN]
       ),
     ]);
 
@@ -293,20 +298,20 @@ router.get("/audit", async (req: any, res) => {
     const limitN = Math.min(parseInt(limit) || 50, 200);
     const offsetN = Math.max(parseInt(offset) || 0, 0);
 
-    const params: any[] = [];
-    const conds: string[] = [];
+    const tenantId = getTenantId(req);
+    const params: any[] = [tenantId]; // $1 = tenantId
+    const conds: string[] = [`a.tenant_id=$1::uuid`];
     if (action) { params.push(action); conds.push(`a.action = $${params.length}`); }
     if (result) { params.push(result); conds.push(`a.result = $${params.length}`); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const where = `WHERE ${conds.join(" AND ")}`;
 
-    params.push(limitN, offsetN);
     const { rows } = await pool.query(
       `SELECT a.id, a.actor_type, a.actor_id, a.action, a.entity_type, a.entity_id,
               a.request_id, a.ip_address, a.result, a.error_code, a.created_at
        FROM automation_audit_logs a ${where}
        ORDER BY a.created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limitN, offsetN]
     );
     res.json({ logs: rows, offset: offsetN, limit: limitN });
   } catch (err: any) {
@@ -323,21 +328,21 @@ router.get("/knowledge", async (req: any, res) => {
   try {
     const { category, status, language, limit = "100" } = req.query as Record<string, string>;
     const limitN = Math.min(parseInt(limit) || 100, 500);
-    const params: any[] = [];
-    const conds: string[] = [];
+    const tenantId = getTenantId(req);
+    const params: any[] = [tenantId]; // $1 = tenantId
+    const conds: string[] = [`k.tenant_id=$1::uuid`];
     if (category) { params.push(category); conds.push(`k.category = $${params.length}`); }
     if (status)   { params.push(status);   conds.push(`k.status = $${params.length}`); }
     if (language) { params.push(language); conds.push(`k.language = $${params.length}`); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-    params.push(limitN);
+    const where = `WHERE ${conds.join(" AND ")}`;
 
     const { rows } = await pool.query(
       `SELECT k.id, k.category, k.question, k.answer, k.language, k.status, k.approval_status,
               k.is_active, k.sort_order, k.version, k.created_at, k.updated_at
        FROM ai_knowledge_base k ${where}
        ORDER BY k.category, k.sort_order NULLS LAST, k.created_at
-       LIMIT $${params.length}`,
-      params
+       LIMIT $${params.length + 1}`,
+      [...params, limitN]
     );
     res.json({ items: rows, total: rows.length });
   } catch (err: any) {

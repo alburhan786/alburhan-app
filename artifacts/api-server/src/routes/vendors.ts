@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("accounting") as any);
@@ -12,9 +13,10 @@ async function q1(text: string, params?: any[]): Promise<any> {
   return (await pool.query(text, params)).rows?.[0] ?? null;
 }
 
-router.get("/", requireAdmin as any, async (_req, res) => {
+router.get("/", requireAdmin as any, async (req: any, res) => {
   try {
-    const vendors = await q(`SELECT * FROM vendors WHERE is_deleted=false ORDER BY name`);
+    const tenantId = getTenantId(req);
+    const vendors = await q(`SELECT * FROM vendors WHERE tenant_id=$1::uuid AND is_deleted=false ORDER BY name`, [tenantId]);
     res.json(vendors);
   } catch (err) {
     console.error("[vendors] GET /", err);
@@ -77,10 +79,11 @@ router.get("/:id/ledger", requireAdmin as any, async (req: AuthenticatedRequest,
     const vendor = await q1(`SELECT * FROM vendors WHERE id=$1 AND is_deleted=false`, [req.params.id]);
     if (!vendor) return void res.status(404).json({ error: "Vendor not found" });
 
+    const tenantId = getTenantId(req);
     let sql = `SELECT e.*, g.name AS group_name FROM expenses e
                LEFT JOIN hajj_groups g ON g.id=e.group_id
-               WHERE e.vendor_id=$1`;
-    const params: any[] = [req.params.id];
+               WHERE e.tenant_id=$2::uuid AND e.vendor_id=$1`;
+    const params: any[] = [req.params.id, tenantId];
     if (from) { params.push(from); sql += ` AND e.date>=$${params.length}`; }
     if (to)   { params.push(to);   sql += ` AND e.date<=$${params.length}`; }
     sql += ` ORDER BY e.date ASC, e.created_at ASC`;

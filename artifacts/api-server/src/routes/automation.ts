@@ -17,6 +17,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import crypto from "crypto";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -264,8 +265,9 @@ router.get("/packages", requireServiceToken("packages:read"), async (req: AutoRe
     const limitN = Math.min(parseInt(q.limit || "20") || 20, 50);
     const offsetN = Math.max(parseInt(q.offset || "0") || 0, 0);
 
-    const params: any[] = [];
-    const conds: string[] = [`p."isActive" = true`];
+    const tenantId = req.serviceToken!.tenantId;
+    const params: any[] = [tenantId]; // $1 = tenantId
+    const conds: string[] = [`p.tenant_id=$1::uuid`, `p."isActive" = true`];
 
     if (q.journey_type)  { params.push(q.journey_type);       conds.push(`p.type = $${params.length}`); }
     if (q.departure_city){ params.push(`%${q.departure_city}%`); conds.push(`(p.details->>'departureCity') ILIKE $${params.length}`); }
@@ -304,8 +306,8 @@ router.get("/packages/:id", requireServiceToken("packages:read"), async (req: Au
       `SELECT p.id, p.name, p.type, p.description, p.duration,
               p."pricePerPerson", p."gstPercent", p.includes, p.highlights,
               p."departureDates", p.details, p."maxPilgrims", p."isActive", p."imageUrl"
-       FROM packages p WHERE p.id = $1 AND p."isActive" = true LIMIT 1`,
-      [req.params.id]
+       FROM packages p WHERE p.tenant_id=$2::uuid AND p.id = $1 AND p."isActive" = true LIMIT 1`,
+      [req.params.id, req.serviceToken!.tenantId]
     );
     if (!rows[0]) return res.status(404).json({ error: "PACKAGE_NOT_FOUND", requestId: rid });
     res.json({ package: fmtPackage(rows[0]), requestId: rid });
@@ -360,13 +362,14 @@ router.post("/leads", requireServiceToken("leads:create"), async (req: AutoReq, 
 
     // Check for open lead with same mobile (update instead of duplicate)
     const mobileSuffix = normalizedMobile.slice(-9);
+    const leadTenantId = req.serviceToken!.tenantId;
     const { rows: openLeads } = await pool.query(
       `SELECT id, COALESCE(lead_number, 'AI-' || SUBSTRING(id,1,8)) AS lead_number, assigned_to
        FROM leads
-       WHERE REPLACE(REPLACE(COALESCE(mobile,''), ' ', ''), '-', '') LIKE $1
+       WHERE tenant_id=$2::uuid AND REPLACE(REPLACE(COALESCE(mobile,''), ' ', ''), '-', '') LIKE $1
          AND status NOT IN ('converted', 'lost', 'closed')
        ORDER BY created_at DESC LIMIT 1`,
-      [`%${mobileSuffix}`]
+      [`%${mobileSuffix}`, leadTenantId]
     );
     if (openLeads[0]) {
       await pool.query(
@@ -386,7 +389,8 @@ router.post("/leads", requireServiceToken("leads:create"), async (req: AutoReq, 
     let assignedName: string | null = null;
     try {
       const { rows: rules } = await pool.query(
-        `SELECT * FROM crm_assignment_rules WHERE is_active = true ORDER BY priority ASC LIMIT 30`
+        `SELECT * FROM crm_assignment_rules WHERE tenant_id=$1::uuid AND is_active = true ORDER BY priority ASC LIMIT 30`,
+        [leadTenantId]
       );
       for (const rule of rules) {
         const cv = (rule.condition_value || "").toLowerCase();

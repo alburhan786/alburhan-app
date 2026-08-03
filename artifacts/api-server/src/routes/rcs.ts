@@ -13,13 +13,18 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
 // ── GET /api/rcs/mappings ─────────────────────────────────────────────────────
-router.get("/mappings", requireAdmin as any, async (_req, res) => {
+router.get("/mappings", requireAdmin as any, async (req, res) => {
   try {
-    const r = await pool.query(`SELECT * FROM rcs_template_mappings ORDER BY erp_event`);
+    const tenantId = getTenantId(req);
+    const r = await pool.query(
+      `SELECT * FROM rcs_template_mappings WHERE tenant_id=$1::uuid ORDER BY erp_event`,
+      [tenantId]
+    );
     res.json({ ok: true, mappings: r.rows });
   } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
 });
@@ -27,10 +32,14 @@ router.get("/mappings", requireAdmin as any, async (_req, res) => {
 // ── PUT /api/rcs/mappings/:event ──────────────────────────────────────────────
 router.put("/mappings/:event", requireAdmin as any, async (req, res) => {
   const event = req.params.event;
+  const tenantId = getTenantId(req);
   const { template_id, alt_template_id, carrier, template_type, variables_required, enabled, notes, template_name } = req.body;
 
   try {
-    const existing = await pool.query(`SELECT erp_event FROM rcs_template_mappings WHERE erp_event=$1`, [event]);
+    const existing = await pool.query(
+      `SELECT erp_event FROM rcs_template_mappings WHERE erp_event=$1 AND tenant_id=$2::uuid`,
+      [event, tenantId]
+    );
     if (!existing.rows.length) {
       return void res.status(404).json({ ok: false, error: `No mapping found for event "${event}"` });
     }
@@ -50,10 +59,15 @@ router.put("/mappings/:event", requireAdmin as any, async (req, res) => {
       updates.push(`variables_required=$${i++}`);
       vals.push(Array.isArray(variables_required) ? variables_required : []);
     }
-    vals.push(event);
-    await pool.query(`UPDATE rcs_template_mappings SET ${updates.join(",")} WHERE erp_event=$${i}`, vals);
-
-    const updated = await pool.query(`SELECT * FROM rcs_template_mappings WHERE erp_event=$1`, [event]);
+    vals.push(event, tenantId);
+    await pool.query(
+      `UPDATE rcs_template_mappings SET ${updates.join(",")} WHERE erp_event=$${i} AND tenant_id=$${i + 1}::uuid`,
+      vals
+    );
+    const updated = await pool.query(
+      `SELECT * FROM rcs_template_mappings WHERE erp_event=$1 AND tenant_id=$2::uuid`,
+      [event, tenantId]
+    );
     res.json({ ok: true, mapping: updated.rows[0] });
   } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
 });
@@ -167,8 +181,9 @@ router.get("/status/:messageId", requireAdmin as any, async (req, res) => {
 // ── GET /api/rcs/fallback-stats ──────────────────────────────────────────────
 // Returns RCS delivery health + "SMS coverage" metric for the Notification Health panel.
 // "SMS coverage" = RCS failed AND the same booking+event had SMS sent within 5 minutes.
-router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
+router.get("/fallback-stats", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const [stats7d, stats24h, perEvent, smsCoverage] = await Promise.all([
       // ── 7-day totals ────────────────────────────────────────────────────────
       pool.query(`
@@ -179,8 +194,8 @@ router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
           MAX(CASE WHEN status='sent'   THEN sent_at END) AS last_success,
           MAX(CASE WHEN status='failed' THEN sent_at END) AS last_failure
         FROM notification_logs
-        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '7 days'
-      `),
+        WHERE channel='rcs' AND tenant_id=$1::uuid AND sent_at > NOW() - INTERVAL '7 days'
+      `, [tenantId]),
 
       // ── Last 24h totals (for alert threshold) ───────────────────────────────
       pool.query(`
@@ -189,8 +204,8 @@ router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
           COUNT(*) FILTER (WHERE status='sent')           AS sent,
           COUNT(*) FILTER (WHERE status='failed')         AS failed
         FROM notification_logs
-        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '24 hours'
-      `),
+        WHERE channel='rcs' AND tenant_id=$1::uuid AND sent_at > NOW() - INTERVAL '24 hours'
+      `, [tenantId]),
 
       // ── Per-event breakdown (7d) ─────────────────────────────────────────────
       pool.query(`
@@ -210,10 +225,10 @@ router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
             )
           ) FILTER (WHERE status='failed') AS top_error
         FROM notification_logs
-        WHERE channel='rcs' AND sent_at > NOW() - INTERVAL '7 days'
+        WHERE channel='rcs' AND tenant_id=$1::uuid AND sent_at > NOW() - INTERVAL '7 days'
         GROUP BY event_type
         ORDER BY total DESC
-      `),
+      `, [tenantId]),
 
       // ── SMS coverage: RCS failed but SMS succeeded for same booking+event ────
       // within 5-minute window → shows parallel SMS channel covered the customer
@@ -223,6 +238,7 @@ router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
           COUNT(*) AS sms_covered_count
         FROM notification_logs rcs
         WHERE rcs.channel = 'rcs'
+          AND rcs.tenant_id = $1::uuid
           AND rcs.status  = 'failed'
           AND rcs.booking_id IS NOT NULL
           AND rcs.sent_at > NOW() - INTERVAL '7 days'
@@ -230,13 +246,14 @@ router.get("/fallback-stats", requireAdmin as any, async (_req, res) => {
             SELECT 1
             FROM notification_logs sms
             WHERE sms.channel     = 'sms'
+              AND sms.tenant_id   = $1::uuid
               AND sms.status      = 'sent'
               AND sms.booking_id  = rcs.booking_id
               AND sms.event_type  = rcs.event_type
               AND ABS(EXTRACT(EPOCH FROM (sms.sent_at - rcs.sent_at))) < 300
           )
         GROUP BY rcs.event_type
-      `),
+      `, [tenantId]),
     ]);
 
     const s7 = stats7d.rows[0] || {};
@@ -297,19 +314,22 @@ router.get("/logs", requireAdmin as any, async (req, res) => {
   const limit  = Math.min(Number(req.query.limit) || 50, 200);
   const offset = Number(req.query.offset) || 0;
   try {
+    const tenantId = getTenantId(req);
     const r = await pool.query(`
       SELECT id, event_type, recipient, customer_name, booking_number, booking_id,
              template_id, template_name, message_id, status, delivery_status,
              http_status, error_code, message,
              sent_at, delivered_at, read_at, last_status_check, created_at,
-             -- provider_response for details but never return request_payload (may have user_id in legacy rows)
              provider_response
       FROM notification_logs
-      WHERE channel='rcs'
+      WHERE channel='rcs' AND tenant_id=$3::uuid
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
-    `, [limit, offset]);
-    const cnt = await pool.query(`SELECT COUNT(*)::int AS total FROM notification_logs WHERE channel='rcs'`);
+    `, [limit, offset, tenantId]);
+    const cnt = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM notification_logs WHERE channel='rcs' AND tenant_id=$1::uuid`,
+      [tenantId]
+    );
     res.json({ ok: true, logs: r.rows, total: cnt.rows[0]?.total || 0 });
   } catch (err: any) { res.status(500).json({ ok: false, error: err.message }); }
 });

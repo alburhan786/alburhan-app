@@ -18,6 +18,7 @@ import { uploadToGCS } from "../lib/gcsUpload.js";
 import { buildPdfOpts, getSiteBase } from "./agreements.js";
 import { createHash } from "crypto";
 import crypto from "crypto";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -70,6 +71,7 @@ router.get("/overview", requireAuth as any, async (req: AuthenticatedRequest, re
          LEFT JOIN hajj_groups hg ON hg.id = b.group_id
          LEFT JOIN invoices inv ON inv.booking_id = b.id
          WHERE b.customer_id = $1
+           AND b.tenant_id = (SELECT tenant_id FROM users WHERE id = $1 LIMIT 1)
          ORDER BY b.created_at DESC
          LIMIT 5`,
         [userId]

@@ -2,14 +2,16 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 const q1 = async (t: string, p?: any[]) => (await pool.query(t, p)).rows?.[0] ?? null;
 const q  = async (t: string, p?: any[]) => (await pool.query(t, p)).rows ?? [];
 
 // ── GET /api/executive/dashboard — comprehensive KPIs ────────────────────────
-router.get("/dashboard", requireAdmin as any, async (_req, res) => {
+router.get("/dashboard", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const today = new Date().toISOString().split("T")[0];
     const monthStart = today.slice(0, 8) + "01";
     const yearStart  = today.slice(0, 5) + "01-01";
@@ -22,37 +24,37 @@ router.get("/dashboard", requireAdmin as any, async (_req, res) => {
       cashFlow, growth, expenses
     ] = await Promise.all([
       // Revenue today
-      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE payment_date::date=CURRENT_DATE AND is_deleted=false`),
+      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date=CURRENT_DATE AND is_deleted=false`, [tenantId]),
       // Revenue this month
-      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE payment_date::date >= $1 AND is_deleted=false`, [monthStart]),
+      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date >= $2 AND is_deleted=false`, [tenantId, monthStart]),
       // Revenue this year
-      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE payment_date::date >= $1 AND is_deleted=false`, [yearStart]),
+      q1(`SELECT COALESCE(SUM(amount::numeric),0) AS rev FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date >= $2 AND is_deleted=false`, [tenantId, yearStart]),
       // Bookings today
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE created_at::date=CURRENT_DATE AND (is_deleted IS NULL OR is_deleted=false)`),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE tenant_id=$1::uuid AND created_at::date=CURRENT_DATE AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId]),
       // Bookings this month
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE created_at::date >= $1 AND (is_deleted IS NULL OR is_deleted=false)`, [monthStart]),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE tenant_id=$1::uuid AND created_at::date >= $2 AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId, monthStart]),
       // Active bookings
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE status NOT IN ('cancelled') AND (is_deleted IS NULL OR is_deleted=false)`),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings WHERE tenant_id=$1::uuid AND status NOT IN ('cancelled') AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId]),
       // Outstanding receivables
-      q1(`SELECT COALESCE(SUM(GREATEST(final_amount::numeric - paid_amount::numeric,0)),0) AS amt FROM bookings WHERE status NOT IN ('cancelled') AND (is_deleted IS NULL OR is_deleted=false)`),
+      q1(`SELECT COALESCE(SUM(GREATEST(final_amount::numeric - paid_amount::numeric,0)),0) AS amt FROM bookings WHERE tenant_id=$1::uuid AND status NOT IN ('cancelled') AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId]),
       // Active pilgrims
-      q1(`SELECT COUNT(*)::int AS cnt FROM pilgrims WHERE (is_deleted IS NULL OR is_deleted=false)`).catch(() => ({ cnt: 0 })),
-      // Flights today
+      q1(`SELECT COUNT(*)::int AS cnt FROM pilgrims WHERE tenant_id=$1::uuid AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId]).catch(() => ({ cnt: 0 })),
+      // Flights today (group_flights not tenant-scoped — global)
       q1(`SELECT COUNT(DISTINCT id)::int AS cnt FROM group_flights WHERE departure_date=CURRENT_DATE`).catch(() => ({ cnt: 0 })),
       // Visa pending
-      q1(`SELECT COUNT(*)::int AS cnt FROM pilgrims WHERE (visa_status IS NULL OR visa_status='pending') AND (is_deleted IS NULL OR is_deleted=false)`).catch(() => ({ cnt: 0 })),
-      // Room allocation status
+      q1(`SELECT COUNT(*)::int AS cnt FROM pilgrims WHERE tenant_id=$1::uuid AND (visa_status IS NULL OR visa_status='pending') AND (is_deleted IS NULL OR is_deleted=false)`, [tenantId]).catch(() => ({ cnt: 0 })),
+      // Room allocation status (global — not tenant-scoped)
       q1(`SELECT COUNT(DISTINCT pr.pilgrim_id)::int AS allocated, COUNT(*)::int AS total_rooms FROM pilgrim_room_assignments pr JOIN hajj_rooms hr ON hr.id=pr.room_id`).catch(() => ({ allocated: 0, total_rooms: 0 })),
       // Agent ranking (top 5)
-      q(`SELECT a.id, a.name, COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS revenue, COUNT(b.id)::int AS bookings FROM agents a JOIN bookings b ON b.agent_id=a.id AND b.created_at::date >= $1 AND (b.is_deleted IS NULL OR b.is_deleted=false) GROUP BY a.id, a.name ORDER BY revenue DESC LIMIT 5`, [monthStart]),
+      q(`SELECT a.id, a.name, COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS revenue, COUNT(b.id)::int AS bookings FROM agents a JOIN bookings b ON b.agent_id=a.id AND b.tenant_id=$1::uuid AND b.created_at::date >= $2 AND (b.is_deleted IS NULL OR b.is_deleted=false) GROUP BY a.id, a.name ORDER BY revenue DESC LIMIT 5`, [tenantId, monthStart]),
       // Branch ranking (top 5)
-      q(`SELECT br.id, br.name, br.city, COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS revenue, COUNT(b.id)::int AS bookings FROM branches br JOIN bookings b ON b.branch_id=br.id AND b.created_at::date >= $1 AND (b.is_deleted IS NULL OR b.is_deleted=false) GROUP BY br.id, br.name, br.city ORDER BY revenue DESC LIMIT 5`, [monthStart]),
+      q(`SELECT br.id, br.name, br.city, COALESCE(SUM(b.paid_amount::numeric),0)::numeric AS revenue, COUNT(b.id)::int AS bookings FROM branches br JOIN bookings b ON b.branch_id=br.id AND b.tenant_id=$1::uuid AND b.created_at::date >= $2 AND (b.is_deleted IS NULL OR b.is_deleted=false) GROUP BY br.id, br.name, br.city ORDER BY revenue DESC LIMIT 5`, [tenantId, monthStart]),
       // Cash flow (last 7 days)
-      q(`SELECT payment_date::date AS date, COALESCE(SUM(amount::numeric),0)::numeric AS collected FROM payment_transactions WHERE payment_date::date >= CURRENT_DATE - INTERVAL '7 days' AND is_deleted=false GROUP BY payment_date::date ORDER BY date`),
+      q(`SELECT payment_date::date AS date, COALESCE(SUM(amount::numeric),0)::numeric AS collected FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date >= CURRENT_DATE - INTERVAL '7 days' AND is_deleted=false GROUP BY payment_date::date ORDER BY date`, [tenantId]),
       // Monthly growth (last 6 months)
-      q(`SELECT TO_CHAR(DATE_TRUNC('month', payment_date::date),'YYYY-MM') AS month, COALESCE(SUM(amount::numeric),0)::numeric AS revenue, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE payment_date::date >= CURRENT_DATE - INTERVAL '6 months' AND is_deleted=false GROUP BY DATE_TRUNC('month',payment_date::date) ORDER BY month`),
+      q(`SELECT TO_CHAR(DATE_TRUNC('month', payment_date::date),'YYYY-MM') AS month, COALESCE(SUM(amount::numeric),0)::numeric AS revenue, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE tenant_id=$1::uuid AND payment_date::date >= CURRENT_DATE - INTERVAL '6 months' AND is_deleted=false GROUP BY DATE_TRUNC('month',payment_date::date) ORDER BY month`, [tenantId]),
       // Expenses last 30 days
-      q1(`SELECT COALESCE(SUM(amount::numeric),0)::numeric AS total FROM expenses WHERE date >= CURRENT_DATE - INTERVAL '30 days'`).catch(() => ({ total: 0 })),
+      q1(`SELECT COALESCE(SUM(amount::numeric),0)::numeric AS total FROM expenses WHERE tenant_id=$1::uuid AND date >= CURRENT_DATE - INTERVAL '30 days'`, [tenantId]).catch(() => ({ total: 0 })),
     ]);
 
     // Pending commissions
@@ -111,10 +113,11 @@ router.get("/collection-summary", requireAdmin as any, async (req, res) => {
     const dateFrom = from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
 
+    const tenantId = getTenantId(req);
     const [byMode, byDay, totals] = await Promise.all([
-      q(`SELECT payment_mode, COALESCE(SUM(amount::numeric),0)::numeric AS amount, COUNT(*)::int AS count FROM payment_transactions WHERE payment_date::date BETWEEN $1 AND $2 AND is_deleted=false GROUP BY payment_mode ORDER BY amount DESC`, [dateFrom, dateTo]),
-      q(`SELECT payment_date::date AS date, COALESCE(SUM(amount::numeric),0)::numeric AS amount, COUNT(*)::int AS count FROM payment_transactions WHERE payment_date::date BETWEEN $1 AND $2 AND is_deleted=false GROUP BY payment_date::date ORDER BY date`, [dateFrom, dateTo]),
-      q1(`SELECT COALESCE(SUM(amount::numeric),0)::numeric AS total, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE payment_date::date BETWEEN $1 AND $2 AND is_deleted=false`, [dateFrom, dateTo]),
+      q(`SELECT payment_mode, COALESCE(SUM(amount::numeric),0)::numeric AS amount, COUNT(*)::int AS count FROM payment_transactions WHERE tenant_id=$3::uuid AND payment_date::date BETWEEN $1 AND $2 AND is_deleted=false GROUP BY payment_mode ORDER BY amount DESC`, [dateFrom, dateTo, tenantId]),
+      q(`SELECT payment_date::date AS date, COALESCE(SUM(amount::numeric),0)::numeric AS amount, COUNT(*)::int AS count FROM payment_transactions WHERE tenant_id=$3::uuid AND payment_date::date BETWEEN $1 AND $2 AND is_deleted=false GROUP BY payment_date::date ORDER BY date`, [dateFrom, dateTo, tenantId]),
+      q1(`SELECT COALESCE(SUM(amount::numeric),0)::numeric AS total, COUNT(DISTINCT booking_id)::int AS bookings FROM payment_transactions WHERE tenant_id=$3::uuid AND payment_date::date BETWEEN $1 AND $2 AND is_deleted=false`, [dateFrom, dateTo, tenantId]),
     ]);
     res.json({ by_mode: byMode, by_day: byDay, totals, period: { from: dateFrom, to: dateTo } });
   } catch (e) { res.status(500).json({ error: "Failed to load collection summary" }); }

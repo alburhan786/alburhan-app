@@ -1,10 +1,11 @@
 // @ts-nocheck
 import { Router } from "express";
 import { db, broadcastsTable, customerNotificationsTable, bookingsTable, usersTable } from "@workspace/db";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { eq, desc, ilike, or, sql } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendRCS, type RcsRichData } from "../lib/notifications.js";
 import axios from "axios";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("customers") as any);
@@ -37,10 +38,11 @@ async function sendBroadcastSMS(_mobile: string, _message: string): Promise<bool
   return false;
 }
 
-async function getRecipients(audience: string): Promise<Recipient[]> {
+async function getRecipients(audience: string, tenantId: string): Promise<Recipient[]> {
+  const tenantFilter = sql`tenant_id = ${tenantId}::uuid`;
   if (audience === "all") {
     const users = await db.select({ id: usersTable.id, mobile: usersTable.mobile, name: usersTable.name })
-      .from(usersTable).where(eq(usersTable.role, "customer"));
+      .from(usersTable).where(sql`role = 'customer' AND tenant_id = ${tenantId}::uuid`);
     return users.map(u => ({ mobile: u.mobile, customerId: u.id, name: u.name || "", group: "", bus: "", hotel: "" }));
   }
 
@@ -50,10 +52,7 @@ async function getRecipients(audience: string): Promise<Recipient[]> {
       .select({ mobile: bookingsTable.customerMobile, id: bookingsTable.customerId, name: bookingsTable.customerName, pkg: bookingsTable.packageName })
       .from(bookingsTable)
       .where(
-        or(
-          ilike(bookingsTable.packageName, `%${year}%`),
-          ilike(bookingsTable.packageName, `%Hajj ${year}%`)
-        )
+        sql`tenant_id = ${tenantId}::uuid AND (package_name ILIKE ${'%' + year + '%'} OR package_name ILIKE ${'%Hajj ' + year + '%'})`
       );
     const seen = new Set<string>();
     return bkgs
@@ -65,7 +64,7 @@ async function getRecipients(audience: string): Promise<Recipient[]> {
     const bkgs = await db
       .select({ mobile: bookingsTable.customerMobile, id: bookingsTable.customerId, name: bookingsTable.customerName, pkg: bookingsTable.packageName })
       .from(bookingsTable)
-      .where(eq(bookingsTable.status, audience as any));
+      .where(sql`tenant_id = ${tenantId}::uuid AND status = ${audience}`);
     const seen = new Set<string>();
     return bkgs
       .filter(b => b.mobile && !seen.has(b.mobile) && seen.add(b.mobile))
@@ -144,7 +143,7 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
     return;
   }
 
-  const recipients = await getRecipients(audience);
+  const recipients = await getRecipients(audience, getTenantId(req));
   if (recipients.length === 0) {
     res.status(400).json({ message: "No recipients found for selected audience" });
     return;
@@ -172,8 +171,11 @@ router.post("/", requireAdmin as any, async (req: AuthenticatedRequest, res) => 
   }
 });
 
-router.get("/", requireAdmin as any, async (_req, res) => {
-  const broadcasts = await db.select().from(broadcastsTable).orderBy(desc(broadcastsTable.sentAt)).limit(100);
+router.get("/", requireAdmin as any, async (req, res) => {
+  const tenantId = getTenantId(req);
+  const broadcasts = await db.select().from(broadcastsTable)
+    .where(sql`broadcasts.tenant_id = ${tenantId}::uuid`)
+    .orderBy(desc(broadcastsTable.sentAt)).limit(100);
   res.json(broadcasts.map(b => ({
     ...b,
     sentAt: b.sentAt?.toISOString?.(),
@@ -182,13 +184,15 @@ router.get("/", requireAdmin as any, async (_req, res) => {
 
 router.post("/:id/resend", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
-  const [original] = await db.select().from(broadcastsTable).where(eq(broadcastsTable.id, id));
+  const tenantId = getTenantId(req);
+  const [original] = await db.select().from(broadcastsTable)
+    .where(sql`id = ${id} AND tenant_id = ${tenantId}::uuid`);
   if (!original) {
     res.status(404).json({ message: "Broadcast not found" });
     return;
   }
 
-  const recipients = await getRecipients(original.audience);
+  const recipients = await getRecipients(original.audience, tenantId);
 
   const [newBroadcast] = await db.insert(broadcastsTable).values({
     title: original.title,

@@ -5,6 +5,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
 import axios from "axios";
+import { getTenantId } from "../lib/tenantContext.js";
 
 // ── Multer: memory storage for inbox media uploads ────────────────────────────
 const upload = multer({
@@ -58,14 +59,15 @@ const PLATFORM_GROUPS: Record<string, string> = {
 };
 
 // ── GET /api/inbox/stats ──────────────────────────────────────────────────────
-router.get("/stats", requireAdmin as any, async (_req, res) => {
+router.get("/stats", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const [unread, todayLeads, todayMsgs, openConvos, followUps] = await Promise.all([
-      pool.query(`SELECT COALESCE(SUM(unread_count),0)::int as total FROM leads WHERE inbox_status='open'`),
-      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE created_at::date = CURRENT_DATE`),
+      pool.query(`SELECT COALESCE(SUM(unread_count),0)::int as total FROM leads WHERE tenant_id=$1::uuid AND inbox_status='open'`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE tenant_id=$1::uuid AND created_at::date = CURRENT_DATE`, [tenantId]),
       pool.query(`SELECT COUNT(*)::int as count FROM social_messages WHERE created_at::date = CURRENT_DATE`),
-      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE inbox_status='open' AND status NOT IN ('converted','lost','cancelled','completed')`),
-      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE follow_up_date::text = CURRENT_DATE::text AND status NOT IN ('converted','lost','cancelled','completed')`),
+      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE tenant_id=$1::uuid AND inbox_status='open' AND status NOT IN ('converted','lost','cancelled','completed')`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE tenant_id=$1::uuid AND follow_up_date::text = CURRENT_DATE::text AND status NOT IN ('converted','lost','cancelled','completed')`, [tenantId]),
     ]);
     res.json({
       unread: unread.rows[0].total,
@@ -80,9 +82,10 @@ router.get("/stats", requireAdmin as any, async (_req, res) => {
 // ── GET /api/inbox/conversations ──────────────────────────────────────────────
 router.get("/conversations", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { platform, status, assignedTo, unread, priority, search, limit = "60", offset = "0" } = req.query as any;
-    const conds: string[] = ["1=1"];
-    const params: any[] = [];
+    const conds: string[] = [`l.tenant_id=$1::uuid`];
+    const params: any[] = [tenantId];
 
     if (platform && platform !== "all") {
       params.push(platform); conds.push(`(l.platform = $${params.length} OR l.source = $${params.length})`);

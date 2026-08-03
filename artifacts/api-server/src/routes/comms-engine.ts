@@ -9,6 +9,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
 import { publishEvent, ensureCommEventsTable } from "../lib/eventBus.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -17,8 +18,9 @@ router.use(requireAdmin as any);
 ensureCommEventsTable().catch(() => {});
 
 // ── GET /summary — Dashboard summary stats ─────────────────────────────────
-router.get("/summary", async (_req, res) => {
+router.get("/summary", async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const today = new Date().toISOString().slice(0, 10);
     const [
       notifStats, queueStats, workflowStats, eventStats, dlqStats,
@@ -32,7 +34,7 @@ router.get("/summary", async (_req, res) => {
           COUNT(*) FILTER (WHERE created_at >= NOW()-INTERVAL '1h')::int AS last_hour,
           COUNT(*) FILTER (WHERE DATE(created_at) = $1)::int         AS today,
           ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(delivered_at, updated_at) - created_at))*1000))::int AS avg_ms
-        FROM notification_logs WHERE created_at >= NOW() - INTERVAL '7 days'`, [today]),
+        FROM notification_logs WHERE tenant_id=$2::uuid AND created_at >= NOW() - INTERVAL '7 days'`, [today, tenantId]),
       pool.query(`
         SELECT status, COUNT(*)::int AS cnt
         FROM notification_retry_queue
@@ -89,15 +91,15 @@ router.get("/summary", async (_req, res) => {
           COUNT(*) FILTER (WHERE source = 'whatsapp')::int          AS from_whatsapp,
           COUNT(*) FILTER (WHERE source = 'website')::int           AS from_website
         FROM leads
-        WHERE created_at >= NOW() - INTERVAL '30 days'`).catch(() => ({
+        WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '30 days'`, [tenantId]).catch(() => ({
           rows: [{ total: 0, today: 0, converted: 0, from_facebook: 0, from_instagram: 0, from_whatsapp: 0, from_website: 0 }]
         })),
 
       // ── Bookings (for conversion rate) ──────────────────────────────────
       pool.query(`
         SELECT COUNT(*)::int AS cnt FROM bookings
-        WHERE created_at >= NOW() - INTERVAL '30 days'
-          AND status NOT IN ('cancelled','rejected')`).catch(() => ({ rows: [{ cnt: 0 }] })),
+        WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '30 days'
+          AND status NOT IN ('cancelled','rejected')`, [tenantId]).catch(() => ({ rows: [{ cnt: 0 }] })),
     ]);
 
     const ns = notifStats.rows[0] || {};

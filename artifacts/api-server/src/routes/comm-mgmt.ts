@@ -10,6 +10,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -52,12 +53,13 @@ async function writeAuditLog(data: {
 /** GET /event-mappings — list all */
 router.get("/event-mappings", async (req: any, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { event_type, channel } = req.query;
-    const conds: string[] = [];
-    const params: any[] = [];
+    const conds: string[] = [`tenant_id=$1::uuid`];
+    const params: any[] = [tenantId];
     if (event_type) { conds.push(`event_type=$${params.length+1}`); params.push(event_type); }
     if (channel)    { conds.push(`channel=$${params.length+1}`); params.push(channel); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const where = `WHERE ${conds.join(" AND ")}`;
     const rows = await pool.query(
       `SELECT * FROM communication_event_mappings ${where} ORDER BY event_type, channel`,
       params
@@ -137,7 +139,7 @@ router.get("/event-mappings/matrix", async (_req, res) => {
   try {
     const [mappings, settings] = await Promise.all([
       pool.query(`SELECT * FROM communication_event_mappings ORDER BY event_type, channel`),
-      pool.query(`SELECT * FROM notification_settings ORDER BY event_type, channel`),
+      pool.query(`SELECT * FROM notification_settings WHERE tenant_id=$1::uuid ORDER BY event_type, channel`, [getTenantId(req)]),
     ]);
 
     // Merge: comm_event_mappings wins; fall back to notification_settings
@@ -155,9 +157,13 @@ router.get("/event-mappings/matrix", async (_req, res) => {
 // ── PROVIDER HEALTH ────────────────────────────────────────────────────────────
 
 /** GET /provider-health — all provider health rows */
-router.get("/provider-health", async (_req, res) => {
+router.get("/provider-health", async (req, res) => {
   try {
-    const rows = await pool.query(`SELECT * FROM provider_health_status ORDER BY channel, provider`);
+    const tenantId = getTenantId(req);
+    const rows = await pool.query(
+      `SELECT * FROM provider_health_status WHERE tenant_id=$1::uuid ORDER BY channel, provider`,
+      [tenantId]
+    );
     res.json({ providers: rows.rows });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
@@ -326,13 +332,14 @@ router.post("/resend/:logId", async (req: any, res) => {
 /** GET /audit-logs — paginated audit log viewer */
 router.get("/audit-logs", async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { limit = "50", offset = "0", action, actor_id, entity_type } = req.query as any;
-    const conds: string[] = [];
-    const params: any[] = [];
+    const conds: string[] = [`tenant_id=$1::uuid`];
+    const params: any[] = [tenantId];
     if (action)      { conds.push(`action=$${params.length+1}`); params.push(action); }
     if (actor_id)    { conds.push(`actor_id=$${params.length+1}`); params.push(actor_id); }
     if (entity_type) { conds.push(`entity_type=$${params.length+1}`); params.push(entity_type); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const where = `WHERE ${conds.join(" AND ")}`;
     const [rows, total] = await Promise.all([
       pool.query(
         `SELECT * FROM communication_audit_logs ${where} ORDER BY created_at DESC LIMIT $${params.length+1} OFFSET $${params.length+2}`,
@@ -420,14 +427,15 @@ router.get("/log-detail/:id", async (req, res) => {
 /** GET /templates — list with full spec fields */
 router.get("/templates", async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { channel, event_type, approval_status, provider } = req.query as any;
-    const conds: string[] = [];
-    const params: any[] = [];
+    const conds: string[] = [`tenant_id=$1::uuid`];
+    const params: any[] = [tenantId];
     if (channel)         { conds.push(`channel=$${params.length+1}`); params.push(channel); }
     if (event_type)      { conds.push(`event_type=$${params.length+1}`); params.push(event_type); }
     if (approval_status) { conds.push(`approval_status=$${params.length+1}`); params.push(approval_status); }
     if (provider)        { conds.push(`provider=$${params.length+1}`); params.push(provider); }
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const where = `WHERE ${conds.join(" AND ")}`;
     const rows = await pool.query(
       `SELECT id, name, event_type, channel, provider, subject,
               body, variables, required_variables, optional_variables,

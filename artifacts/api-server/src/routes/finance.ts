@@ -42,6 +42,7 @@ import {
   type InvoiceSource,
   type PaymentMethod,
 } from "../lib/financeService.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -73,6 +74,7 @@ router.get("/dashboard", async (req: AuthenticatedRequest, res) => {
     else if (from && to)        { dateFrom = from;          dateTo = to; }
     else                        { dateFrom = firstOfMonth;  dateTo = today; }
 
+    const tenantId = getTenantId(req);
     const [
       totals,
       todayCollected,
@@ -91,32 +93,32 @@ router.get("/dashboard", async (req: AuthenticatedRequest, res) => {
         FROM invoices i
         LEFT JOIN (
           SELECT booking_id, COALESCE(SUM(amount::numeric),0) AS paid
-          FROM payment_transactions WHERE is_deleted=false GROUP BY booking_id
+          FROM payment_transactions WHERE tenant_id=$1::uuid AND is_deleted=false GROUP BY booking_id
         ) pt ON pt.booking_id=i.booking_id
-        WHERE i.is_void=false
-      `),
+        WHERE i.tenant_id=$1::uuid AND i.is_void=false
+      `, [tenantId]),
       // Today's collection
       q1(`
         SELECT COALESCE(SUM(amount::numeric),0) AS collected
         FROM payment_transactions
-        WHERE payment_date::date = CURRENT_DATE AND is_deleted=false
-      `),
+        WHERE tenant_id=$1::uuid AND payment_date::date = CURRENT_DATE AND is_deleted=false
+      `, [tenantId]),
       // This month's collection (filtered range)
       q1(`
         SELECT COALESCE(SUM(amount::numeric),0) AS collected
         FROM payment_transactions
-        WHERE payment_date::date BETWEEN $1 AND $2 AND is_deleted=false
-      `, [dateFrom, dateTo]),
+        WHERE tenant_id=$1::uuid AND payment_date::date BETWEEN $2 AND $3 AND is_deleted=false
+      `, [tenantId, dateFrom, dateTo]),
       // Unpaid bookings count
       q1(`
         SELECT COUNT(*)::int AS cnt FROM invoices
-        WHERE payment_status='unpaid' AND is_void=false
-      `),
+        WHERE tenant_id=$1::uuid AND payment_status='unpaid' AND is_void=false
+      `, [tenantId]),
       // Partially paid bookings count
       q1(`
         SELECT COUNT(*)::int AS cnt FROM invoices
-        WHERE payment_status='partially_paid' AND is_void=false
-      `),
+        WHERE tenant_id=$1::uuid AND payment_status='partially_paid' AND is_void=false
+      `, [tenantId]),
       // Overdue balances (due_date passed, still has outstanding)
       q(`
         SELECT i.booking_id, i.invoice_number, b.customer_name, b.customer_mobile,
@@ -124,14 +126,14 @@ router.get("/dashboard", async (req: AuthenticatedRequest, res) => {
                DATE_PART('day', NOW() - i.due_date)::int AS days_overdue
         FROM invoices i
         JOIN bookings b ON b.id=i.booking_id
-        WHERE i.due_date < NOW() AND i.balance > 0.01 AND i.is_void=false
+        WHERE i.tenant_id=$1::uuid AND i.due_date < NOW() AND i.balance > 0.01 AND i.is_void=false
         ORDER BY i.due_date ASC LIMIT 20
-      `),
+      `, [tenantId]),
       // Total refunded
       q1(`
         SELECT COALESCE(SUM(amount::numeric),0) AS total_refunded
-        FROM refunds WHERE status IN ('approved','processed')
-      `),
+        FROM refunds WHERE tenant_id=$1::uuid AND status IN ('approved','processed')
+      `, [tenantId]),
     ]);
 
     res.json({

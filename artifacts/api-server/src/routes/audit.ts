@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requirePermission, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -16,9 +17,14 @@ router.get(
         limit = "200", offset = "0",
       } = req.query as Record<string, string>;
 
-      const params: any[] = [];
-      const conditions: string[] = ["created_at > NOW() - INTERVAL '12 months'"];
-      let pi = 1;
+      const tenantId = getTenantId(req);
+      // tenant_id is always $1 — dynamic filters follow
+      const params: any[] = [tenantId];
+      const conditions: string[] = [
+        "created_at > NOW() - INTERVAL '12 months'",
+        "tenant_id = $1::uuid",
+      ];
+      let pi = 2;
 
       if (entity_table) { conditions.push(`entity_table=$${pi++}`); params.push(entity_table); }
       if (action) { conditions.push(`action=$${pi++}`); params.push(action); }
@@ -54,10 +60,12 @@ router.get(
 router.get(
   "/entities",
   requirePermission("audit_logs", "view") as any,
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const tenantId = getTenantId(req);
       const r = await pool.query(
-        `SELECT DISTINCT entity_table FROM audit_logs ORDER BY entity_table`
+        `SELECT DISTINCT entity_table FROM audit_logs WHERE tenant_id = $1::uuid ORDER BY entity_table`,
+        [tenantId]
       );
       res.json(r.rows.map((x: any) => x.entity_table));
     } catch (err) {
@@ -71,7 +79,11 @@ router.post(
   requirePermission("audit_logs", "edit") as any,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const logResult = await pool.query(`SELECT * FROM audit_logs WHERE id=$1`, [req.params.id]);
+      const tenantId = getTenantId(req);
+      const logResult = await pool.query(
+        `SELECT * FROM audit_logs WHERE id=$1 AND tenant_id=$2::uuid`,
+        [req.params.id, tenantId]
+      );
       if (!logResult.rows[0]) return void res.status(404).json({ error: "Audit log entry not found" });
 
       const log = logResult.rows[0];

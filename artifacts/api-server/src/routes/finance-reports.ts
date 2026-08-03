@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -20,14 +21,15 @@ router.get("/dashboard", requireAdmin as any, async (req: AuthenticatedRequest, 
     const firstOfMonth = today.slice(0, 8) + "01";
     const firstOfYear = today.slice(0, 5) + "01-01";
 
+    const tenantId = getTenantId(req);
     const [todayStats, monthStats, yearStats, outstanding, cashBank, agentStats, branchStats, bookingStatus] = await Promise.all([
       // Today's revenue + bookings
       q1(`
         SELECT
           COALESCE(SUM(pt.amount::numeric),0) AS revenue,
           COUNT(DISTINCT pt.booking_id)::int AS payment_count
-        FROM payment_transactions pt WHERE pt.payment_date::date = CURRENT_DATE AND pt.is_deleted=false
-      `),
+        FROM payment_transactions pt WHERE pt.tenant_id=$1::uuid AND pt.payment_date::date = CURRENT_DATE AND pt.is_deleted=false
+      `, [tenantId]),
       // This month
       q1(`
         SELECT
@@ -35,7 +37,7 @@ router.get("/dashboard", requireAdmin as any, async (req: AuthenticatedRequest, 
           COUNT(DISTINCT b.id)::int AS bookings
         FROM payment_transactions pt
         JOIN bookings b ON b.id=pt.booking_id
-        WHERE pt.payment_date >= $1 AND pt.is_deleted=false`, [firstOfMonth]),
+        WHERE pt.tenant_id=$1::uuid AND pt.payment_date >= $2 AND pt.is_deleted=false`, [tenantId, firstOfMonth]),
       // This year
       q1(`
         SELECT
@@ -43,43 +45,44 @@ router.get("/dashboard", requireAdmin as any, async (req: AuthenticatedRequest, 
           COUNT(DISTINCT b.id)::int AS bookings
         FROM payment_transactions pt
         JOIN bookings b ON b.id=pt.booking_id
-        WHERE pt.payment_date >= $1 AND pt.is_deleted=false`, [firstOfYear]),
+        WHERE pt.tenant_id=$1::uuid AND pt.payment_date >= $2 AND pt.is_deleted=false`, [tenantId, firstOfYear]),
       // Outstanding receivables
       q1(`
         SELECT COALESCE(SUM(GREATEST(b.final_amount::numeric - b.paid_amount::numeric, 0)),0) AS outstanding
-        FROM bookings b WHERE b.status NOT IN ('cancelled') AND (b.is_deleted IS NULL OR b.is_deleted=false)
-          AND b.final_amount::numeric > b.paid_amount::numeric`),
-      // Cash + Bank balances from journal
+        FROM bookings b WHERE b.tenant_id=$1::uuid AND b.status NOT IN ('cancelled') AND (b.is_deleted IS NULL OR b.is_deleted=false)
+          AND b.final_amount::numeric > b.paid_amount::numeric`, [tenantId]),
+      // Cash + Bank balances from journal (accounts global; journal_entries tenant-scoped)
       q1(`
         SELECT
           COALESCE(SUM(jel.debit - jel.credit) FILTER (WHERE a.code='1001'),0)::numeric AS cash_balance,
           COALESCE(SUM(jel.debit - jel.credit) FILTER (WHERE a.code='1002'),0)::numeric AS bank_balance
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id=jel.account_id
-        WHERE a.code IN ('1001','1002')`),
+        JOIN journal_entries je ON je.id=jel.journal_entry_id
+        WHERE je.tenant_id=$1::uuid AND a.code IN ('1001','1002')`, [tenantId]),
       // Top 5 agents by revenue
       q(`
         SELECT a.name, a.commission_rate,
           COALESCE(SUM(b.paid_amount::numeric),0) AS revenue,
           COUNT(b.id)::int AS bookings
-        FROM agents a JOIN bookings b ON b.agent_id=a.id AND (b.is_deleted IS NULL OR b.is_deleted=false)
-        GROUP BY a.id, a.name, a.commission_rate ORDER BY revenue DESC LIMIT 5`),
+        FROM agents a JOIN bookings b ON b.agent_id=a.id AND b.tenant_id=$1::uuid AND (b.is_deleted IS NULL OR b.is_deleted=false)
+        GROUP BY a.id, a.name, a.commission_rate ORDER BY revenue DESC LIMIT 5`, [tenantId]),
       // Top 5 branches by revenue
       q(`
         SELECT br.name, br.city,
           COALESCE(SUM(b.paid_amount::numeric),0) AS revenue,
           COUNT(b.id)::int AS bookings
-        FROM branches br JOIN bookings b ON b.branch_id=br.id AND (b.is_deleted IS NULL OR b.is_deleted=false)
-        GROUP BY br.id, br.name, br.city ORDER BY revenue DESC LIMIT 5`),
+        FROM branches br JOIN bookings b ON b.branch_id=br.id AND b.tenant_id=$1::uuid AND (b.is_deleted IS NULL OR b.is_deleted=false)
+        GROUP BY br.id, br.name, br.city ORDER BY revenue DESC LIMIT 5`, [tenantId]),
       // Booking status breakdown
-      q(`SELECT status, COUNT(*)::int AS count FROM bookings WHERE is_deleted IS NULL OR is_deleted=false GROUP BY status ORDER BY count DESC`),
+      q(`SELECT status, COUNT(*)::int AS count FROM bookings WHERE tenant_id=$1::uuid AND (is_deleted IS NULL OR is_deleted=false) GROUP BY status ORDER BY count DESC`, [tenantId]),
     ]);
 
     // Pending counts
     const [pendingVisa, pendingPassport, pendingAgreements, upcomingFlights] = await Promise.all([
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='visa')`),
-      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='passport')`),
-      q1(`SELECT COUNT(*)::int AS cnt FROM agreements WHERE status='pending_signature'`).catch(() => ({ cnt: 0 })),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE b.tenant_id=$1::uuid AND (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='visa')`, [tenantId]),
+      q1(`SELECT COUNT(*)::int AS cnt FROM bookings b WHERE b.tenant_id=$1::uuid AND (b.is_deleted IS NULL OR b.is_deleted=false) AND b.status NOT IN ('cancelled') AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.booking_id=b.id AND d.document_type::text='passport')`, [tenantId]),
+      q1(`SELECT COUNT(*)::int AS cnt FROM agreements WHERE tenant_id=$1::uuid AND status='pending_signature'`, [tenantId]).catch(() => ({ cnt: 0 })),
       q1(`SELECT COUNT(DISTINCT bf.booking_id)::int AS cnt FROM booking_flights bf WHERE bf.departure_date >= CURRENT_DATE AND bf.departure_date <= CURRENT_DATE + INTERVAL '7 days'`).catch(() => ({ cnt: 0 })),
     ]);
 
@@ -110,10 +113,11 @@ router.get("/dashboard", requireAdmin as any, async (req: AuthenticatedRequest, 
 // ── GET /api/finance-reports/daily-sales ──────────────────────────────────────
 router.get("/daily-sales", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { from, to, branch_id, agent_id } = req.query as Record<string, string>;
     const dateFrom = from || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
-    const params: any[] = [dateFrom, dateTo];
+    const params: any[] = [tenantId, dateFrom, dateTo];
     const filters: string[] = [];
     if (branch_id) { params.push(branch_id); filters.push(`b.branch_id=$${params.length}`); }
     if (agent_id)  { params.push(agent_id);  filters.push(`b.agent_id=$${params.length}`); }
@@ -127,7 +131,7 @@ router.get("/daily-sales", requireAdmin as any, async (req: AuthenticatedRequest
         COUNT(DISTINCT pt.id)::int AS transactions
       FROM payment_transactions pt
       JOIN bookings b ON b.id=pt.booking_id
-      WHERE pt.payment_date::date BETWEEN $1 AND $2 AND pt.is_deleted=false ${where}
+      WHERE pt.tenant_id=$1::uuid AND pt.payment_date::date BETWEEN $2 AND $3 AND pt.is_deleted=false ${where}
       GROUP BY pt.payment_date::date ORDER BY date DESC
     `, params);
 
@@ -147,6 +151,7 @@ router.get("/branch-summary", requireAdmin as any, async (req: AuthenticatedRequ
     const dateFrom = from || new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
 
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT br.id, br.name AS branch_name, br.city, br.is_active,
         COUNT(DISTINCT b.id)::int AS total_bookings,
@@ -157,12 +162,14 @@ router.get("/branch-summary", requireAdmin as any, async (req: AuthenticatedRequ
         COUNT(DISTINCT a.id)::int AS agents_count
       FROM branches br
       LEFT JOIN bookings b ON b.branch_id=br.id
-        AND b.created_at::date BETWEEN $1 AND $2
+        AND b.tenant_id=$1::uuid
+        AND b.created_at::date BETWEEN $2 AND $3
         AND (b.is_deleted IS NULL OR b.is_deleted=false)
       LEFT JOIN agents a ON a.branch_id=br.id AND a.is_active=true
+      WHERE br.tenant_id=$1::uuid
       GROUP BY br.id, br.name, br.city, br.is_active
       ORDER BY total_collected DESC
-    `, [dateFrom, dateTo]);
+    `, [tenantId, dateFrom, dateTo]);
     res.json({ rows, period: { from: dateFrom, to: dateTo } });
   } catch (err) { res.status(500).json({ error: "Failed to generate branch summary" }); }
 });
@@ -170,10 +177,11 @@ router.get("/branch-summary", requireAdmin as any, async (req: AuthenticatedRequ
 // ── GET /api/finance-reports/agent-summary ────────────────────────────────────
 router.get("/agent-summary", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { from, to, branch_id } = req.query as Record<string, string>;
     const dateFrom = from || new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
-    const params: any[] = [dateFrom, dateTo];
+    const params: any[] = [tenantId, dateFrom, dateTo];
     const brFilter = branch_id ? (params.push(branch_id), `AND a.branch_id=$${params.length}`) : "";
 
     const rows = await q(`
@@ -186,10 +194,11 @@ router.get("/agent-summary", requireAdmin as any, async (req: AuthenticatedReque
       FROM agents a
       LEFT JOIN branches br ON br.id=a.branch_id
       LEFT JOIN bookings b ON b.agent_id=a.id
-        AND b.created_at::date BETWEEN $1 AND $2
+        AND b.tenant_id=$1::uuid
+        AND b.created_at::date BETWEEN $2 AND $3
         AND (b.is_deleted IS NULL OR b.is_deleted=false)
       LEFT JOIN agent_commissions ac ON ac.booking_id=b.id
-      WHERE a.is_active=true ${brFilter}
+      WHERE a.tenant_id=$1::uuid AND a.is_active=true ${brFilter}
       GROUP BY a.id, a.name, a.mobile, a.commission_rate, a.city, br.name
       ORDER BY total_collected DESC
     `, params);
@@ -204,6 +213,7 @@ router.get("/package-sales", requireAdmin as any, async (req: AuthenticatedReque
     const dateFrom = from || new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
 
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT b.package_name,
         COUNT(*)::int AS bookings,
@@ -213,10 +223,10 @@ router.get("/package-sales", requireAdmin as any, async (req: AuthenticatedReque
         COALESCE(SUM(GREATEST(b.final_amount::numeric - b.paid_amount::numeric,0)),0)::numeric AS outstanding,
         AVG(b.final_amount::numeric)::numeric AS avg_booking_value
       FROM bookings b
-      WHERE b.created_at::date BETWEEN $1 AND $2 AND (b.is_deleted IS NULL OR b.is_deleted=false)
+      WHERE b.tenant_id=$1::uuid AND b.created_at::date BETWEEN $2 AND $3 AND (b.is_deleted IS NULL OR b.is_deleted=false)
         AND b.status NOT IN ('cancelled')
       GROUP BY b.package_name ORDER BY total_collected DESC
-    `, [dateFrom, dateTo]);
+    `, [tenantId, dateFrom, dateTo]);
     res.json({ rows, period: { from: dateFrom, to: dateTo } });
   } catch (err) { res.status(500).json({ error: "Failed to generate package sales" }); }
 });
@@ -226,8 +236,9 @@ router.get("/outstanding", requireAdmin as any, async (req: AuthenticatedRequest
   try {
     const { type = "receivable", from, to, branch_id } = req.query as Record<string, string>;
     if (type === "receivable") {
-      const params: any[] = [];
-      const filters: string[] = ["b.status NOT IN ('cancelled')", "(b.is_deleted IS NULL OR b.is_deleted=false)", "b.final_amount::numeric > b.paid_amount::numeric"];
+      const tenantId = getTenantId(req);
+      const params: any[] = [tenantId];
+      const filters: string[] = ["b.tenant_id=$1::uuid", "b.status NOT IN ('cancelled')", "(b.is_deleted IS NULL OR b.is_deleted=false)", "b.final_amount::numeric > b.paid_amount::numeric"];
       if (from) { params.push(from); filters.push(`b.created_at::date >= $${params.length}`); }
       if (to)   { params.push(to);   filters.push(`b.created_at::date <= $${params.length}`); }
       if (branch_id) { params.push(branch_id); filters.push(`b.branch_id=$${params.length}`); }
@@ -266,25 +277,26 @@ router.get("/profit-loss", requireAdmin as any, async (req: AuthenticatedRequest
     const dateFrom = from || new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
     const dateTo   = to   || new Date().toISOString().split("T")[0];
 
+    const tenantId = getTenantId(req);
     const [income, expenses, bookingRevenue] = await Promise.all([
       q(`
         SELECT a.name, a.code, COALESCE(SUM(jel.credit - jel.debit),0)::numeric AS amount
         FROM accounts a JOIN journal_entry_lines jel ON jel.account_id=a.id
-        JOIN journal_entries je ON je.id=jel.journal_entry_id AND je.date BETWEEN $1 AND $2
+        JOIN journal_entries je ON je.id=jel.journal_entry_id AND je.tenant_id=$3::uuid AND je.date BETWEEN $1 AND $2
         WHERE a.type='income'
         GROUP BY a.id, a.name, a.code ORDER BY amount DESC
-      `, [dateFrom, dateTo]),
+      `, [dateFrom, dateTo, tenantId]),
       q(`
         SELECT a.name, a.code, COALESCE(SUM(jel.debit - jel.credit),0)::numeric AS amount
         FROM accounts a JOIN journal_entry_lines jel ON jel.account_id=a.id
-        JOIN journal_entries je ON je.id=jel.journal_entry_id AND je.date BETWEEN $1 AND $2
+        JOIN journal_entries je ON je.id=jel.journal_entry_id AND je.tenant_id=$3::uuid AND je.date BETWEEN $1 AND $2
         WHERE a.type='expense'
         GROUP BY a.id, a.name, a.code ORDER BY amount DESC
-      `, [dateFrom, dateTo]),
+      `, [dateFrom, dateTo, tenantId]),
       q1(`
         SELECT COALESCE(SUM(pt.amount::numeric),0) AS total
-        FROM payment_transactions pt WHERE pt.payment_date::date BETWEEN $1 AND $2 AND pt.is_deleted=false
-      `, [dateFrom, dateTo]),
+        FROM payment_transactions pt WHERE pt.tenant_id=$3::uuid AND pt.payment_date::date BETWEEN $1 AND $2 AND pt.is_deleted=false
+      `, [dateFrom, dateTo, tenantId]),
     ]);
 
     const totalIncome = income.reduce((s, r) => s + Number(r.amount), 0) || Number(bookingRevenue?.total ?? 0);
@@ -304,14 +316,15 @@ router.get("/profit-loss", requireAdmin as any, async (req: AuthenticatedRequest
 router.get("/monthly-trend", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const months = Number(req.query.months ?? 12);
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT TO_CHAR(DATE_TRUNC('month', pt.payment_date::date), 'YYYY-MM') AS month,
         COALESCE(SUM(pt.amount::numeric),0)::numeric AS revenue,
         COUNT(DISTINCT pt.booking_id)::int AS bookings
       FROM payment_transactions pt
-      WHERE pt.payment_date::date >= CURRENT_DATE - (${months} || ' months')::INTERVAL AND pt.is_deleted=false
+      WHERE pt.tenant_id=$1::uuid AND pt.payment_date::date >= CURRENT_DATE - (${months} || ' months')::INTERVAL AND pt.is_deleted=false
       GROUP BY DATE_TRUNC('month', pt.payment_date::date) ORDER BY month ASC
-    `);
+    `, [tenantId]);
 
     const expRows = await q(`
       SELECT TO_CHAR(DATE_TRUNC('month', date::date), 'YYYY-MM') AS month,

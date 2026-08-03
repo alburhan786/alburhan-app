@@ -4,6 +4,7 @@ import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "..
 import { randomUUID } from "crypto";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);

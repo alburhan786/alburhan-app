@@ -8,6 +8,7 @@ import { generateHotelVoucherPdf } from "../lib/hotelVoucherPdf.js";
 import { generateRoomAllocationPdf } from "../lib/roomAllocationPdf.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

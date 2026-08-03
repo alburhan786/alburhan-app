@@ -4,6 +4,7 @@ import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { retryNotification, EVENT_TYPES, CHANNELS, sendBulkNotification, type Channel } from "../lib/notificationEngine.js";
 import { randomUUID } from "crypto";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -75,14 +76,15 @@ async function seedEmailTemplates() {
 })();
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
-router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/stats", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const today = new Date().toISOString().split("T")[0];
     const [todayRes, deliveredRes, failedRes, pendingRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE created_at >= $1`, [`${today}T00:00:00Z`]),
-      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE status='sent' AND created_at >= $1`, [`${today}T00:00:00Z`]),
-      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE status='failed' AND created_at >= $1`, [`${today}T00:00:00Z`]),
-      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE status='pending'`),
+      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE tenant_id=$2::uuid AND created_at >= $1`, [`${today}T00:00:00Z`, tenantId]),
+      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE tenant_id=$2::uuid AND status='sent' AND created_at >= $1`, [`${today}T00:00:00Z`, tenantId]),
+      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE tenant_id=$2::uuid AND status='failed' AND created_at >= $1`, [`${today}T00:00:00Z`, tenantId]),
+      pool.query(`SELECT COUNT(*) FROM notification_logs WHERE tenant_id=$1::uuid AND status='pending'`, [tenantId]),
     ]);
     const sent = Number(todayRes.rows[0]?.count ?? 0);
     const delivered = Number(deliveredRes.rows[0]?.count ?? 0);
@@ -91,8 +93,8 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
     const deliveryRate = sent > 0 ? Math.round((delivered / sent) * 100) : 0;
 
     const byChannel = await pool.query(
-      `SELECT channel, status, COUNT(*) as cnt FROM notification_logs WHERE created_at >= $1 GROUP BY channel, status`,
-      [`${today}T00:00:00Z`]
+      `SELECT channel, status, COUNT(*) as cnt FROM notification_logs WHERE tenant_id=$2::uuid AND created_at >= $1 GROUP BY channel, status`,
+      [`${today}T00:00:00Z`, tenantId]
     );
     const channelStats: Record<string, Record<string, number>> = {};
     for (const row of byChannel.rows) {
@@ -100,8 +102,14 @@ router.get("/stats", requireAdmin as any, async (_req: AuthenticatedRequest, res
       channelStats[row.channel][row.status] = Number(row.cnt);
     }
 
-    const allTime = await pool.query(`SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status='sent') as total_sent FROM notification_logs`);
-    const campaignCount = await pool.query(`SELECT COUNT(*) FROM notification_campaigns`).catch(() => ({ rows: [{ count: 0 }] }));
+    const allTime = await pool.query(
+      `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE status='sent') as total_sent FROM notification_logs WHERE tenant_id=$1::uuid`,
+      [tenantId]
+    );
+    const campaignCount = await pool.query(
+      `SELECT COUNT(*) FROM notification_campaigns WHERE tenant_id=$1::uuid`,
+      [tenantId]
+    ).catch(() => ({ rows: [{ count: 0 }] }));
 
     res.json({ sent, delivered, failed, pending, deliveryRate, channelStats, allTime: allTime.rows[0], campaignCount: Number(campaignCount.rows[0]?.count ?? 0) });
   } catch (err) {
@@ -138,9 +146,11 @@ router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) 
     const limitParam = Number(req.query.limit || req.query.limit || 30);
     const offsetParam = Number(req.query.offset || (pageParam - 1) * limitParam);
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-    let idx = 1;
+    const tenantId = getTenantId(req);
+    // tenant_id is always $1; dynamic filters start at $2
+    const conditions: string[] = [`nl.tenant_id=$1::uuid`];
+    const params: unknown[] = [tenantId];
+    let idx = 2;
 
     if (status)   { conditions.push(`nl.status=$${idx++}`); params.push(status); }
     if (channel)  { conditions.push(`nl.channel=$${idx++}`); params.push(channel); }
@@ -162,7 +172,7 @@ router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) 
       params.push(error_code);
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where = `WHERE ${conditions.join(" AND ")}`;
     const [result, countRes] = await Promise.all([
       pool.query(
         `SELECT nl.*, b.booking_number, b.customer_name
@@ -186,9 +196,13 @@ router.get("/logs", requireAdmin as any, async (req: AuthenticatedRequest, res) 
 });
 
 // ── Automation Settings ───────────────────────────────────────────────────────
-router.get("/settings", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/settings", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM notification_settings ORDER BY event_type, channel`);
+    const tenantId = getTenantId(req);
+    const result = await pool.query(
+      `SELECT * FROM notification_settings WHERE tenant_id=$1::uuid ORDER BY event_type, channel`,
+      [tenantId]
+    );
     res.json({ settings: result.rows });
   } catch (err) {
     res.status(500).json({ message: "Failed to get settings" });
@@ -217,10 +231,11 @@ router.put("/settings", requireAdmin as any, async (req: AuthenticatedRequest, r
 // ── Templates ─────────────────────────────────────────────────────────────────
 router.get("/templates", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { channel } = req.query as any;
     const result = channel
-      ? await pool.query(`SELECT * FROM notification_templates WHERE channel=$1 ORDER BY event_type, name`, [channel])
-      : await pool.query(`SELECT * FROM notification_templates ORDER BY event_type, channel, name`);
+      ? await pool.query(`SELECT * FROM notification_templates WHERE tenant_id=$2::uuid AND channel=$1 ORDER BY event_type, name`, [channel, tenantId])
+      : await pool.query(`SELECT * FROM notification_templates WHERE tenant_id=$1::uuid ORDER BY event_type, channel, name`, [tenantId]);
     res.json({ templates: result.rows });
   } catch (err) {
     res.status(500).json({ message: "Failed to get templates" });
@@ -302,7 +317,11 @@ router.put("/templates/:id", requireAdmin as any, async (req: AuthenticatedReque
 
 router.delete("/templates/:id", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    await pool.query(`DELETE FROM notification_templates WHERE id=$1`, [req.params.id]);
+    const tenantId = getTenantId(req);
+    await pool.query(
+      `DELETE FROM notification_templates WHERE id=$1 AND tenant_id=$2::uuid`,
+      [req.params.id, tenantId]
+    );
     res.json({ message: "Template deleted" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete template" });
@@ -312,7 +331,11 @@ router.delete("/templates/:id", requireAdmin as any, async (req: AuthenticatedRe
 // ── Per-template DLT test ─────────────────────────────────────────────────────
 router.post("/templates/:id/test", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const tplRow = await pool.query(`SELECT * FROM notification_templates WHERE id=$1`, [req.params.id]);
+    const tenantId = getTenantId(req);
+    const tplRow = await pool.query(
+      `SELECT * FROM notification_templates WHERE id=$1 AND tenant_id=$2::uuid`,
+      [req.params.id, tenantId]
+    );
     if (!tplRow.rows[0]) return void res.status(404).json({ ok: false, message: "Template not found" });
     const tpl = tplRow.rows[0];
 

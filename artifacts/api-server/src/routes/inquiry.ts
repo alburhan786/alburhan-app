@@ -4,6 +4,7 @@ import { db, inquiriesTable } from "@workspace/db";
 import { SubmitInquiryBody } from "@workspace/api-zod";
 import { sendWhatsApp } from "../lib/notifications.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

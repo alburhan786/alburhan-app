@@ -11,6 +11,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { addTimeline } from "../lib/workflowEngine.js";
 import { broadcastToInbox } from "./inbox.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

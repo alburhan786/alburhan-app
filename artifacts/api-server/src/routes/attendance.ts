@@ -4,6 +4,7 @@ import { db, attendanceEventsTable, attendanceLogsTable, pilgrimsTable } from "@
 import { eq, and, desc, inArray, or } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import * as XLSX from "xlsx";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 // Exempt token-based scan endpoints (requireAdminOrToken) from admin-session-only RBAC

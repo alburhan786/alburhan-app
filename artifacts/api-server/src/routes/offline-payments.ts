@@ -10,6 +10,7 @@ import {
   sendOfflinePaymentRejectedNotification,
   sendOfflinePaymentSubmittedNotification,
 } from "../lib/notifications.js";
+import { getTenantId } from "../lib/tenantContext.js";
 import { processPaymentSuccessNotifications } from "./payments.js";
 
 const router = Router();

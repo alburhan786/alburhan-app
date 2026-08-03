@@ -7,6 +7,7 @@ import { auditLog } from "../lib/audit.js";
 import { isPlaceholderKey } from "../lib/keyValidation.js";
 import axios from "axios";
 import nodemailer from "nodemailer";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
