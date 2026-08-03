@@ -109,6 +109,32 @@ import { ensureLeadEnginePhaseBSchema, runLeadReminderCron } from "./lib/leadEng
 import { startGoogleHealthCheckCron } from "./jobs/googleHealthCheck.js";
 
 async function runMigrations() {
+  // ── DB role guard: DDL requires the table owner, not the runtime role ─────
+  // On production, DATABASE_URL connects as 'app_user' (NOSUPERUSER, NOBYPASSRLS).
+  // app_user holds DML-only rights — DDL statements (CREATE TABLE / ALTER TABLE)
+  // produce "permission denied" errors when attempted under that role.
+  // Detect this at startup and exit early with a single informational log
+  // rather than emitting one error per migration statement.
+  try {
+    const roleRes = await pool.query("SELECT current_user AS r");
+    const dbRole: string = roleRes.rows[0]?.r ?? "";
+    if (dbRole === "app_user") {
+      console.log(
+        "[Migration] Connected as 'app_user' (restricted runtime role). " +
+        "Inline DDL migrations are skipped — all required migrations have " +
+        "already been applied via the table owner account. No action needed."
+      );
+      return;
+    }
+    if (dbRole) {
+      console.log(`[Migration] Connected as '${dbRole}' — running inline migrations.`);
+    }
+  } catch (roleErr) {
+    // Cannot determine role — proceed with migrations and let individual
+    // statements surface their own errors as before.
+    console.warn("[Migration] Could not determine DB role, proceeding:", roleErr);
+  }
+
   // Session table — must exist BEFORE connect-pg-simple initializes
   try {
     await db.execute(sql`

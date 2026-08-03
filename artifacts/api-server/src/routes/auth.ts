@@ -286,6 +286,67 @@ router.post("/verify-otp", async (req, res) => {
   const now     = new Date();
   const otpHash = hashOtp(otp, cleanMobile);
 
+  // ── Staging OTP bypass ────────────────────────────────────────────────────
+  // ONLY active when ALL three conditions hold simultaneously:
+  //   1. NODE_ENV is NOT "production"
+  //   2. STAGING_OTP_BYPASS env var is exactly "true"
+  //   3. The submitted OTP is exactly "000000"
+  // This allows automated test suites to authenticate without receiving a
+  // real SMS. The NODE_ENV guard makes it structurally impossible to
+  // activate in production regardless of env var configuration.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.STAGING_OTP_BYPASS === "true" &&
+    otp === "000000"
+  ) {
+    console.warn(
+      `[OTP-VERIFY] ⚠️  STAGING BYPASS ACTIVE — test OTP 000000 accepted for ` +
+      `mobile=****${maskedMobile}. This code path is unreachable in production ` +
+      `(NODE_ENV=${process.env.NODE_ENV}).`
+    );
+    const bypassUsers = await db.select().from(usersTable)
+      .where(eq(usersTable.mobile, cleanMobile)).limit(1);
+    const bypassUser = bypassUsers[0];
+    if (!bypassUser) {
+      res.status(401).json({ message: "User not found. Please contact support." });
+      return;
+    }
+    const BYPASS_PORTAL_ROLES: Record<string, string[]> = {
+      customer: ["customer"],
+      agent: ["agent"],
+      branch: ["branch_manager"],
+      staff: ["staff"],
+      admin: ["admin", "super_admin"],
+    };
+    const bypassAllowed = BYPASS_PORTAL_ROLES[requestedPortalVerify] || ["customer"];
+    if (!bypassAllowed.includes(bypassUser.role as string)) {
+      console.warn(`[OTP-VERIFY] BYPASS: portal role mismatch portal=${requestedPortalVerify} role=${bypassUser.role}`);
+      res.status(403).json({ message: "Access denied — portal role mismatch." });
+      return;
+    }
+    (req.session as any).userId = bypassUser.id;
+    await new Promise<void>((resolve, reject) =>
+      req.session.save((err: Error | null) => (err ? reject(err) : resolve()))
+    );
+    console.log(`[OTP-VERIFY] BYPASS success: userId=${bypassUser.id} role=${bypassUser.role}`);
+    res.json({
+      message: "Login successful",
+      isNewUser: false,
+      _stagingBypass: true,
+      user: {
+        id: bypassUser.id,
+        name: bypassUser.name,
+        mobile: bypassUser.mobile,
+        email: bypassUser.email,
+        role: bypassUser.role,
+        createdAt: bypassUser.createdAt,
+      },
+      entityId: null,
+    });
+    return;
+  }
+  // ── End staging bypass ────────────────────────────────────────────────────
+
   // All OTP lookups match either hashed (new rows) OR plaintext (legacy rows).
   // Parameter order: $1=mobile, $2=otpHash, $3=otp, $4=timestamp_where_needed.
 

@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { pool } from "@workspace/db";
-import { DEFAULT_TENANT_ID } from "@workspace/db";
+import { pool, DEFAULT_TENANT_ID } from "@workspace/db";
 import { hasPermission, isValidAdminRole, type AdminRole, type Module, type Action } from "./rbac.js";
 
 export interface AuthenticatedRequest extends Request {
