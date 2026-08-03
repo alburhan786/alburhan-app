@@ -16,10 +16,28 @@ import Contact from "@/pages/public/Contact";
 import { PrivacyPolicy, TermsAndConditions, CancellationPolicy, RefundPolicy } from "@/pages/public/Legal";
 import Invoice from "@/pages/public/Invoice";
 import PaymentPage from "@/pages/public/PaymentPage";
+import PublicAgreementSign from "@/pages/public/PublicAgreementSign";
 import Login from "@/pages/auth/Login";
 import CustomerDashboard from "@/pages/customer/Dashboard";
 import DocumentCenter from "@/pages/customer/DocumentCenter";
 import SupportCenter from "@/pages/customer/SupportCenter";
+// Customer Portal 2.0
+import OverviewPage from "@/pages/customer/OverviewPage";
+import ProfilePage from "@/pages/customer/ProfilePage";
+import MyBookingPage from "@/pages/customer/MyBookingPage";
+import BookingDetailPage from "@/pages/customer/BookingDetailPage";
+import TravelTimelinePage from "@/pages/customer/TravelTimelinePage";
+import PaymentsPage from "@/pages/customer/PaymentsPage";
+import InvoicesReceiptsPage from "@/pages/customer/InvoicesReceiptsPage";
+import AgreementPage from "@/pages/customer/AgreementPage";
+import DocumentCenterPage from "@/pages/customer/DocumentCenterPage";
+import FlightHotelPage from "@/pages/customer/FlightHotelPage";
+import RoomBusPage from "@/pages/customer/RoomBusPage";
+import CommunicationsPage from "@/pages/customer/CommunicationsPage";
+import NotificationsPage from "@/pages/customer/NotificationsPage";
+import ResourcesPage from "@/pages/customer/ResourcesPage";
+import EmergencyPage from "@/pages/customer/EmergencyPage";
+import CustomerPortalControls from "@/pages/admin/CustomerPortalControls";
 import SupportManager from "@/pages/admin/SupportManager";
 import SuperDashboard from "@/pages/admin/SuperDashboard";
 import PilgrimReports from "@/pages/admin/PilgrimReports";
@@ -34,6 +52,7 @@ import SupplierManager from "@/pages/admin/SupplierManager";
 import GroupTracking from "@/pages/admin/GroupTracking";
 import KnowledgeCenter from "@/pages/public/KnowledgeCenter";
 import AIOperationsCenter from "@/pages/admin/AIOperationsCenter";
+import AIAssistantControlCenter from "@/pages/admin/AIAssistantControlCenter";
 import ExecutiveDashboard from "@/pages/admin/ExecutiveDashboard";
 import BookingFunnel from "@/pages/admin/BookingFunnel";
 import RevenueAnalytics from "@/pages/admin/RevenueAnalytics";
@@ -84,6 +103,7 @@ import PaymentAnalytics from "@/pages/admin/PaymentAnalytics";
 import PaymentTrash from "@/pages/admin/PaymentTrash";
 import SystemHealth from "@/pages/admin/SystemHealth";
 import OTPDebug from "@/pages/admin/OTPDebug";
+import OtpDiagnostics from "@/pages/admin/OtpDiagnostics";
 import PrintCenter from "@/pages/admin/PrintCenter";
 import BroadcastManager from "@/pages/admin/BroadcastManager";
 import KYCManager from "@/pages/admin/KYCManager";
@@ -238,7 +258,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   if (role === 'branch_manager') return <Redirect to="/branch/dashboard" />;
   if (role === 'agent') return <Redirect to="/agent/dashboard" />;
   if (role === 'staff') return <Redirect to="/staff/dashboard" />;
-  if (role !== 'admin') return <Redirect to="/customer/dashboard" />;
+  if (role !== 'admin' && role !== 'super_admin') return <Redirect to="/customer/dashboard" />;
   return <Component />;
 }
 
@@ -312,23 +332,45 @@ function Router() {
       {/* Public Agreement Verification */}
       <Route path="/verify-agreement/:token" component={VerifyAgreement} />
 
+      {/* Public Agreement Signing — no auth required, link sent via WhatsApp/SMS/Email */}
+      <Route path="/sign-agreement/:token" component={PublicAgreementSign} />
+
       {/* Short portal aliases — redirect to full paths */}
       <Route path="/branch" component={() => <Redirect to="/branch/dashboard" />} />
       <Route path="/agent" component={() => <Redirect to="/agent/dashboard" />} />
       <Route path="/staff" component={() => <Redirect to="/staff/dashboard" />} />
-      <Route path="/customer" component={() => <Redirect to="/customer/dashboard" />} />
+      <Route path="/customer" component={() => <Redirect to="/customer/overview" />} />
 
       {/* Portal Routes — Branch Manager, Agent, Staff */}
       <Route path="/branch/dashboard" component={() => <BranchRoute component={BranchPortal} />} />
       <Route path="/agent/dashboard" component={() => <AgentRoute component={AgentPortal} />} />
       <Route path="/staff/dashboard" component={() => <StaffRoute component={StaffPortal} />} />
 
-      {/* Customer Routes */}
-      <Route path="/customer/dashboard" component={() => <CustomerRoute component={CustomerDashboard} />} />
+      {/* Customer Routes — legacy dashboard (keep for backwards compat, redirects to overview) */}
+      <Route path="/customer/dashboard" component={() => <Redirect to="/customer/overview" />} />
       <Route path="/customer/documents" component={() => <CustomerRoute component={DocumentCenter} />} />
       <Route path="/customer/support" component={() => <CustomerRoute component={SupportCenter} />} />
       <Route path="/kyc" component={() => <CustomerRoute component={KYCPage} />} />
       <Route path="/agreement/:id/sign" component={() => <CustomerRoute component={AgreementSigning} />} />
+
+      {/* ── Customer Portal 2.0 ── */}
+      <Route path="/customer/overview"       component={() => <CustomerRoute component={OverviewPage} />} />
+      <Route path="/customer/profile"        component={() => <CustomerRoute component={ProfilePage} />} />
+      <Route path="/customer/my-booking"     component={() => <CustomerRoute component={MyBookingPage} />} />
+      <Route path="/customer/notifications"  component={() => <CustomerRoute component={NotificationsPage} />} />
+      <Route path="/customer/resources"      component={() => <CustomerRoute component={ResourcesPage} />} />
+      <Route path="/customer/emergency"      component={() => <CustomerRoute component={EmergencyPage} />} />
+
+      {/* Booking-scoped routes */}
+      <Route path="/customer/booking/:bookingNumber"                component={() => <CustomerRoute component={BookingDetailPage} />} />
+      <Route path="/customer/booking/:bookingNumber/timeline"       component={() => <CustomerRoute component={TravelTimelinePage} />} />
+      <Route path="/customer/booking/:bookingNumber/payments"       component={() => <CustomerRoute component={PaymentsPage} />} />
+      <Route path="/customer/booking/:bookingNumber/invoices"       component={() => <CustomerRoute component={InvoicesReceiptsPage} />} />
+      <Route path="/customer/booking/:bookingNumber/agreement"      component={() => <CustomerRoute component={AgreementPage} />} />
+      <Route path="/customer/booking/:bookingNumber/documents"      component={() => <CustomerRoute component={DocumentCenterPage} />} />
+      <Route path="/customer/booking/:bookingNumber/flights-hotels" component={() => <CustomerRoute component={FlightHotelPage} />} />
+      <Route path="/customer/booking/:bookingNumber/room-bus"       component={() => <CustomerRoute component={RoomBusPage} />} />
+      <Route path="/customer/booking/:bookingNumber/communications" component={() => <CustomerRoute component={CommunicationsPage} />} />
 
       {/* Admin Routes */}
       <Route path="/admin/dashboard" component={() => <AdminRoute component={AdminDashboard} />} />
@@ -407,6 +449,7 @@ function Router() {
       <Route path="/admin/suppliers" component={() => <AdminRoute component={SupplierManager} />} />
       <Route path="/admin/group-tracking" component={() => <AdminRoute component={GroupTracking} />} />
       <Route path="/admin/ai-ops" component={() => <AdminRoute component={AIOperationsCenter} />} />
+      <Route path="/admin/ai-assistant-control" component={() => <AdminRoute component={AIAssistantControlCenter} />} />
       <Route path="/admin/executive" component={() => <AdminRoute component={ExecutiveDashboard} />} />
       <Route path="/admin/funnel" component={() => <AdminRoute component={BookingFunnel} />} />
       <Route path="/admin/revenue" component={() => <AdminRoute component={RevenueAnalytics} />} />
@@ -438,6 +481,7 @@ function Router() {
       <Route path="/admin/sms-test" component={() => <AdminRoute component={SmsTestPage} />} />
       <Route path="/admin/system-health" component={() => <AdminRoute component={SystemHealth} />} />
       <Route path="/admin/otp-debug" component={() => <AdminRoute component={OTPDebug} />} />
+      <Route path="/admin/otp-diagnostics" component={() => <AdminRoute component={OtpDiagnostics} />} />
       <Route path="/admin/user-roles" component={() => <AdminRoute component={UserRolesManager} />} />
       <Route path="/admin/notifications" component={() => <AdminRoute component={NotificationCenter} />} />
       <Route path="/admin/notification-logs" component={() => <AdminRoute component={NotificationLogs} />} />
@@ -479,6 +523,7 @@ function Router() {
       <Route path="/admin/branch-login"     component={() => <AdminRoute component={BranchLoginManager} />} />
       <Route path="/admin/agent-login"      component={() => <AdminRoute component={AgentLoginManager} />} />
       <Route path="/admin/customer360"       component={() => <AdminRoute component={Customer360} />} />
+      <Route path="/admin/customer-portal-controls" component={() => <AdminRoute component={CustomerPortalControls} />} />
       <Route path="/admin/crm"              component={() => <AdminRoute component={CRMDashboard} />} />
       <Route path="/admin/lead-pipeline"    component={() => <AdminRoute component={LeadPipeline} />} />
       <Route path="/admin/lead-inbox"       component={() => <AdminRoute component={LeadInbox} />} />

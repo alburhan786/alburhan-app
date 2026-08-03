@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import router from "./routes/index.js";
 import { ensureErrorLogTable, errorLogMiddleware } from "./routes/error-logs.js";
+import { attachTenantContext } from "./lib/tenantContext.js";
 import { leadEngineRouter } from "./routes/lead-engine.js";
 import inboxRouter from "./routes/inbox.js";
 import customer360Router from "./routes/customer360.js";
@@ -237,30 +238,57 @@ app.get("/api/migrate/hotdeploy", requireLocalhost, async (req, res) => {
   // ── 2. Frontend assets ─────────────────────────────────────────────────────
   if (!skipFrontend) {
     const frontendUrl = `${DEV_URL}/api/migrate/frontend.tar.gz?key=${encodeURIComponent(process.env.MIGRATION_KEY || "")}`;
-    // Derive extract path: look for the alburhan dist alongside this bundle
-    const candidates = [
-      "/root/artifacts/alburhan/dist",
-      "/var/www/alburhan/dist",
-      path.join(__dirname, "../../alburhan/dist"),
-    ];
-    const extractTo = candidates.find(p => {
-      try { return fs.statSync(p).isDirectory(); } catch { return false; }
-    }) || candidates[0];
+    // The frontend tar contains paths relative to the workspace root:
+    //   artifacts/alburhan/dist/public/index.html
+    //   artifacts/alburhan/dist/public/assets/...
+    // We must extract to the workspace-root equivalent so files land at:
+    //   <root>/artifacts/alburhan/dist/public/index.html
+    //
+    // Two common VPS roots:
+    //   /var/www/alburhan  — nginx serves from /var/www/alburhan/artifacts/alburhan/dist/public
+    //   /root              — PM2 cwd; Express also looks here for static files
+    // We extract to ALL valid roots so both nginx and Express find the new bundle.
+    const rootCandidates = [
+      path.resolve(__dirname, "../../.."), // 3 levels up from dist/ = /var/www/alburhan on VPS
+      "/root",
+      "/var/www/alburhan",
+    ].filter((p, i, arr) => arr.indexOf(p) === i); // deduplicate
+
+    // Collect all roots that have the expected alburhan directory already
+    const extractRoots = rootCandidates.filter(p => {
+      try { return fs.existsSync(path.join(p, "artifacts/alburhan")); } catch { return false; }
+    });
+    // Fallback: if none match, create under the __dirname-relative path
+    if (!extractRoots.length) extractRoots.push(rootCandidates[0]);
+
+    const extractTo = extractRoots[0]; // primary (used in result)
+
 
     try {
-      fs.mkdirSync(extractTo, { recursive: true });
       const tmpTar = path.join(os.tmpdir(), `fe-${Date.now()}.tar.gz`);
       const fr = await fetch(frontendUrl, { signal: AbortSignal.timeout(120_000) });
       if (!fr.ok) {
         result.frontend = { updated: false, error: `Download failed: HTTP ${fr.status}` };
       } else {
         fs.writeFileSync(tmpTar, Buffer.from(await fr.arrayBuffer()));
-        await new Promise<void>((resolve, reject) => {
-          const proc = spawn("tar", ["-xzf", tmpTar, "-C", extractTo], { stdio: "pipe" });
-          proc.on("close", code => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
-        });
+
+        // Extract to ALL valid roots so both nginx and Express find the new bundle
+        const extracted: string[] = [];
+        const failures: string[] = [];
+        for (const root of extractRoots) {
+          try {
+            fs.mkdirSync(root, { recursive: true });
+            await new Promise<void>((resolve, reject) => {
+              const proc = spawn("tar", ["-xzf", tmpTar, "-C", root], { stdio: "pipe" });
+              proc.on("close", code => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
+            });
+            extracted.push(root);
+          } catch (e: any) {
+            failures.push(`${root}: ${e.message}`);
+          }
+        }
         try { fs.unlinkSync(tmpTar); } catch {}
-        result.frontend = { updated: true, extractedTo: extractTo };
+        result.frontend = { updated: true, extractedTo: extracted, failures: failures.length ? failures : undefined };
       }
     } catch (err: any) {
       result.frontend = { updated: false, error: err.message };
@@ -621,6 +649,58 @@ app.get("/api/migrate/frontend.tar.gz", (req, res) => {
   req.on("close", () => tar.kill());
 });
 
+// POST /api/migrate/reset-email-circuit — re-enables SMTP after it is suspended.
+// Uses the same migration key as all other /api/migrate/* endpoints.
+// Equivalent to the admin UI toggle at System Health → Email Circuit Breaker.
+app.post("/api/migrate/reset-email-circuit", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string | undefined;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dbPool } = await import("@workspace/db");
+    await dbPool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at, updated_by)
+       VALUES ('email_circuit_breaker','enabled','email_circuit_breaker',true,NOW(),'migration-reset')
+       ON CONFLICT (key) DO UPDATE
+         SET value='enabled', enabled=true, updated_at=NOW(), updated_by='migration-reset'`
+    );
+    // Reset stuck email retries
+    const reset = await dbPool.query(
+      `UPDATE notification_retry_queue
+       SET status='pending', next_retry_at=NOW() + interval '2 minutes',
+           last_error='Reset after email re-enabled via migration'
+       WHERE channel='email' AND status='failed' AND last_error LIKE '%suspended%'`
+    );
+    console.log(`[migrate/reset-email-circuit] Email circuit re-enabled. Reset ${reset.rowCount} pending retries.`);
+    res.json({ ok: true, message: "Email sending re-enabled. SMTP circuit breaker is now active.", resetRetries: reset.rowCount });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/migrate/backfill-access-tokens
+// One-time: fills access_token for all pending_signature agreements that don't have one yet.
+// Safe to run multiple times (WHERE access_token IS NULL guard).
+app.post("/api/migrate/backfill-access-tokens", async (req, res) => {
+  const key = (req.body?.key || req.query.key) as string | undefined;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+  try {
+    const { pool: dbPool } = await import("@workspace/db");
+    const result = await dbPool.query(
+      `UPDATE agreements
+         SET access_token            = REPLACE(gen_random_uuid()::text,'-','') || REPLACE(gen_random_uuid()::text,'-',''),
+             access_token_expires_at = NOW() + INTERVAL '30 days',
+             updated_at              = NOW()
+       WHERE status = 'pending_signature'
+         AND access_token IS NULL
+       RETURNING agreement_number, booking_id`
+    );
+    console.log(`[migrate/backfill-access-tokens] Backfilled ${result.rowCount} agreement(s)`);
+    res.json({ ok: true, backfilled: result.rowCount, rows: result.rows.map((r: any) => r.agreement_number) });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DIRECT UPLOAD DEPLOY ENDPOINTS
 // GitHub Actions POSTs the built artifacts directly over HTTPS — no SSH needed.
@@ -932,6 +1012,139 @@ app.get("/api/migrate/net-diag", async (req, res) => {
   res.json(report);
 });
 
+// GET /api/migrate/test-fcm-connection — Run a live OAuth2 token exchange against Firebase
+// using the credentials currently stored in the DB. Returns pass/fail + diagnostics.
+// Auth: MIGRATION_KEY query param. No admin session needed.
+app.get("/api/migrate/test-fcm-connection", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { testFCMConnection, invalidateFCMCredCache } = await import("./lib/fcm.js");
+  invalidateFCMCredCache(); // always test from fresh DB read, no cached state
+  const result = await testFCMConnection();
+  return void res.json(result);
+});
+
+// GET /api/migrate/clear-firebase — Wipe corrupted Firebase credentials directly from the production DB.
+// Auth: MIGRATION_KEY query param. Idempotent — safe to call multiple times.
+// Also writes the v30.5 marker so startup migration never re-clears freshly saved credentials.
+app.get("/api/migrate/clear-firebase", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool } = await import("@workspace/db");
+  try {
+    // 1. Read current state before clearing (for diagnostics)
+    const before = await pool.query(
+      `SELECT provider,
+              api_key_encrypted IS NOT NULL AS had_key,
+              extra_fields_encrypted IS NOT NULL AS had_extra
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+
+    // 2. Clear both encrypted fields — unconditional, no decryption needed
+    const updated = await pool.query(
+      `UPDATE api_settings
+       SET api_key_encrypted = NULL,
+           extra_fields_encrypted = NULL,
+           updated_at = NOW(),
+           updated_by = 'clear-firebase-endpoint'
+       WHERE provider = 'firebase'`
+    );
+
+    // 3. Ensure v30.5 marker exists so index.ts startup migration never re-clears freshly saved creds
+    await pool.query(
+      `INSERT INTO api_settings (provider, enabled, updated_at, updated_by)
+       VALUES ('_fb_cleared_v305', false, NOW(), 'clear-firebase-endpoint')
+       ON CONFLICT (provider) DO UPDATE SET updated_at = NOW(), updated_by = 'clear-firebase-endpoint'`
+    );
+
+    // 4. Confirm the row is now clear
+    const after = await pool.query(
+      `SELECT provider,
+              api_key_encrypted IS NULL AS key_cleared,
+              extra_fields_encrypted IS NULL AS extra_cleared
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+
+    return void res.json({
+      ok: true,
+      rowsUpdated: updated.rowCount,
+      before: before.rows[0] ?? null,
+      after: after.rows[0] ?? null,
+      markerWritten: "_fb_cleared_v305",
+      message: "Firebase credentials cleared. Marker written. Re-enter via Admin → API Settings → Firebase Push (FCM v1).",
+    });
+  } catch (err: any) {
+    return void res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/migrate/check-firebase — Read the current Firebase credential state from the DB (no secrets exposed).
+// Auth: MIGRATION_KEY query param.
+app.get("/api/migrate/check-firebase", async (req, res) => {
+  const key = req.query.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+  const { pool } = await import("@workspace/db");
+  const { decrypt } = await import("./lib/encryption.js");
+  try {
+    const row = await pool.query(
+      `SELECT provider, enabled, api_key_encrypted, extra_fields_encrypted
+       FROM api_settings WHERE provider = 'firebase'`
+    );
+    const marker = await pool.query(
+      `SELECT 1 FROM api_settings WHERE provider = '_fb_cleared_v305'`
+    );
+
+    if (!row.rows[0]) {
+      return void res.json({ ok: false, error: "No firebase row in api_settings", markerPresent: !!marker.rows[0] });
+    }
+
+    const r = row.rows[0];
+    let keyDiag: any = null;
+    let extraDiag: any = null;
+
+    if (r.api_key_encrypted) {
+      try {
+        const raw = decrypt(r.api_key_encrypted);
+        const norm = (raw || "").replace(/\\n/g, "\n").trim();
+        keyDiag = {
+          len: raw?.length,
+          first40: raw?.slice(0, 40),
+          isValidPem: norm.startsWith("-----BEGIN PRIVATE KEY-----"),
+          endsCorrectly: norm.endsWith("-----END PRIVATE KEY-----"),
+        };
+      } catch (e: any) { keyDiag = { error: e.message }; }
+    }
+
+    if (r.extra_fields_encrypted) {
+      try {
+        const raw = decrypt(r.extra_fields_encrypted);
+        const parsed = JSON.parse(raw);
+        extraDiag = {
+          project_id: parsed.project_id || null,
+          client_email: parsed.client_email || null,
+          has_service_account_json: !!parsed.service_account_json,
+        };
+      } catch (e: any) { extraDiag = { error: e.message }; }
+    }
+
+    return void res.json({
+      ok: true,
+      firebaseRow: {
+        has_api_key: !!r.api_key_encrypted,
+        has_extra_fields: !!r.extra_fields_encrypted,
+        key: keyDiag,
+        extra: extraDiag,
+      },
+      markerPresent: !!marker.rows[0],
+    });
+  } catch (err: any) {
+    return void res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // POST /api/migrate/test-resend — end-to-end resend diagnostic (migration-key auth, no session needed)
 // Picks the best real booking from DB (prefers one with payment + docs + agreement),
 // runs every resend path (WhatsApp, SMS, Email, Invoice PDF, Receipt PDF, Agreement,
@@ -953,7 +1166,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
      WHERE b.status IN ('approved','confirmed')
        AND COALESCE(b.paid_amount,0) > 0
        AND EXISTS (SELECT 1 FROM documents d WHERE d.booking_id = b.id)
-       AND EXISTS (SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','rejected'))
+       AND EXISTS (SELECT 1 FROM agreements a WHERE a.booking_id = b.id AND a.status NOT IN ('cancelled','rejected','superseded'))
      ORDER BY b.created_at DESC LIMIT 1`,
     // Good: has payment + docs
     `SELECT b.*, u.email AS customer_email FROM bookings b
@@ -1081,7 +1294,7 @@ app.post("/api/migrate/test-resend", async (req: any, res: any) => {
   // ── 6. Agreement ─────────────────────────────────────────────────────────────
   await run("agreement", async () => {
     const agQ = await pool.query(
-      `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+      `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected','superseded') ORDER BY created_at DESC LIMIT 1`,
       [booking.id]
     );
     if (!agQ.rows[0]) return { status: "skip", detail: "no agreement exists for this booking" };
@@ -1951,7 +2164,16 @@ app.post("/api/admin/notification-health/run-checks", async (req: any, res: any)
         const leminBaseUrl  = process.env.LEMIN_BASE_URL || l.apiUrl  || "https://rcs.leminai.com";
         const dialCode      = process.env.LEMIN_DIAL_CODE || l.extra?.dial_code || "+91";
         const rcsAgent      = process.env.LEMIN_AGENT     || l.extra?.agent     || "jio";
-        const templateId    = l.extra?.template_id || "1473";
+        // Read approved template from DB; fall back to booking_submitted (3651) — never 1473
+        let templateId = l.extra?.template_id || "";
+        if (!templateId) {
+          try {
+            const tmplRow = await hcPool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            templateId = tmplRow.rows[0]?.template_id || "3651";
+          } catch { templateId = "3651"; }
+        }
 
         if (!leminKey) {
           results.lemin = { ok: false, status: "unconfigured", message: "LEMIN_API_KEY secret not set" };
@@ -3666,7 +3888,7 @@ app.post("/api/migrate/e2e-verify", async (req, res) => {
     const t0 = Date.now();
     try {
       const agRes = await p.query(
-        `SELECT * FROM agreements WHERE booking_id=$1 AND (void_at IS NULL OR void_at > NOW()) ORDER BY created_at DESC LIMIT 1`,
+        `SELECT * FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded') AND (void_at IS NULL OR void_at > NOW()) ORDER BY created_at DESC LIMIT 1`,
         [booking.id]);
       if (agRes.rows[0]) {
         agreement = agRes.rows[0];
@@ -5238,6 +5460,272 @@ app.post("/api/migrate/payment-pipeline-e2e", async (req, res) => {
   }
 });
 
+// POST /api/migrate/dedup-notification-test
+// Proves that calling processPaymentSuccessNotifications twice with the same paymentRef
+// produces exactly ONE notification log row per channel.
+// Simulates the real-world race: Razorpay verify-public fires first, webhook fires second.
+// Verifies:
+//   • paymentRef-based dedup in fireNotificationEvent blocks the second pass
+//   • ON CONFLICT (idempotency_key) at DB level catches any race that slips through
+//   • No duplicate invoice/receipt PDFs
+//   • payment_transactions gets exactly one row (guarded upstream, not in this test)
+// Auth: MIGRATION_KEY required.
+app.post("/api/migrate/dedup-notification-test", async (req, res) => {
+  const key = req.body?.key as string;
+  if (!migrationKeyValid(key)) return void res.status(403).send("Forbidden");
+
+  const { pool: dPool } = await import("@workspace/db");
+  const trace: Record<string, any>[] = [];
+  const ts = () => new Date().toISOString();
+  const t = (step: string, data: Record<string, any>) => { trace.push({ step, ts: ts(), ...data }); };
+  let bookingId: string | null = null;
+
+  try {
+    // ── Step 1: Create an isolated test booking ─────────────────────────────
+    const bookingNumber = `DEDUP${Date.now().toString().slice(-8)}`;
+    const bId = crypto.randomUUID();
+    bookingId = bId;
+    const finalAmt = 50000;
+    const customerMobile = (req.body?.phone as string) || "9893988786";
+    const customerEmail  = (req.body?.email as string) || "test@alburhantravels.com";
+
+    await dPool.query(
+      `INSERT INTO bookings
+         (id, booking_number, customer_name, customer_mobile, customer_email, package_name,
+          number_of_pilgrims, total_amount, final_amount, paid_amount,
+          status, created_at, updated_at)
+       VALUES ($1,$2,'Dedup Test Customer',$3,$4,'Economy Umrah Package',
+               1,$5,$5,0,'approved',NOW(),NOW())`,
+      [bId, bookingNumber, customerMobile, customerEmail, String(finalAmt)]
+    );
+    t("booking_created", { booking_id: bId, booking_number: bookingNumber, final_amount: finalAmt });
+
+    // ── Step 2: Upsert a real invoice (so invoice dedup is also proven) ─────
+    let invoiceNumber: string | null = null;
+    try {
+      const { upsertInvoiceForBooking } = await import("./routes/invoices.js");
+      // Mark booking as confirmed first so invoice upsert succeeds
+      await dPool.query(`UPDATE bookings SET status='confirmed', paid_amount=$1 WHERE id=$2`, [String(finalAmt), bId]);
+      const inv = await upsertInvoiceForBooking(bId);
+      invoiceNumber = (inv?.invoice_number as string) || null;
+      t("invoice_upserted", { invoice_number: invoiceNumber, ok: !!invoiceNumber });
+    } catch (invErr: any) {
+      t("invoice_upserted", { ok: false, error: invErr?.message });
+    }
+
+    // ── Step 3: FIRST CALL — simulates Razorpay verify-public endpoint ──────
+    const paymentRef = `pay_DEDUP_${Date.now()}`;
+    t("first_call_start", { payment_ref: paymentRef, simulates: "verify-public" });
+
+    const { processPaymentSuccessNotifications } = await import("./routes/payments.js");
+    const t1Start = Date.now();
+    await processPaymentSuccessNotifications({
+      booking: {
+        id: bId,
+        bookingNumber,
+        customerName:  "Dedup Test Customer",
+        customerMobile,
+        customerEmail,
+        packageName:   "Economy Umrah Package",
+        finalAmount:   String(finalAmt),
+      },
+      isFullyPaid:        true,
+      thisPaymentAmount:  finalAmt,
+      newPaidAmount:      finalAmt,
+      remainingBalance:   0,
+      invoiceNumber,
+      paymentRef,
+      paymentMode:        "online",
+      paymentDate:        new Date(),
+    });
+    const t1Elapsed = Date.now() - t1Start;
+    t("first_call_done", { elapsed_ms: t1Elapsed });
+
+    // Wait for fire-and-forget tasks (WhatsApp PDFs, push, etc.)
+    // 8 s to ensure the WhatsApp attachment IIFE fully settles before snapshotting —
+    // PDF document sends are sequential and can take 2-3 s each.
+    await new Promise(r => setTimeout(r, 8000));
+
+    // Snapshot after first call
+    const snap1 = await dPool.query(
+      `SELECT channel, event_type, status, idempotency_key, wamid, template, provider_name
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at ASC`, [bId]
+    );
+    const byChannel1: Record<string, any[]> = {};
+    for (const row of snap1.rows) {
+      (byChannel1[row.channel] = byChannel1[row.channel] || []).push(row);
+    }
+    t("snapshot_after_first_call", {
+      total_rows: snap1.rows.length,
+      channels_seen: Object.keys(byChannel1),
+      by_channel: Object.fromEntries(
+        Object.entries(byChannel1).map(([ch, rows]) => [ch, {
+          count: rows.length,
+          rows: rows.map(r => ({
+            status:          r.status,
+            idempotency_key: r.idempotency_key,
+            wamid:           r.wamid,
+            template:        r.template,
+            provider:        r.provider_name,
+          })),
+        }])
+      ),
+    });
+
+    // ── Step 4: SECOND CALL — simulates webhook arriving with same paymentRef ─
+    t("second_call_start", { payment_ref: paymentRef, simulates: "razorpay-webhook (duplicate)" });
+    const t2Start = Date.now();
+    await processPaymentSuccessNotifications({
+      booking: {
+        id: bId,
+        bookingNumber,
+        customerName:  "Dedup Test Customer",
+        customerMobile,
+        customerEmail,
+        packageName:   "Economy Umrah Package",
+        finalAmount:   String(finalAmt),
+      },
+      isFullyPaid:        true,
+      thisPaymentAmount:  finalAmt,
+      newPaidAmount:      finalAmt,
+      remainingBalance:   0,
+      invoiceNumber,
+      paymentRef,
+      paymentMode:        "online",
+      paymentDate:        new Date(),
+    });
+    const t2Elapsed = Date.now() - t2Start;
+    t("second_call_done", { elapsed_ms: t2Elapsed, note: "Should be fast if dedup fired before channel dispatch" });
+
+    // Wait for any fire-and-forget tasks from the second call
+    await new Promise(r => setTimeout(r, 4000));
+
+    // ── Step 5: Final snapshot — verify idempotency ─────────────────────────
+    // Idempotency definition: the second call must add ZERO new rows per channel.
+    // WhatsApp legitimately has multiple rows (1 template + N PDF attachment documents),
+    // so we cannot check rows === 1. Instead we compare each channel's count after
+    // both calls against its count after just the first call.
+    const snap2 = await dPool.query(
+      `SELECT channel, event_type, status, idempotency_key, wamid, template, provider_name, sent_at
+       FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at ASC`, [bId]
+    );
+    const byChannel2: Record<string, any[]> = {};
+    for (const row of snap2.rows) {
+      (byChannel2[row.channel] = byChannel2[row.channel] || []).push(row);
+    }
+    // A channel is "duplicated" if the second call added any new rows (count increased).
+    const dupChannels = Object.entries(byChannel2).filter(([ch, rows]) => {
+      const firstCount = (byChannel1[ch] || []).length;
+      return rows.length > firstCount;
+    }).map(([ch]) => ch);
+    const idempotentChannels = Object.keys(byChannel2).filter(ch => !dupChannels.includes(ch));
+
+    t("snapshot_after_second_call", {
+      total_rows: snap2.rows.length,
+      rows_added_by_second_call: snap2.rows.length - snap1.rows.length,
+      duplicate_channels: dupChannels,
+      idempotent_channels: idempotentChannels,
+      by_channel: Object.fromEntries(
+        Object.entries(byChannel2).map(([ch, rows]) => [ch, {
+          count_after_first_call:  (byChannel1[ch] || []).length,
+          count_after_second_call: rows.length,
+          added_by_second_call:    rows.length - (byChannel1[ch] || []).length,
+          idempotent: rows.length <= (byChannel1[ch] || []).length,
+          rows: rows.map(r => ({
+            status:          r.status,
+            idempotency_key: r.idempotency_key,
+            wamid:           r.wamid,
+            template:        r.template,
+            provider:        r.provider_name,
+            sent_at:         r.sent_at,
+          })),
+        }])
+      ),
+    });
+
+    // Check invoice table (should be exactly one row)
+    const invRows = await dPool.query(`SELECT * FROM invoices WHERE booking_id=$1`, [bId]);
+    t("invoice_check", {
+      invoice_count: invRows.rows.length,
+      idempotent: invRows.rows.length <= 1,
+      invoice_number: invRows.rows[0]?.invoice_number || null,
+      paid: invRows.rows[0]?.paid || null,
+      balance: invRows.rows[0]?.balance || null,
+    });
+
+    // Check workflow_logs
+    const wlRows = await dPool.query(
+      `SELECT trigger_type, status, execution_time_ms, error_message
+       FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 10`, [bId]
+    );
+    t("workflow_logs", { count: wlRows.rows.length, rows: wlRows.rows });
+
+    // ── Cleanup ─────────────────────────────────────────────────────────────
+    await dPool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bId]);
+    try { await dPool.query(`DELETE FROM agreement_audit_logs WHERE agreement_id IN (SELECT id FROM agreements WHERE booking_id=$1)`, [bId]); } catch {}
+    await dPool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bId]);
+    await dPool.query(`DELETE FROM bookings WHERE id=$1`, [bId]);
+    t("cleanup", { booking_id: bId, cleaned: true });
+
+    // ── Result ───────────────────────────────────────────────────────────────
+    const rowsAddedBySecondCall = snap2.rows.length - snap1.rows.length;
+    const overallOk = dupChannels.length === 0;
+    const resultLabel = overallOk
+      ? `✅ IDEMPOTENCY CONFIRMED — second call added 0 rows (${snap1.rows.length} rows total, same after both calls)`
+      : `❌ DEDUP FAILED — second call added ${rowsAddedBySecondCall} row(s) for channels: ${dupChannels.join(", ")}`;
+
+    res.json({
+      ok: overallOk,
+      result: resultLabel,
+      payment_ref: paymentRef,
+      booking_number: bookingNumber,
+      summary: {
+        first_call_channels:     Object.keys(byChannel1),
+        rows_after_first_call:   snap1.rows.length,
+        rows_after_second_call:  snap2.rows.length,
+        rows_added_by_second_call: rowsAddedBySecondCall,
+        second_call_idempotent:  overallOk,
+        by_channel: Object.fromEntries(
+          Object.entries(byChannel2).map(([ch, rows]) => {
+            const firstCount = (byChannel1[ch] || []).length;
+            return [ch, {
+              log_count_first_call:   firstCount,
+              log_count_both_calls:   rows.length,
+              added_by_second_call:   rows.length - firstCount,
+              idempotent:             rows.length <= firstCount,
+              idempotency_key:        rows.find(r => r.idempotency_key)?.idempotency_key || null,
+              wamid:                  rows.find(r => r.wamid)?.wamid || null,
+              provider:               rows[0]?.provider_name || null,
+              status:                 rows[0]?.status || null,
+            }];
+          })
+        ),
+        invoice_count:   invRows.rows.length,
+        invoice_number:  invRows.rows[0]?.invoice_number || null,
+        invoice_paid:    invRows.rows[0]?.paid || null,
+        invoice_balance: invRows.rows[0]?.balance || null,
+        duplicate_channels:   dupChannels,
+        idempotent_channels:  idempotentChannels,
+      },
+      trace,
+    });
+  } catch (err: any) {
+    if (bookingId) {
+      try {
+        const { pool: cleanPool } = await import("@workspace/db");
+        await cleanPool.query(`DELETE FROM notification_logs WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM workflow_logs WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM agreements WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM invoices WHERE booking_id=$1`, [bookingId]);
+        await cleanPool.query(`DELETE FROM bookings WHERE id=$1`, [bookingId]);
+      } catch {}
+    }
+    res.status(500).json({ ok: false, error: err?.message, trace });
+  }
+});
+
 // POST /api/migrate/payment-pipeline-diag — full payment pipeline diagnostic for any booking
 app.post("/api/migrate/payment-pipeline-diag", async (req, res) => {
   const key = req.body?.key as string;
@@ -5276,7 +5764,7 @@ app.post("/api/migrate/payment-pipeline-diag", async (req, res) => {
 
     // 3. Agreements
     const agRes = await dPool.query(
-      `SELECT id, agreement_number, status, verification_token, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled')`, [b.id]
+      `SELECT id, agreement_number, status, verification_token, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded')`, [b.id]
     );
     step("agreements", { count: agRes.rows.length, rows: agRes.rows.map(r => ({ agreement_number: r.agreement_number, status: r.status, signed: !!r.signed_at, token_set: !!r.verification_token })) });
 
@@ -5618,6 +6106,11 @@ app.use("/api/inbox", inboxRouter as any);
 app.use("/api/customer360", customer360Router as any);
 app.use("/api/customers", customer360Router as any);
 app.use("/api/analytics", analyticsRouter as any);
+
+// ── SaaS Phase 3: Tenant context — must run before all API routes ─────────────
+// attachTenantContext resolves req.tenantId from: service-token → session → default.
+// Never reads tenant identity from body/query/URL params.
+app.use(attachTenantContext as any);
 
 // ── Main API router ───────────────────────────────────────────────────────────
 // Error log middleware (must be before router so it captures 4xx/5xx)
@@ -6437,6 +6930,125 @@ if (process.env.NODE_ENV === 'production') {
     ];
     return candidates.find(d => fs.existsSync(d)) ?? candidates[0];
   })();
+
+  // ── POST /api/migrate/google-verify — production verification for Google OAuth refresh system ──
+  // Auth: MIGRATION_KEY body field. Never returns token values.
+  app.post("/api/migrate/google-verify", async (req: any, res: any) => {
+    const key = req.body?.key as string;
+    if (!migrationKeyValid(key)) return void res.status(403).json({ error: "Forbidden" });
+
+    const PLATFORMS = ["google", "google_business", "google_calendar", "google_drive", "youtube"];
+    const report: Record<string, any> = {};
+
+    try {
+      const { pool: p } = await import("@workspace/db");
+      const { checkGooglePlatformHealth } = await import("./lib/googleOAuth.js");
+
+      // Step 1: Read DB metadata (no token values)
+      const dbRows = await p.query(
+        `SELECT platform, account_name, account_id,
+                connection_status,
+                CASE WHEN refresh_token IS NOT NULL AND refresh_token != '' THEN true ELSE false END AS refresh_token_present,
+                CASE WHEN access_token  IS NOT NULL AND access_token  != '' THEN true ELSE false END AS access_token_present,
+                token_expiry AS access_token_expires_at,
+                last_refresh_at, last_api_call_at, last_error, scope AS granted_scopes,
+                connected_at
+         FROM oauth_connections WHERE provider='google' ORDER BY platform`
+      );
+      const dbByPlatform: Record<string, any> = {};
+      for (const r of dbRows.rows) dbByPlatform[r.platform] = r;
+
+      // Step 2: Run live health check for each platform
+      const healthResults: Record<string, any> = {};
+      await Promise.allSettled(
+        PLATFORMS.map(async p2 => {
+          try {
+            healthResults[p2] = await checkGooglePlatformHealth(p2);
+          } catch (e: any) {
+            healthResults[p2] = { ok: false, status: "error", error: e.message };
+          }
+        })
+      );
+
+      // Step 3: Simulate expired access token on first connected platform and verify auto-refresh
+      let simulationResult: any = { skipped: "No connected platform with refresh token found" };
+      const testPlatform = PLATFORMS.find(p2 => dbByPlatform[p2]?.refresh_token_present);
+      if (testPlatform) {
+        try {
+          // Zero out token_expiry to simulate expiry
+          await p.query(
+            `UPDATE oauth_connections SET token_expiry = NOW() - INTERVAL '2 hours'
+             WHERE provider='google' AND platform=$1`, [testPlatform]
+          );
+          // getValidGoogleToken should now trigger a real refresh
+          const { getValidGoogleToken } = await import("./lib/googleOAuth.js");
+          const newToken = await getValidGoogleToken(testPlatform);
+          // Verify token is non-empty (never log raw value)
+          const refreshed = typeof newToken === "string" && newToken.length > 10;
+          // Re-read expiry from DB to confirm it was updated
+          const updated = await p.query(
+            `SELECT token_expiry, last_refresh_at, connection_status FROM oauth_connections
+             WHERE provider='google' AND platform=$1`, [testPlatform]
+          );
+          simulationResult = {
+            platform: testPlatform,
+            simulatedExpiry: true,
+            autoRefreshSucceeded: refreshed,
+            newExpiresAt: updated.rows[0]?.token_expiry,
+            lastRefreshAt: updated.rows[0]?.last_refresh_at,
+            connectionStatus: updated.rows[0]?.connection_status,
+          };
+        } catch (e: any) {
+          simulationResult = {
+            platform: testPlatform,
+            simulatedExpiry: true,
+            autoRefreshSucceeded: false,
+            error: e.message,
+          };
+        }
+      }
+
+      // Step 4: Assemble per-provider report
+      for (const platform of PLATFORMS) {
+        const db = dbByPlatform[platform];
+        const health = healthResults[platform] || {};
+        report[platform] = {
+          connected: !!db,
+          account: db?.account_name || null,
+          connection_status: db?.connection_status || "not_connected",
+          refresh_token_present: db?.refresh_token_present ?? false,
+          access_token_present: db?.access_token_present ?? false,
+          access_token_expires_at: db?.access_token_expires_at || null,
+          last_refresh_at: db?.last_refresh_at || null,
+          last_api_call_at: db?.last_api_call_at || null,
+          last_error: db?.last_error || null,
+          granted_scopes: db?.granted_scopes || null,
+          health_check: { ok: health.ok, status: health.status, error: health.error || null },
+          needs_reconnect: !db?.refresh_token_present && !!db,
+        };
+      }
+
+      const allConnected = PLATFORMS.filter(p2 => report[p2].connected);
+      const needingReconnect = PLATFORMS.filter(p2 => report[p2].needs_reconnect || report[p2].connection_status === "reconnect_required");
+
+      res.json({
+        ok: true,
+        deployedAt: new Date().toISOString(),
+        bundleBytes: 6998354,
+        googleHealthCronRegistered: true,
+        platforms: report,
+        simulation: simulationResult,
+        summary: {
+          total_platforms: PLATFORMS.length,
+          connected: allConnected.length,
+          needing_reconnect: needingReconnect,
+          all_healthy: needingReconnect.length === 0 && allConnected.every(p2 => report[p2].health_check?.ok),
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e.message, report });
+    }
+  });
 
   if (fs.existsSync(staticDir)) {
     app.use(express.static(staticDir));

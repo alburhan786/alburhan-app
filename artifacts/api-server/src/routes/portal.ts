@@ -4,6 +4,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { requireAuth } from "../lib/auth.js";
 import { pool } from "@workspace/db";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -52,14 +53,14 @@ router.get("/branch", requireAuth as any, async (req: any, res) => {
         `SELECT b.status, COUNT(*)::int AS cnt
          FROM bookings b JOIN agents a ON a.id = b.agent_id
          JOIN branches br ON br.id = a.branch_id
-         WHERE br.manager_mobile=$1 AND b.deleted_at IS NULL GROUP BY b.status`,
+         WHERE br.manager_mobile=$1 AND b.tenant_id=(SELECT tenant_id FROM branches WHERE manager_mobile=$1 LIMIT 1)::uuid AND b.deleted_at IS NULL GROUP BY b.status`,
         [mobile]
       ).catch(() => ({ rows: [] })),
       pool.query(
         `SELECT COALESCE(SUM(pt.amount),0)::numeric AS total
          FROM payment_transactions pt JOIN bookings b ON b.id = pt.booking_id
          JOIN agents a ON a.id = b.agent_id JOIN branches br ON br.id = a.branch_id
-         WHERE br.manager_mobile=$1`,
+         WHERE br.manager_mobile=$1 AND b.tenant_id=(SELECT tenant_id FROM branches WHERE manager_mobile=$1 LIMIT 1)::uuid`,
         [mobile]
       ).catch(() => ({ rows: [{ total: 0 }] })),
       pool.query(

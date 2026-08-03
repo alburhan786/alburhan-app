@@ -6,6 +6,7 @@ import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),

@@ -6,14 +6,17 @@ function apiUrl(path: string) { return `${API}${path}`; }
 
 const TABS = [
   { id: "dashboard", label: "📊 Dashboard" },
-  { id: "test-center", label: "🔬 Test API" },
+  { id: "event-mapping", label: "🗺️ Event Mapping" },
+  { id: "provider-health", label: "🏥 Provider Health" },
   { id: "queue", label: "📋 Delivery Logs" },
   { id: "failed", label: "❌ Failed" },
+  { id: "templates", label: "📝 Templates" },
   { id: "campaigns", label: "📢 Campaigns" },
   { id: "scheduled", label: "🕐 Scheduled" },
   { id: "automation", label: "⚙️ Automation" },
-  { id: "templates", label: "📝 Templates" },
-  { id: "template-preview", label: "🔍 Template Preview" },
+  { id: "audit-logs", label: "🔍 Audit Logs" },
+  { id: "test-center", label: "🔬 Test API" },
+  { id: "template-preview", label: "👁 Preview" },
   { id: "whatsapp", label: "💬 WhatsApp" },
   { id: "sms", label: "📱 SMS" },
   { id: "rcs", label: "🔵 RCS" },
@@ -1597,6 +1600,465 @@ function TemplatePreview() {
   );
 }
 
+// ── Event Mapping Tab ─────────────────────────────────────────────────────────
+const CHANNEL_PROVIDERS: Record<string, string[]> = {
+  whatsapp: ["botbee", "meta"],
+  sms: ["fast2sms"],
+  email: ["smtp"],
+  rcs: ["lemin"],
+  push: ["fcm", "webpush"],
+};
+
+function EventMappingTab() {
+  const [matrix, setMatrix] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [filterEvent, setFilterEvent] = useState("");
+  const [filterChannel, setFilterChannel] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(apiUrl("/api/comm-mgmt/event-mappings/matrix"));
+      const d = await r.json();
+      setMatrix(d.matrix || []);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true); setMsg("");
+    try {
+      const r = await fetch(apiUrl("/api/comm-mgmt/event-mappings"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editing),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMsg("Error: " + (d.error || r.status)); return; }
+      setMsg("✅ Saved"); setEditing(null); load();
+    } catch (e: any) { setMsg("Error: " + e.message); }
+    setSaving(false);
+  };
+
+  const filtered = matrix.filter(m =>
+    (!filterEvent || m.event_type?.includes(filterEvent)) &&
+    (!filterChannel || m.channel === filterChannel)
+  );
+
+  const STATUS_COLORS: Record<string, string> = {
+    botbee: "#25D366", meta: "#1877f2", fast2sms: "#f59e0b",
+    smtp: "#8b5cf6", lemin: "#3b82f6", fcm: "#ef4444", webpush: "#ec4899",
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading event mappings…</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>🗺️ Event → Channel Mappings</h2>
+        <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>
+          {filtered.length} mappings
+        </span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <input placeholder="Filter event…" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 10px", fontSize: 12, width: 160 }} />
+          <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 8px", fontSize: 12 }}>
+            <option value="">All channels</option>
+            {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {msg && <div style={{ background: msg.startsWith("✅") ? "#f0fdf4" : "#fef2f2", color: msg.startsWith("✅") ? "#166534" : "#991b1b", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#f9fafb" }}>
+              {["Event", "Channel", "Enabled", "Primary Provider", "Template ID", "Retry Max", "Send Timing", "Actions"].map(h => (
+                <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((m, i) => (
+              <tr key={`${m.event_type}:${m.channel}`} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "#1e40af", fontSize: 11 }}>{m.event_type}</td>
+                <td style={{ padding: "7px 10px" }}>
+                  <span style={{ background: CH_COLORS[m.channel] + "22", color: CH_COLORS[m.channel] || "#374151", borderRadius: 4, padding: "2px 7px", fontWeight: 600, fontSize: 11 }}>{m.channel}</span>
+                </td>
+                <td style={{ padding: "7px 10px" }}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: m.enabled ? "#22c55e" : "#9ca3af", marginRight: 4 }} />
+                  {m.enabled ? "On" : "Off"}
+                </td>
+                <td style={{ padding: "7px 10px" }}>
+                  {m.primary_provider && (
+                    <span style={{ background: (STATUS_COLORS[m.primary_provider] || "#6b7280") + "22", color: STATUS_COLORS[m.primary_provider] || "#374151", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>
+                      {m.primary_provider}
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: "7px 10px", fontFamily: "monospace", color: "#374151", fontSize: 11, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.template_id || "—"}</td>
+                <td style={{ padding: "7px 10px", textAlign: "center" }}>{m.retry_max ?? 3}</td>
+                <td style={{ padding: "7px 10px", color: "#6b7280" }}>{m.send_timing || "immediate"}</td>
+                <td style={{ padding: "7px 10px" }}>
+                  <button onClick={() => setEditing({ ...m })}
+                    style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 11 }}>
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {editing && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+            <h3 style={{ fontWeight: 800, marginTop: 0 }}>Edit Mapping: {editing.event_type} / {editing.channel}</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Enabled
+                <select value={editing.enabled ? "true" : "false"} onChange={e => setEditing({ ...editing, enabled: e.target.value === "true" })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px" }}>
+                  <option value="true">✅ Enabled</option>
+                  <option value="false">❌ Disabled</option>
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Primary Provider
+                <select value={editing.primary_provider || ""} onChange={e => setEditing({ ...editing, primary_provider: e.target.value })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px" }}>
+                  <option value="">— select —</option>
+                  {(CHANNEL_PROVIDERS[editing.channel] || []).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, gridColumn: "1/-1" }}>
+                Template ID
+                <input value={editing.template_id || ""} onChange={e => setEditing({ ...editing, template_id: e.target.value })}
+                  placeholder="e.g. tpl_whatsapp_booking_received"
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 10px" }} />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Retry Max
+                <input type="number" min={0} max={10} value={editing.retry_max ?? 3} onChange={e => setEditing({ ...editing, retry_max: Number(e.target.value) })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 10px" }} />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Send Timing
+                <select value={editing.send_timing || "immediate"} onChange={e => setEditing({ ...editing, send_timing: e.target.value })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px" }}>
+                  <option value="immediate">Immediate</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="business_hours">Business Hours</option>
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Attachment Policy
+                <select value={editing.attachment_policy || "link_only"} onChange={e => setEditing({ ...editing, attachment_policy: e.target.value })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px" }}>
+                  <option value="link_only">Link only</option>
+                  <option value="attach_pdf">Attach PDF</option>
+                  <option value="none">None</option>
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600 }}>
+                Recipient Type
+                <select value={editing.recipient_type || "customer"} onChange={e => setEditing({ ...editing, recipient_type: e.target.value })}
+                  style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px" }}>
+                  <option value="customer">Customer</option>
+                  <option value="admin">Admin</option>
+                  <option value="both">Both</option>
+                </select>
+              </label>
+            </div>
+            {msg && <div style={{ marginTop: 12, color: msg.startsWith("✅") ? "#166534" : "#991b1b", fontSize: 13 }}>{msg}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button onClick={save} disabled={saving}
+                style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, padding: "9px 20px", cursor: "pointer", fontWeight: 700, fontSize: 13, flex: 1 }}>
+                {saving ? "Saving…" : "Save Mapping"}
+              </button>
+              <button onClick={() => { setEditing(null); setMsg(""); }}
+                style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 7, padding: "9px 16px", cursor: "pointer", fontSize: 13 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Provider Health Tab ───────────────────────────────────────────────────────
+function ProviderHealthTab() {
+  const [providers, setProviders] = useState<any[]>([]);
+  const [healthCheck, setHealthCheck] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [resetReason, setResetReason] = useState("");
+  const [resetting, setResetting] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  const loadProviders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(apiUrl("/api/comm-mgmt/provider-health"));
+      const d = await r.json();
+      setProviders(d.providers || []);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  const runHealthCheck = async () => {
+    setChecking(true); setMsg("");
+    try {
+      const r = await fetch(apiUrl("/api/comms/health"));
+      const d = await r.json();
+      setHealthCheck(d);
+    } catch (e: any) { setMsg("Health check failed: " + e.message); }
+    setChecking(false);
+  };
+
+  const resetCircuit = async (provider: string) => {
+    if (!resetReason.trim()) { setMsg("Enter a reason before resetting circuit breaker"); return; }
+    setResetting(provider);
+    try {
+      const r = await fetch(apiUrl(`/api/comm-mgmt/provider-health/${provider}/circuit-reset`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: resetReason }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMsg("Error: " + (d.error || r.status)); }
+      else { setMsg(`✅ Circuit breaker reset for ${provider}`); setResetReason(""); loadProviders(); }
+    } catch (e: any) { setMsg("Error: " + e.message); }
+    setResetting(null);
+  };
+
+  useEffect(() => { loadProviders(); runHealthCheck(); }, [loadProviders]);
+
+  const CIRCUIT_BADGE: Record<string, { bg: string; color: string }> = {
+    closed:    { bg: "#f0fdf4", color: "#166534" },
+    open:      { bg: "#fef2f2", color: "#991b1b" },
+    half_open: { bg: "#fef9c3", color: "#854d0e" },
+  };
+
+  const liveStatusFor = (providerKey: string): { status: string; detail?: string } => {
+    if (!healthCheck?.checks) return { status: "unknown" };
+    const key = Object.keys(healthCheck.checks).find(k =>
+      k.includes(providerKey) || healthCheck.checks[k]?.provider?.toLowerCase().includes(providerKey)
+    );
+    return key ? healthCheck.checks[key] : { status: "unknown" };
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>🏥 Provider Health Center</h2>
+        <span style={{
+          background: healthCheck?.overall === "ok" ? "#f0fdf4" : healthCheck?.overall === "degraded" ? "#fef2f2" : "#f9fafb",
+          color: healthCheck?.overall === "ok" ? "#166534" : healthCheck?.overall === "degraded" ? "#991b1b" : "#6b7280",
+          borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, border: "1px solid currentColor"
+        }}>
+          {healthCheck ? `Overall: ${healthCheck.overall?.toUpperCase()}` : "—"}
+        </span>
+        <button onClick={runHealthCheck} disabled={checking}
+          style={{ marginLeft: "auto", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, padding: "8px 18px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+          {checking ? "Checking…" : "🔄 Run Health Check"}
+        </button>
+      </div>
+
+      {msg && <div style={{ background: msg.startsWith("✅") ? "#f0fdf4" : "#fef2f2", color: msg.startsWith("✅") ? "#166534" : "#991b1b", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+
+      {/* Live health results */}
+      {healthCheck?.checks && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px,1fr))", gap: 12, marginBottom: 24 }}>
+          {Object.entries(healthCheck.checks).map(([key, v]: [string, any]) => (
+            <div key={key} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px", background: v.status === "ok" ? "#f0fdf4" : v.status === "unconfigured" ? "#f9fafb" : "#fef2f2" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: v.status === "ok" ? "#22c55e" : v.status === "unconfigured" ? "#9ca3af" : "#ef4444", display: "inline-block" }} />
+                <strong style={{ fontSize: 13, color: "#111827" }}>{v.provider || key}</strong>
+              </div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>{v.status?.toUpperCase()}{v.ms ? ` · ${v.ms}ms` : ""}</div>
+              {v.wallet && <div style={{ fontSize: 11, color: "#059669", marginTop: 2 }}>Balance: {v.wallet}</div>}
+              {v.error && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>{v.error.slice(0, 60)}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Provider status from DB */}
+      {providers.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#374151" }}>Circuit Breaker State</h3>
+          <div style={{ overflowX: "auto", marginBottom: 20 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#f9fafb" }}>
+                  {["Provider", "Channel", "Circuit", "Failures", "Last Success", "Last Failure", "Enabled"].map(h => (
+                    <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "2px solid #e5e7eb" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {providers.map((p, i) => {
+                  const cb = CIRCUIT_BADGE[p.circuit_state] || CIRCUIT_BADGE.closed;
+                  return (
+                    <tr key={p.provider} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                      <td style={{ padding: "8px 10px", fontWeight: 600 }}>{p.display_name}</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <span style={{ background: CH_COLORS[p.channel] + "22", color: CH_COLORS[p.channel] || "#374151", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600 }}>{p.channel}</span>
+                      </td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <span style={{ background: cb.bg, color: cb.color, borderRadius: 5, padding: "2px 8px", fontWeight: 700, fontSize: 11 }}>
+                          {p.circuit_state?.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: "8px 10px", textAlign: "center", color: p.consecutive_failures > 0 ? "#dc2626" : "#374151" }}>{p.consecutive_failures}</td>
+                      <td style={{ padding: "8px 10px", color: "#6b7280", fontSize: 11 }}>{p.last_success_at ? new Date(p.last_success_at).toLocaleString("en-IN") : "—"}</td>
+                      <td style={{ padding: "8px 10px", color: "#6b7280", fontSize: 11 }}>{p.last_failure_at ? new Date(p.last_failure_at).toLocaleString("en-IN") : "—"}</td>
+                      <td style={{ padding: "8px 10px" }}>
+                        <span style={{ color: p.is_enabled ? "#059669" : "#9ca3af", fontWeight: 600, fontSize: 11 }}>{p.is_enabled ? "✅ On" : "Off"}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: 16 }}>
+            <h4 style={{ fontWeight: 700, marginTop: 0, color: "#92400e", fontSize: 13 }}>⚡ Reset Circuit Breaker (Super Admin)</h4>
+            <p style={{ fontSize: 12, color: "#78350f", margin: "0 0 10px" }}>Resets the failure counter and re-opens a tripped provider. Requires a reason — logged to audit trail.</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <input value={resetReason} onChange={e => setResetReason(e.target.value)}
+                placeholder="Reason for reset (required)…"
+                style={{ flex: 1, minWidth: 200, border: "1px solid #fcd34d", borderRadius: 6, padding: "7px 10px", fontSize: 12 }} />
+              {providers.filter(p => p.circuit_state !== "closed").map(p => (
+                <button key={p.provider} onClick={() => resetCircuit(p.provider)} disabled={resetting === p.provider || !resetReason.trim()}
+                  style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, opacity: !resetReason.trim() ? 0.5 : 1 }}>
+                  {resetting === p.provider ? "Resetting…" : `Reset ${p.provider}`}
+                </button>
+              ))}
+              {providers.every(p => p.circuit_state === "closed") && (
+                <span style={{ fontSize: 12, color: "#059669", padding: "7px 0" }}>All circuits are closed ✅</span>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Audit Logs Tab ─────────────────────────────────────────────────────────────
+function AuditLogsTab() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState({ action: "", entity_type: "" });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const q = new URLSearchParams({ limit: "100", ...Object.fromEntries(Object.entries(filter).filter(([,v]) => v)) });
+      const r = await fetch(apiUrl(`/api/comm-mgmt/audit-logs?${q}`));
+      const d = await r.json();
+      setLogs(d.logs || []);
+      setTotal(d.total || 0);
+    } catch {}
+    setLoading(false);
+  }, [filter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const ACTION_COLORS: Record<string, string> = {
+    manual_resend: "#7c3aed", circuit_breaker_reset: "#dc2626",
+    event_mapping_updated: "#0369a1", event_mapping_created: "#059669",
+    template_updated: "#d97706", template_created: "#059669",
+    provider_disabled: "#dc2626", provider_enabled: "#059669",
+    schedule_created: "#0369a1", schedule_cancelled: "#6b7280",
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>🔍 Communication Audit Logs</h2>
+        <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>{total} entries</span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <input placeholder="Filter action…" value={filter.action} onChange={e => setFilter(f => ({ ...f, action: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 10px", fontSize: 12, width: 160 }} />
+          <select value={filter.entity_type} onChange={e => setFilter(f => ({ ...f, entity_type: e.target.value }))}
+            style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 8px", fontSize: 12 }}>
+            <option value="">All entities</option>
+            <option value="template">Template</option>
+            <option value="event_mapping">Event Mapping</option>
+            <option value="provider">Provider</option>
+            <option value="notification_log">Notification Log</option>
+            <option value="schedule">Schedule</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>Loading audit logs…</div>
+      ) : logs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 40, color: "#9ca3af", background: "#f9fafb", borderRadius: 12 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+          <div>No audit entries yet — changes to templates, event mappings, providers, and resends will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f9fafb" }}>
+                {["Time", "Action", "Entity", "Actor", "Reason", "Details"].map(h => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#374151", borderBottom: "2px solid #e5e7eb" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log, i) => (
+                <tr key={log.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                  <td style={{ padding: "7px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>{new Date(log.created_at).toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "7px 10px" }}>
+                    <span style={{ color: ACTION_COLORS[log.action] || "#374151", fontWeight: 600, fontSize: 11 }}>{log.action}</span>
+                  </td>
+                  <td style={{ padding: "7px 10px", fontFamily: "monospace", fontSize: 11, color: "#374151" }}>
+                    {log.entity_type && <span style={{ background: "#f3f4f6", borderRadius: 3, padding: "1px 5px" }}>{log.entity_type}</span>}
+                    {log.entity_id && <span style={{ color: "#6b7280", marginLeft: 4 }}>{log.entity_id.slice(0, 20)}</span>}
+                  </td>
+                  <td style={{ padding: "7px 10px", color: "#374151" }}>{log.actor_id || "system"}</td>
+                  <td style={{ padding: "7px 10px", color: "#6b7280", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.reason || "—"}</td>
+                  <td style={{ padding: "7px 10px" }}>
+                    {log.new_values && (
+                      <details>
+                        <summary style={{ cursor: "pointer", color: "#2563eb", fontSize: 11 }}>View changes</summary>
+                        <pre style={{ fontSize: 10, background: "#f9fafb", borderRadius: 4, padding: 6, margin: "4px 0 0", overflow: "auto", maxWidth: 300, maxHeight: 120 }}>
+                          {JSON.stringify(log.new_values, null, 2).slice(0, 400)}
+                        </pre>
+                      </details>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function CommunicationCenter() {
   const [tab, setTab] = useState("dashboard");
@@ -1622,6 +2084,9 @@ export default function CommunicationCenter() {
 
       <div style={{ padding: "28px 32px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "dashboard" && <Dashboard />}
+        {tab === "event-mapping" && <EventMappingTab />}
+        {tab === "provider-health" && <ProviderHealthTab />}
+        {tab === "audit-logs" && <AuditLogsTab />}
         {tab === "test-center" && <TestCenter />}
         {tab === "queue" && <DeliveryLogs />}
         {tab === "failed" && <DeliveryLogs filterStatus="failed" />}

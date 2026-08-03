@@ -2,6 +2,7 @@ import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "../lib/auth.js";
 import { pool } from "@workspace/db";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

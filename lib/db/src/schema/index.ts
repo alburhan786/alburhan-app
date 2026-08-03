@@ -19,3 +19,4 @@ export * from "./attendance";
 export * from "./expenses";
 export * from "./flights";
 export * from "./booking_settings";
+export * from "./tenants";

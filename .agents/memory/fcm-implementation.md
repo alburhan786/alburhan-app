@@ -1,33 +1,58 @@
 ---
-name: FCM implementation pattern
-description: Firebase Cloud Messaging setup for VPS-bundled Node.js — no firebase-admin SDK, pure REST
+name: FCM implementation — Node 20 / OpenSSL 3 private key rules + migration gotcha
+description: How Firebase service account credentials are loaded, normalised, and used for JWT signing via built-in crypto (no firebase-admin). Includes the migration wipe bug.
 ---
 
-## Rule
-Never use firebase-admin SDK on the VPS API server. Use FCM v1 REST API + Node.js built-in `crypto` for JWT signing.
+## Critical: v30.4 migration was wiping credentials on every restart
+The original v30.4 migration unconditionally ran `UPDATE api_settings SET api_key_encrypted = NULL` and `SET extra_fields_encrypted = NULL` on **every startup**. This meant any credentials saved by the user were erased on the next deploy/restart.
 
-**Why:** firebase-admin bundles native modules that break when bundled into CJS for VPS (MODULE_NOT_FOUND on startup). The FCM v1 REST API accepts a signed JWT (RS256) + OAuth2 token exchange — pure Node crypto handles this with zero extra deps.
+Fixed to be conditional:
+- `api_key_encrypted`: only cleared if the decrypted value is NOT a valid PEM (`-----BEGIN PRIVATE KEY-----`) and NOT a valid service-account JSON (with `private_key` field)
+- `extra_fields_encrypted`: only cleared if it contains ONLY legacy `sender_id` field and no `project_id`/`client_email`
+- `api_url`: always cleared (FCM v1 uses a fixed endpoint, not configurable)
 
-**How to apply:**
-- `lib/fcm.ts` uses `crypto.createSign("RSA-SHA256")` to sign JWT claims
-- Exchange at `https://oauth2.googleapis.com/token` for an access token (cached 50 min)
-- Send to `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`
-- `FIREBASE_PRIVATE_KEY` has literal `\n` (not newlines) in env vars — always call `.replace(/\\n/g, "\n")` before use
+**Rule**: Any migration that clears credentials must be conditional. Never use `UPDATE ... SET field = NULL WHERE field IS NOT NULL` without first checking the decrypted value.
 
-## Token registration
-- Frontend: `useFCM` hook registers FCM token via `POST /api/push/register-token` after `getToken()` succeeds
-- Tokens stored in `customer_push_tokens(id, customer_id, token, platform, device_info, updated_at, created_at)`
-- ON CONFLICT (customer_id, token) DO UPDATE — deduplication handled at DB level
-- `push_campaigns` table logs all broadcast sends (filter, total_tokens, sent, failed, status)
+## Rule: PEM normalisation — always rebuild the key
+`error:1E08010C:DECODER routines::unsupported` on Node 20 / OpenSSL 3 fires when the base64 body of a PEM key doesn't have exactly 64-character lines.
 
-## Service worker
-- Using existing `sw.js` (not a separate `firebase-messaging-sw.js`) — useFCM passes `serviceWorkerRegistration: sw` to `getToken()` so Firebase uses the existing SW
-- SW must handle BOTH FCM nested format `{notification:{title,body}, data:{url}}` AND legacy flat format `{title,body,url}`
+`normalizePemKey(raw: string)` in `lib/fcm.ts`:
+1. `.replace(/\\n/g, "\n")` — literal backslash-n → real LF
+2. `.replace(/\r\n/g, "\n")` — CRLF → LF
+3. `.replace(/\r/g, "\n")` — bare CR → LF
+4. Regex-extract header / base64-body / footer
+5. Strip ALL whitespace from body
+6. Rebuild with exactly 64-char lines
+7. Output: `${header}\n${lines.join("\n")}\n${footer}\n`
 
-## Audience filters
-`getTokensByFilter(filter)` supports: all, hajj, umrah, payment_pending, visa_ready, ticket_issued, agreement_signed, (default) package name ILIKE
+## Rule: Use crypto.createPrivateKey() before sign()
+Do NOT pass a raw PEM string directly to `sign.sign(privateKey)` on Node 20.
+Instead:
+```typescript
+const keyObject = crypto.createPrivateKey({ key: normalizedPem, format: "pem" });
+const signer = crypto.createSign("RSA-SHA256");
+signer.update(payload);
+const sig = signer.sign(keyObject, "base64url");
+```
 
-## Build/deploy
-- All 8 Firebase keys added to `build.ts` injectKeys so they're baked into VPS bundle
-- Frontend VITE_* vars read at Vite build time; backend reads same VITE_ vars for `getFirebaseWebConfig()` endpoint
-- Always run `pnpm build` before VPS self-update to ensure new Firebase keys are in the bundle
+## Credential loading priority
+1. `FIREBASE_PRIVATE_KEY` env var — only used if PEM headers present AND len > 200 (guards against placeholder values)
+2. `api_key_encrypted` in DB — tries `JSON.parse()` first (full service account JSON); falls back to raw PEM
+3. `extra_fields_encrypted.service_account_json` — last resort if api_key had no private_key
+
+## Frontend: "Parse JSON → Fill Fields" contract
+- Uses `JSON.parse(raw)` — never regex, line-matching, or substring extraction
+- Extracts ONLY: `parsed.project_id`, `parsed.client_email`, `parsed.private_key`
+- Validates before committing to state:
+  - projectId: no quotes or commas
+  - clientEmail: matches `.iam.gserviceaccount.com`
+  - privateKey: starts with `-----BEGIN PRIVATE KEY-----`, ends with `-----END PRIVATE KEY-----`, length > 1000
+- Sets `api_key = privateKey` (NOT `private_key_id`)
+- Clears `service_account_json` textarea after successful parse
+- Save strips `service_account_json` from `extra_fields` before sending to backend
+
+## Test connection diagnostics
+`testFCMConnection()` returns:
+- `keyDiagnostics: { firstLine, lastLine, length }` — never the full key
+- `stack` — full error stack trace
+- `hint` — human-readable suggestion matched to common error patterns

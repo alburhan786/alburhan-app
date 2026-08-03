@@ -234,7 +234,7 @@ export async function sendText(
 // ⚠️  Flat positional arrays get HTTP 200 + wamid but are NOT substituted — recipient sees #!Name!#.
 // variable_map.body (BotBee): {"1":"#!Name!#","2":"#!BookingID!#",...} — key names must match exactly.
 export const TEMPLATE_BODIES: Record<string, string> = {
-  "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\nAlhamdulillah! ✅\n\nYour booking has been APPROVED.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Amount: ₹ {{4}}\n\nPlease complete your payment using the link below.\n\n🔗 {{5}}\n\n📞 +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
+  "409950": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah! Your booking has been approved.\n\n📋 Booking ID: {{2}}\n📦 Package: {{3}}\n💰 Total Amount: ₹{{4}}\n\nYour agreement is ready for review and digital signature:\n\n🔗 {{5}}\n\n📞 For assistance: +91 9893225590\n\nJazak Allah Khair.\nAl Burhan Tours & Travels",
   "409953": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nAlhamdulillah! 🎉\n\nWe have successfully received your payment.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No: {{3}}\n💰 Amount Received: ₹ {{4}}\n\nYour booking is confirmed.\n\nJazak Allah Khair.\n\nAl Burhan Tours & Travels",
   "409956": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour invoice has been generated.\n\n📋 Booking ID:{{2}}\n🧾 Invoice No:{{3}}\n💰 Amount: ₹ {{4}}\nDownload your invoice below.\n\n🔗 {{5}}\n\nThank you for choosing Al Burhan Tours & Travels.",
   "409958": "Assalamu Alaikum wa Rahmatullahi wa Barakatuh {{1}}\n\nYour Hajj/Umrah Agreement is ready.\n\n📋 Booking ID: {{2}}\n📄 Agreement No: {{3}}\n\nDownload your agreement below.\n\n🔗 {{4}}\n\nPlease review and complete the digital signature if required.\n\nAl Burhan Tours & Travels",
@@ -968,20 +968,70 @@ export async function sendPendingPaymentTemplate(
 
 /** booking_approved — fires when admin approves a booking
  *  BotBee vars: Name, BookingID, PackageContent, Amount, Paymenturllink
+ *
+ *  Variable mapping:
+ *    {{1}} Name           — customer full name
+ *    {{2}} BookingID      — booking number (e.g. ABT26737539), NOT the internal UUID
+ *    {{3}} PackageContent — package name
+ *    {{4}} Amount         — total amount formatted (e.g. "1,00,000")
+ *    {{5}} Paymenturllink — agreement signing URL (preferred) or invoice URL
+ *
+ *  Paymenturllink carries the agreement URL because the business flow requires
+ *  customers to sign the agreement BEFORE making payment.  If no agreement URL
+ *  is available, falls back to the invoice/payment page URL.
+ *
+ *  forceTemplateApi is intentionally NOT set here so the PRIMARY PATH runs:
+ *    1. Meta Cloud API (uses body_content with {{1}}…{{5}} — guaranteed substitution)
+ *    2. BotBee text API with locally pre-rendered body (session-based fallback)
+ *    3. BotBee /send/template (24 h window fallback — substitution unreliable)
+ *  This avoids the "all #!Name!# unresolved" bug caused by forcing step 3 directly.
  */
 export async function sendApprovalTemplate(
   to: string,
-  ctx: { customerName: string; packageName: string; bookingId: string; amount?: string | number; invoiceUrl?: string },
+  ctx: {
+    customerName: string;
+    packageName: string;
+    bookingId: string;
+    bookingNumber?: string;  // ABT... number — preferred over bookingId for BookingID variable
+    amount?: string | number;
+    invoiceUrl?: string;
+    agreementUrl?: string;   // agreement signing link — used as Paymenturllink ({{5}})
+  },
   opts?: BotBeeTemplateOpts
 ): Promise<BotBeeResult> {
+  // {{5}} shows the agreement URL when available; falls back to payment/invoice page.
+  // If neither is present, omit gracefully (send "-" rather than a raw UUID or blank).
+  const linkUrl = ctx.agreementUrl || ctx.invoiceUrl ||
+    (ctx.bookingNumber ? `${SITE}/invoice/${ctx.bookingNumber}` : undefined) ||
+    `${SITE}/invoice/${ctx.bookingId}`;
+
+  // Validate the link URL before sending — block if it looks malformed.
+  const linkUrlClean = String(linkUrl ?? "").trim();
+  if (linkUrlClean.includes(" ") || !linkUrlClean.startsWith("https://")) {
+    console.error(`[BotBee] sendApprovalTemplate BLOCKED: Paymenturllink is malformed — "${linkUrlClean}" (INVALID_AGREEMENT_URL). Booking: ${ctx.bookingNumber || ctx.bookingId}`);
+    return {
+      ok: false, provider: "BotBee", endpoint: `${SITE}`,
+      errorMessage: `INVALID_AGREEMENT_URL: "${linkUrlClean}" — spaces or non-HTTPS detected`,
+    };
+  }
+
   return sendTemplate(to, tplId("booking_approved"), {
-    ...opts,
+    // Do NOT forward forceTemplateApi from opts — let the PRIMARY PATH (Meta Cloud API)
+    // handle substitution so {{1}}…{{5}} are replaced correctly in body_content.
+    // forceTemplateApi skips Meta and goes straight to BotBee template API which delivers
+    // mixed_body_text with #!Name!# unsubstituted.
+    eventType: opts?.eventType,
+    bookingId: opts?.bookingId,
+    customerId: opts?.customerId,
+    customerName: opts?.customerName,
+    skipFailureLog: opts?.skipFailureLog,
+    noInternalLog: opts?.noInternalLog,
     variables: {
       Name: ctx.customerName,
-      BookingID: ctx.bookingId,
+      BookingID: ctx.bookingNumber || ctx.bookingId,   // use ABT... number, not internal UUID
       PackageContent: ctx.packageName || "Hajj/Umrah Package",
       Amount: fmtAmount(ctx.amount),
-      Paymenturllink: ctx.invoiceUrl || `${SITE}/invoice/${ctx.bookingId}`,
+      Paymenturllink: linkUrlClean,
     },
   });
 }

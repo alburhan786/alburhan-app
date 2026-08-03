@@ -450,7 +450,8 @@ export async function sendRCS(
   const dial_code   = process.env.LEMIN_DIAL_CODE || leminCfg.extra?.dial_code || "+91";
   const rcs_agent   = process.env.LEMIN_AGENT     || leminCfg.extra?.agent     || "jio";
   const lemin_user_id = process.env.LEMIN_API_KEY || leminCfg.apiKey || leminCfg.extra?.user_id || "";
-  const lemin_template_id = leminCfg.extra?.template_id || "1473";
+  // No hardcoded fallback — use admin-configured default or the approved booking_submitted template (3651)
+  const lemin_template_id = leminCfg.extra?.template_id || "3651";
 
   if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Missing or invalid mobile number" };
@@ -462,8 +463,11 @@ export async function sendRCS(
     return { ok: false, provider: "Lemin AI", endpoint, errorMessage: "Lemin Developer API Key not configured" };
   }
   try {
-    const clean = mobile.replace(/\D/g, "");
-    const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean;
+    // Normalise: strip spaces/hyphens/+, leading 0, leading 91 → exactly 10 digits
+    let cleanNum = mobile.replace(/[\s\-\+]/g, "");
+    if (cleanNum.startsWith("0")) cleanNum = cleanNum.slice(1);
+    if (cleanNum.startsWith("91") && cleanNum.length === 12) cleanNum = cleanNum.slice(2);
+    const phone = cleanNum.slice(-10);
     const payload: Record<string, unknown> = {
       type: "single", dial_code, template: lemin_template_id,
       phone,

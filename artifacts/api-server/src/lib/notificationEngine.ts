@@ -226,8 +226,13 @@ export function buildDefaultMessage(eventType: EventType, ctx: NotificationConte
       return `URGENT ALERT: ${name} — ${ctx.description || "An emergency has been reported."} Please contact your group leader or call +91 9893225590 immediately.\n\nAl Burhan Tours & Travels`;
     case "new_booking":
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} for ${pkg} has been received. Our team will review and approve it shortly.\n\nJazak Allah Khair!\nAl Burhan Tours & Travels\n+91 9893225590`;
-    case "booking_approved":
-      return `Assalamu Alaikum ${name},\n\nCongratulations! Your booking ${booking} for ${pkg} has been APPROVED.\n\nPlease complete your payment at:\n${invUrl}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    case "booking_approved": {
+      // Use agreement URL when available — customers must sign the agreement before paying.
+      const agUrl = (ctx as any).agreementUrl as string | undefined;
+      const approvedLink = (agUrl && agUrl.startsWith("https://") && !agUrl.includes(" ")) ? agUrl : invUrl;
+      const approvedLinkLabel = (agUrl && agUrl.startsWith("https://")) ? "Please sign your agreement at:" : "Please complete your payment at:";
+      return `Assalamu Alaikum ${name},\n\nCongratulations! Your booking ${booking} for ${pkg} has been APPROVED.\n\n${approvedLinkLabel}\n${approvedLink}\n\nFor queries: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
+    }
     case "booking_cancelled":
     case "booking_rejected":
       return `Assalamu Alaikum ${name},\n\nYour booking ${booking} has been ${eventType === "booking_rejected" ? "rejected" : "cancelled"}${ctx.reason ? `: ${ctx.reason}` : ""}. Please contact us for assistance.\n\nPhone: +91 9893225590\n\nJazak Allah Khair!\nAl Burhan Tours & Travels`;
@@ -386,9 +391,15 @@ export async function trackNotification(data: {
   customerName?: string;
   bookingNumber?: string;
   message?: string;
-  status: "sent" | "failed" | "pending";
+  status: "sent" | "failed" | "pending" | "skipped";
   providerResponse?: unknown;
   provider?: string;
+  /** Optional idempotency key — prevents double-log rows when sms.ts also logs internally */
+  idempotencyKey?: string;
+  /** Optional override for error_code when the caller knows it (e.g. PUSH_TOKEN_MISSING) */
+  errorCode?: string;
+  /** Optional human-readable error message */
+  errorMessage?: string;
 }): Promise<void> {
   try {
     const id = await makeLogId();
@@ -397,28 +408,65 @@ export async function trackNotification(data: {
     const apiEndpoint = pr?.endpoint || null;
     const httpStatus = pr?.httpStatus || null;
     const requestPayload = pr?.requestPayload ? JSON.stringify(pr.requestPayload) : null;
-    const errorCode = pr?.errorCode || null;
+    const errorCode = data.errorCode || pr?.errorCode || null;
+    const errorMessage = data.errorMessage || pr?.errorMessage || (pr?.responsePayload as any)?.message || null;
     // Extract wamid and template_id from the BotBee response payload
     const innerRp = pr?.responsePayload as Record<string, unknown> | null | undefined;
     const msgArr = Array.isArray(innerRp?.messages) ? (innerRp!.messages as Array<Record<string, unknown>>) : null;
     const wamid = (innerRp?.wa_message_id || innerRp?.msg_id || innerRp?.wamid || msgArr?.[0]?.id || null) as string | null;
     const templateId = (pr?.requestPayload?.template_id?.toString() || pr?.requestPayload?.template_name || null) as string | null;
-    if (wamid) console.log(`[trackNotification] ${data.eventType} → wamid=${wamid} template=${templateId}`);
+
+    // provider_message_id: canonical message ID from each provider
+    // BotBee/Meta: wamid; Fast2SMS: request_id; nodemailer: messageId; Lemin: data.id; FCM: name
+    const providerMessageId: string | null = (
+      wamid ||
+      pr?.messageId ||                               // nodemailer / generic
+      pr?.request_id ||                              // Fast2SMS
+      (pr?.responsePayload as any)?.data?.id ||      // Lemin RCS
+      (pr?.responsePayload as any)?.name ||          // FCM
+      (pr?.responsePayload as any)?.request_id ||    // Fast2SMS nested
+      null
+    ) as string | null;
+
+    if (wamid || providerMessageId) console.log(`[trackNotification] ${data.eventType} → provider_msg=${providerMessageId} template=${templateId}`);
+
+    // failed_at: set when status is failed (any variant)
+    const isFailed = data.status === "failed" || (data.status as string) === "permanently_failed";
+
     await pool.query(
       `INSERT INTO notification_logs
        (id, event_type, customer_id, booking_id, customer_name, booking_number,
         channel, recipient, message, status,
-        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code,
-        wamid, template,
-        sent_at, retry_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),0)`,
+        provider_response, provider_name, api_endpoint, http_status, request_payload, error_code, error_message,
+        wamid, template, provider_message_id,
+        sent_at, failed_at, retry_count, idempotency_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),$21,0,$22)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE SET
+         status           = EXCLUDED.status,
+         customer_id      = COALESCE(notification_logs.customer_id, EXCLUDED.customer_id),
+         message          = COALESCE(EXCLUDED.message, notification_logs.message),
+         provider_response= EXCLUDED.provider_response,
+         provider_name    = EXCLUDED.provider_name,
+         api_endpoint     = EXCLUDED.api_endpoint,
+         http_status      = EXCLUDED.http_status,
+         request_payload  = EXCLUDED.request_payload,
+         error_code       = EXCLUDED.error_code,
+         error_message    = EXCLUDED.error_message,
+         wamid            = COALESCE(EXCLUDED.wamid, notification_logs.wamid),
+         template         = COALESCE(EXCLUDED.template, notification_logs.template),
+         provider_message_id = COALESCE(EXCLUDED.provider_message_id, notification_logs.provider_message_id),
+         sent_at          = CASE WHEN EXCLUDED.status = 'sent' THEN NOW() ELSE notification_logs.sent_at END,
+         failed_at        = EXCLUDED.failed_at,
+         retry_count      = notification_logs.retry_count`,
       [
         id, data.eventType, data.customerId || null, data.bookingId || null,
         data.customerName || null, data.bookingNumber || null,
         data.channel, data.recipient, data.message || null, data.status,
         data.providerResponse ? JSON.stringify(data.providerResponse) : null,
-        providerName, apiEndpoint, httpStatus, requestPayload, errorCode,
-        wamid, templateId,
+        providerName, apiEndpoint, httpStatus, requestPayload, errorCode, errorMessage,
+        wamid, templateId, providerMessageId,
+        isFailed ? new Date() : null,
+        data.idempotencyKey || null,
       ]
     );
     // ── Enqueue non-WhatsApp failures into the generic retry queue ──────────
@@ -511,10 +559,13 @@ async function sendOnChannel(channel: Channel, ctx: NotificationContext, message
           if (r.rows[0]?.customer_id) pushCustomerId = r.rows[0].customer_id;
         } catch {}
       }
-      if (!pushCustomerId) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      if (!pushCustomerId) return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No customer ID for push — push skipped" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushResult = await sendPushToCustomer(pushCustomerId, { title: "Al Burhan Tours & Travels", body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        if (!pushResult.ok && pushResult.total === 0) {
+          return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No device tokens registered for this customer" } };
+        }
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
@@ -596,21 +647,32 @@ export async function sendBotBeeEventTemplate(
 
   switch (eventType) {
     // ── Booking ───────────────────────────────────────────────────────────────
-    case "new_booking":
+    case "new_booking": {
+      const newBkgPkg = ctx.packageName;
+      if (!newBkgPkg) {
+        console.error(`[notifEngine] MISSING_PACKAGE_DATA: new_booking for bookingId=${bookingId} — packageName is blank after DB enrichment. WhatsApp will use generic name.`);
+      }
       return sendBookingSubmittedTemplate(ctx.customerMobile, {
         customerName: ctx.customerName,
-        packageName: ctx.packageName || "Hajj/Umrah Package",
+        packageName: newBkgPkg || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        // Pass amount so template slot {{4}} / Amount shows the actual booking total, not "-".
+        // ctx.finalAmount is preferred (set from booking.finalAmount in triggerWorkflow call);
+        // ctx.amount is the fallback (some callers use amount= directly).
+        amount: ctx.finalAmount ?? ctx.amount,
         invoiceUrl,
       }, opts);
+    }
 
     case "booking_approved":
       return sendApprovalTemplate(ctx.customerMobile, {
         customerName: (ctx.customerName || "").trim() || "Customer",
         packageName: ctx.packageName || "Hajj/Umrah Package",
         bookingId: bookingRef,
+        bookingNumber: ctx.bookingNumber || bookingRef,   // ABT... number for BookingID variable
         amount: ctx.finalAmount ?? ctx.amount ?? 0,
         invoiceUrl,
+        agreementUrl: (ctx as any).agreementUrl,          // agreement signing link for {{5}}
       }, opts);
 
     // ── Payments ──────────────────────────────────────────────────────────────
@@ -786,11 +848,12 @@ export async function sendBotBeeEventTemplate(
 async function sendWhatsAppForEvent(eventType: EventType, ctx: NotificationContext, message: string, bookingId?: string, customerId?: string): Promise<{ status: "sent" | "failed"; providerResponse: unknown }> {
   console.log(`[notifEngine] sendWhatsAppForEvent: ${eventType} → ${ctx.customerMobile} | isABTTemplate=${ABT_TEMPLATE_EVENTS.has(eventType)}`);
   try {
-    // ── Priority 0: Meta WhatsApp Cloud API (primary provider) ───────────────
+    // ── Priority 0: Meta WhatsApp Cloud API (non-ABT events only) ────────────
     // Activated when META_ACCESS_TOKEN is configured in Replit Secrets.
-    // Falls back automatically to BotBee when not configured or when the
-    // template is not found / not approved in Meta Business Manager.
-    if (isMetaWapiConfigured() && META_EVENT_TEMPLATE_MAP[eventType] !== undefined) {
+    // ABT_TEMPLATE_EVENTS always use BotBee (Priority 1) directly — Meta does
+    // not have those templates approved, so trying Meta first produces
+    // permanently_failed log spam without delivering anything.
+    if (isMetaWapiConfigured() && META_EVENT_TEMPLATE_MAP[eventType] !== undefined && !ABT_TEMPLATE_EVENTS.has(eventType)) {
       console.log(`[notifEngine] ${eventType}: trying Meta Cloud API first (primary provider)…`);
       try {
         const metaResult = await sendMetaEventTemplate(eventType, ctx as Record<string, any>, { bookingId, customerId });
@@ -917,6 +980,9 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           packageName: ctx.packageName,
           bookingId: ctx.bookingId,
           customerId: ctx.customerId,
+          // Skip sms.ts's internal logSMS — notificationEngine handles logging via trackNotification.
+          // Without this, each send creates TWO notification_logs rows (one from sms.ts, one here).
+          skipLog: true,
         };
         let result: import("./sms.js").SMSResult;
         switch (eventType) {
@@ -1056,6 +1122,9 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           customerId: ctx.customerId,
           bookingNumber: ctx.bookingNumber,
           customerName: ctx.customerName,
+          // Skip rcs.ts's internal logRCSNotification — notificationEngine handles logging
+          // via trackNotification to avoid two notification_logs rows per send.
+          skipLog: true,
         });
         return { status: rcsResult.ok ? "sent" : "failed", providerResponse: rcsResult };
       } catch (rcsErr: any) {
@@ -1075,11 +1144,16 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
           if (r.rows[0]?.customer_id) pushCustomerId2 = r.rows[0].customer_id;
         } catch {}
       }
-      if (!pushCustomerId2) return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: "No customer ID for push" } };
+      if (!pushCustomerId2) return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No customer ID for push — push skipped, other channels continue" } };
       try {
         const { sendPushToCustomer } = await import("./webPush.js");
         const pushTitle = buildEmailSubject(eventType, ctx) || "Al Burhan Tours & Travels";
         const pushResult = await sendPushToCustomer(pushCustomerId2, { title: pushTitle, body: message.substring(0, 200), url: "https://alburhantravels.com/customer/dashboard" });
+        // If no device tokens exist, log PUSH_TOKEN_MISSING and treat as skipped (not failed),
+        // so other channels are not affected by the absence of a push subscription.
+        if (!pushResult.ok && pushResult.total === 0) {
+          return { status: "skipped", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorCode: "PUSH_TOKEN_MISSING", errorMessage: "No device tokens registered for this customer" } };
+        }
         return { status: pushResult.ok ? "sent" : "failed", providerResponse: { ok: pushResult.ok, provider: "WebPush", endpoint: "web-push", sent: pushResult.sent, total: pushResult.total } };
       } catch (pushErr: any) {
         return { status: "failed", providerResponse: { ok: false, provider: "WebPush", endpoint: "web-push", errorMessage: pushErr.message } };
@@ -1091,12 +1165,84 @@ async function sendOnChannelWithType(channel: Channel, eventType: EventType, ctx
   }
 }
 
+/**
+ * Load fresh package name and financial amounts from the database when the ctx is incomplete.
+ *
+ * Prevents generic "Hajj/Umrah Package" and "₹0" values appearing in customer-facing messages.
+ * Called at the very top of fireNotificationEvent so ALL downstream channels receive real data.
+ *
+ * Spec requirement (Section 17): fetch packages.name, bookings.final_amount/total_amount via JOIN.
+ * If data is genuinely missing from DB, logs MISSING_PACKAGE_DATA and leaves ctx unchanged.
+ */
+async function enrichCtxFromDB(ctx: NotificationContext): Promise<NotificationContext> {
+  if (!ctx.bookingId) return ctx;  // no booking context — nothing to enrich
+
+  const needsPackage = !ctx.packageName
+    || ctx.packageName === "Hajj/Umrah Package"
+    || ctx.packageName === "Travel Package"
+    || ctx.packageName === "your package";
+  const needsAmount  = ctx.finalAmount == null || ctx.finalAmount === 0;
+
+  if (!needsPackage && !needsAmount) return ctx;  // already fully populated
+
+  try {
+    const row = await pool.query<{
+      package_name: string | null;
+      final_amount:  string | null;
+    }>(
+      `SELECT
+         COALESCE(NULLIF(b.package_name,''), p.name) AS package_name,
+         COALESCE(NULLIF(b.final_amount,''), NULLIF(b.total_amount,'')) AS final_amount
+       FROM bookings b
+       LEFT JOIN packages p ON p.id = b.package_id
+       WHERE b.id = $1
+       LIMIT 1`,
+      [ctx.bookingId]
+    );
+    if (!row.rows[0]) return ctx;
+
+    const r = row.rows[0];
+    const enriched = { ...ctx } as NotificationContext & { [k: string]: unknown };
+
+    if (needsPackage) {
+      if (r.package_name) {
+        enriched.packageName = r.package_name;
+      } else {
+        console.error(
+          `[notifEngine] MISSING_PACKAGE_DATA: bookingId=${ctx.bookingId} event=${ctx.bookingId} — ` +
+          `no package name found in bookings or packages tables.  ` +
+          `WhatsApp/SMS may show generic placeholder.`
+        );
+      }
+    }
+    if (needsAmount && r.final_amount && Number(r.final_amount) > 0) {
+      enriched.finalAmount = Number(r.final_amount);
+    }
+
+    const changed: string[] = [];
+    if (enriched.packageName !== ctx.packageName) changed.push(`packageName="${enriched.packageName}"`);
+    if (enriched.finalAmount  !== ctx.finalAmount)  changed.push(`finalAmount=${enriched.finalAmount}`);
+    if (changed.length) {
+      console.log(`[notifEngine] enrichCtxFromDB: bookingId=${ctx.bookingId} → ${changed.join(", ")}`);
+    }
+
+    return enriched as NotificationContext;
+  } catch (err) {
+    console.warn("[notifEngine] enrichCtxFromDB failed (non-fatal):", err instanceof Error ? err.message : err);
+    return ctx;
+  }
+}
+
 export async function fireNotificationEvent(
   eventType: EventType,
   ctx: NotificationContext,
   opts: { dedupWindowHours?: number } = {}
 ): Promise<void> {
-  console.log(`[notifEngine] ▶ fireNotificationEvent: ${eventType} | mobile=${ctx.customerMobile} | customer=${ctx.customerName} | booking=${ctx.bookingId || "none"}`);
+  // ── DATA COMPLETENESS: load real package name + amounts from DB when missing ──
+  // Must happen BEFORE dedup check and channel dispatch so every channel gets real data.
+  ctx = await enrichCtxFromDB(ctx);
+
+  console.log(`[notifEngine] ▶ fireNotificationEvent: ${eventType} | mobile=${ctx.customerMobile} | customer=${ctx.customerName} | booking=${ctx.bookingId || "none"} | pkg="${ctx.packageName}" | amount=${ctx.finalAmount}`);
 
   // ── IDEMPOTENCY: skip if this exact event+booking was sent recently ─────────
   const dedupWindow = opts.dedupWindowHours ?? defaultDedupWindow(eventType);
@@ -1121,6 +1267,31 @@ export async function fireNotificationEvent(
     }
   }
 
+  // ── PAYMENT IDEMPOTENCY: skip if this exact payment (paymentRef) already triggered this event ──
+  // Prevents double-firing when both Razorpay verify and webhook endpoints call
+  // processPaymentSuccessNotifications for the same payment transaction simultaneously.
+  const paymentRefCtx = (ctx as any).paymentRef as string | undefined;
+  if (paymentRefCtx && (eventType === "payment_received" || eventType === "partial_payment")) {
+    try {
+      const recent = await pool.query(
+        `SELECT id FROM notification_logs
+         WHERE booking_id = $1
+           AND event_type = $2
+           AND idempotency_key LIKE $3
+           AND status = 'sent'
+         LIMIT 1`,
+        [ctx.bookingId, eventType, `pay:${paymentRefCtx}:%`]
+      );
+      if (recent.rows.length > 0) {
+        console.log(`[notifEngine] ⏭ PAYMENT-DEDUP-BLOCKED: ${eventType} already fired for paymentRef=${paymentRefCtx} (log=${recent.rows[0].id})`);
+        return;
+      }
+      console.log(`[notifEngine] ✓ Payment dedup OK: no prior ${eventType} send for paymentRef=${paymentRefCtx}`);
+    } catch (dedupErr: any) {
+      console.warn(`[notifEngine] ⚠ payment dedup check failed (non-fatal):`, dedupErr?.message);
+    }
+  }
+
   const enabled = await getEnabledChannels(eventType);
   const orderedChannels = CHANNEL_PRIORITY.filter(c => {
     if (!enabled.includes(c)) return false;
@@ -1138,6 +1309,58 @@ export async function fireNotificationEvent(
   const templateBody = await getTemplate(eventType, orderedChannels[0] ?? "whatsapp");
   const message = templateBody ? applyTemplate(templateBody, ctx) : buildDefaultMessage(eventType, ctx);
 
+  // ── IDEMPOTENCY PRE-RESERVATION: check + reserve keys BEFORE calling providers ──
+  // For each channel, compute the idempotency key and check whether it already exists
+  // in notification_logs with a non-failed status. Skip channels that are already
+  // reserved/sent. This prevents concurrent webhook/retry calls from double-sending
+  // even when both pass the time-window dedup check above.
+  const paymentRef = (ctx as any).paymentRef as string | undefined;
+  const channelKeyMap: Record<string, string> = {};
+  if (ctx.bookingId) {
+    for (const ch of orderedChannels) {
+      channelKeyMap[ch] = paymentRef
+        ? `pay:${paymentRef}:${eventType}:${ch}`
+        : `${eventType}:${ctx.bookingId}:${ch}`;
+    }
+    const keyValues = Object.values(channelKeyMap);
+    if (keyValues.length > 0) {
+      try {
+        const existing = await pool.query(
+          `SELECT idempotency_key FROM notification_logs
+           WHERE idempotency_key = ANY($1) AND status IN ('sent','pending')`,
+          [keyValues]
+        );
+        const reservedKeys = new Set(existing.rows.map((r: any) => r.idempotency_key));
+        const channelsToFire = orderedChannels.filter(ch => !reservedKeys.has(channelKeyMap[ch]));
+        const skippedChannels = orderedChannels.filter(ch => reservedKeys.has(channelKeyMap[ch]));
+        if (skippedChannels.length > 0) {
+          console.log(`[notifEngine] ${eventType}: IDEMPOTENCY-PRE-SKIP channels [${skippedChannels.join(", ")}] — key already reserved/sent`);
+        }
+        // Pre-insert "pending" rows to hold the slot before any provider call
+        for (const ch of channelsToFire) {
+          const iKey = channelKeyMap[ch];
+          const reserveId = `nr_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+          await pool.query(
+            `INSERT INTO notification_logs
+               (id, event_type, channel, recipient, status, booking_id, customer_name, booking_number, idempotency_key, created_at)
+             VALUES ($1,$2,$3,$4,'pending',$5,$6,$7,$8,NOW())
+             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
+            [reserveId, eventType, ch, ctx.customerMobile, ctx.bookingId, ctx.customerName ?? null, ctx.bookingNumber ?? null, iKey]
+          ).catch((e: any) => console.warn(`[notifEngine] pre-reserve insert failed (non-fatal):`, e?.message));
+        }
+        // Replace orderedChannels with the filtered list in-place
+        orderedChannels.splice(0, orderedChannels.length, ...channelsToFire);
+      } catch (preResErr: any) {
+        console.warn(`[notifEngine] pre-reservation check failed (non-fatal):`, preResErr?.message);
+      }
+    }
+  }
+
+  if (orderedChannels.length === 0) {
+    console.log(`[notifEngine] ${eventType}: all channels skipped by idempotency pre-reservation`);
+    return;
+  }
+
   // ── BROADCAST MODE: fire ALL enabled channels in parallel ──────────────────
   console.log(`[notifEngine] ${eventType}: dispatching to ${orderedChannels.length} channel(s)…`);
   const results = await Promise.allSettled(
@@ -1152,12 +1375,27 @@ export async function fireNotificationEvent(
       ? result.value
       : { status: "failed" as const, providerResponse: { ok: false, errorMessage: (result.reason as Error)?.message } };
 
+    // Build idempotency key — matches the pre-reserved key so trackNotification uses ON CONFLICT UPDATE
+    const pr2 = providerResponse as Record<string, unknown> | null | undefined;
+    const smsRequestId = pr2?.messageId || pr2?.request_id ||
+      (pr2?.rawResponse as Record<string, unknown>)?.request_id || null;
+    let iKey: string | undefined;
+    if (paymentRef) {
+      iKey = `pay:${paymentRef}:${eventType}:${channel}`;
+    } else if (channel === "sms" && smsRequestId && ctx.bookingId) {
+      // SMS: keyed by Fast2SMS request_id to collapse the sms.ts internal log + notificationEngine log
+      iKey = `sms:${ctx.bookingId}:${eventType}:${smsRequestId}`;
+    } else if (channelKeyMap[channel]) {
+      // Use the pre-reserved key so the final INSERT resolves against the reserved "pending" row
+      iKey = channelKeyMap[channel];
+    }
     await trackNotification({
       eventType, channel,
       recipient: channel === "email" ? (ctx.customerEmail || ctx.customerMobile) : ctx.customerMobile,
       customerId: ctx.customerId, bookingId: ctx.bookingId,
       customerName: ctx.customerName, bookingNumber: ctx.bookingNumber,
       message, status, providerResponse,
+      idempotencyKey: iKey,
     });
     if (status === "sent") {
       successCount++;

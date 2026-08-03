@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, pilgrimsTable, hajjGroupsTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

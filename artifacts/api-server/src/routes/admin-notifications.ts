@@ -9,6 +9,7 @@ import {
   markAllNotificationsRead,
   deleteAdminNotification,
 } from "../lib/adminNotifications.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

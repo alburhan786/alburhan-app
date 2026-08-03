@@ -8,6 +8,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -51,22 +52,23 @@ ensureAnalyticsTables().catch(e => console.error("[Analytics] Migration error:",
 //  GET /api/analytics/booking-funnel
 //  Returns stage-by-stage funnel data from leads → bookings → confirmed → departed
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/booking-funnel", requireAdmin as any, async (_req, res) => {
+router.get("/booking-funnel", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const [leads, bookings, payments, confirmed, departed] = await Promise.all([
-      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE created_at >= NOW() - INTERVAL '90 days'`),
-      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE created_at >= NOW() - INTERVAL '90 days'`),
-      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE paid_amount > 0 AND created_at >= NOW() - INTERVAL '90 days'`),
-      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE status IN ('confirmed','completed') AND created_at >= NOW() - INTERVAL '90 days'`),
-      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE status = 'completed' AND created_at >= NOW() - INTERVAL '90 days'`),
+      pool.query(`SELECT COUNT(*)::int as count FROM leads WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '90 days'`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '90 days'`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE tenant_id=$1::uuid AND paid_amount > 0 AND created_at >= NOW() - INTERVAL '90 days'`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE tenant_id=$1::uuid AND status IN ('confirmed','completed') AND created_at >= NOW() - INTERVAL '90 days'`, [tenantId]),
+      pool.query(`SELECT COUNT(*)::int as count FROM bookings WHERE tenant_id=$1::uuid AND status = 'completed' AND created_at >= NOW() - INTERVAL '90 days'`, [tenantId]),
     ]);
 
     // Lead stage breakdown
     const leadStages = await pool.query(`
       SELECT pipeline_stage as stage, COUNT(*)::int as count
-      FROM leads WHERE created_at >= NOW() - INTERVAL '90 days'
+      FROM leads WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '90 days'
       GROUP BY pipeline_stage ORDER BY count DESC
-    `);
+    `, [tenantId]);
 
     // Monthly booking trend (last 6 months)
     const monthlyTrend = await pool.query(`
@@ -76,10 +78,10 @@ router.get("/booking-funnel", requireAdmin as any, async (_req, res) => {
         COUNT(*)::int as bookings,
         COALESCE(SUM(final_amount),0)::bigint as revenue
       FROM bookings
-      WHERE created_at >= NOW() - INTERVAL '6 months'
+      WHERE tenant_id=$1::uuid AND created_at >= NOW() - INTERVAL '6 months'
       GROUP BY month_key, month
       ORDER BY month_key ASC
-    `);
+    `, [tenantId]);
 
     const totalLeads = leads.rows[0].count || 1;
 
@@ -105,6 +107,7 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
   try {
     const months = parseInt(String(req.query.months || "12"));
 
+    const tenantId = getTenantId(req);
     const [monthly, byPackage, bySource, summary] = await Promise.all([
       pool.query(`
         SELECT
@@ -113,10 +116,11 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
           COALESCE(SUM(pt.amount),0)::bigint as collected,
           COUNT(DISTINCT pt.booking_id)::int as bookings
         FROM payment_transactions pt
-        WHERE pt.created_at >= NOW() - ($1 || ' months')::INTERVAL
+        WHERE pt.tenant_id=$2::uuid
+          AND pt.created_at >= NOW() - ($1 || ' months')::INTERVAL
           AND (pt.is_deleted IS NULL OR pt.is_deleted=false)
         GROUP BY month_key, month ORDER BY month_key ASC
-      `, [months]),
+      `, [months, tenantId]),
 
       pool.query(`
         SELECT
@@ -127,9 +131,9 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
           COALESCE(SUM(b.final_amount - b.paid_amount),0)::bigint as outstanding
         FROM bookings b
         LEFT JOIN packages p ON p.id = b.package_id
-        WHERE b.created_at >= NOW() - ($1 || ' months')::INTERVAL
+        WHERE b.tenant_id=$2::uuid AND b.created_at >= NOW() - ($1 || ' months')::INTERVAL
         GROUP BY p.name ORDER BY revenue DESC LIMIT 10
-      `, [months]),
+      `, [months, tenantId]),
 
       pool.query(`
         SELECT
@@ -138,9 +142,9 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
           COALESCE(SUM(b.final_amount),0)::bigint as revenue
         FROM bookings b
         LEFT JOIN leads l ON l.converted_booking_id = b.id
-        WHERE b.created_at >= NOW() - ($1 || ' months')::INTERVAL
+        WHERE b.tenant_id=$2::uuid AND b.created_at >= NOW() - ($1 || ' months')::INTERVAL
         GROUP BY source ORDER BY revenue DESC LIMIT 10
-      `, [months]),
+      `, [months, tenantId]),
 
       pool.query(`
         SELECT
@@ -151,8 +155,8 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
           COUNT(DISTINCT CASE WHEN b.status = 'confirmed' THEN b.id END)::int as confirmed_bookings
         FROM bookings b
         LEFT JOIN payment_transactions pt ON pt.booking_id = b.id
-        WHERE b.created_at >= NOW() - ($1 || ' months')::INTERVAL
-      `, [months]),
+        WHERE b.tenant_id=$2::uuid AND b.created_at >= NOW() - ($1 || ' months')::INTERVAL
+      `, [months, tenantId]),
     ]);
 
     res.json({
@@ -168,17 +172,18 @@ router.get("/revenue", requireAdmin as any, async (req, res) => {
 //  GET /api/analytics/marketing
 //  Marketing campaign performance dashboard data
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/marketing", requireAdmin as any, async (_req, res) => {
+router.get("/marketing", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const campaigns = await pool.query(`
       SELECT *, 
         CASE WHEN spend > 0 THEN ROUND((revenue_attr / spend * 100)::numeric, 1) ELSE 0 END as roi_pct,
         CASE WHEN impressions > 0 THEN ROUND((clicks::numeric / impressions * 100), 2) ELSE 0 END as ctr,
         CASE WHEN leads_gen > 0 THEN ROUND((conversions::numeric / leads_gen * 100), 1) ELSE 0 END as conv_rate,
         CASE WHEN spend > 0 AND leads_gen > 0 THEN ROUND(spend / leads_gen, 0) ELSE 0 END as cpl
-      FROM marketing_campaigns
+      FROM marketing_campaigns WHERE tenant_id=$1::uuid
       ORDER BY created_at DESC LIMIT 50
-    `);
+    `, [tenantId]);
 
     const summary = await pool.query(`
       SELECT
@@ -190,8 +195,8 @@ router.get("/marketing", requireAdmin as any, async (_req, res) => {
         COALESCE(SUM(conversions),0)::int as total_conversions,
         COALESCE(SUM(revenue_attr),0)::bigint as total_revenue,
         CASE WHEN SUM(spend) > 0 THEN ROUND(SUM(revenue_attr)/SUM(spend)*100,1) ELSE 0 END as overall_roi
-      FROM marketing_campaigns
-    `);
+      FROM marketing_campaigns WHERE tenant_id=$1::uuid
+    `, [tenantId]);
 
     // Channel breakdown
     const byChannel = await pool.query(`
@@ -199,8 +204,8 @@ router.get("/marketing", requireAdmin as any, async (_req, res) => {
         COALESCE(SUM(spend),0)::bigint as spend,
         COALESCE(SUM(leads_gen),0)::int as leads,
         COALESCE(SUM(revenue_attr),0)::bigint as revenue
-      FROM marketing_campaigns GROUP BY channel ORDER BY spend DESC
-    `);
+      FROM marketing_campaigns WHERE tenant_id=$1::uuid GROUP BY channel ORDER BY spend DESC
+    `, [tenantId]);
 
     res.json({ campaigns: campaigns.rows, summary: summary.rows[0], byChannel: byChannel.rows });
   } catch (err: any) { res.status(500).json({ error: err.message }); }

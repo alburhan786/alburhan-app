@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { db, pool, bookingsTable, paymentTransactionsTable, reminderLogsTable } from "@workspace/db";
@@ -9,7 +10,6 @@ import { CreatePaymentOrderBody, VerifyPaymentBody } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendAdminPaymentAlert, sendWhatsApp, type EmailAttachment } from "../lib/notifications.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
-import { sendPaymentReceipt } from "../services/emailService.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { generateInvoicePdfBuffer, generateReceiptPdfBuffer } from "../lib/paymentDocs.js";
 import { sendReminderForBookingId, getReminderHistory, runDailyReminders, isRemindersEnabled, setRemindersEnabled } from "../jobs/paymentReminder.js";
@@ -92,11 +92,27 @@ async function recordOnlinePaymentTransaction(
   const today = new Date().toISOString().slice(0, 10);
   const txnId = crypto.randomUUID();
   try {
+    // Use advisory lock keyed by hashtext(reference_number) so that concurrent verify +
+    // webhook calls for the same Razorpay payment ID never race past each other.
+    // pg_try_advisory_xact_lock is transaction-scoped and released automatically at commit/rollback.
+    const lockRes = await pool.query(
+      `SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS locked`,
+      [razorpayPaymentId]
+    );
+    const gotLock = lockRes.rows[0]?.locked === true;
+    if (!gotLock) {
+      // Another concurrent request is processing the same paymentId right now — skip.
+      console.log(`[payments] payment_transactions: advisory lock not acquired for ${razorpayPaymentId} — skipping duplicate`);
+      return null;
+    }
+
     const r = await pool.query(
+      // UNIQUE INDEX on reference_number (migration v33.1) is the DB-level safety net.
+      // The application-level WHERE NOT EXISTS guard is kept as a fast pre-check.
       `INSERT INTO payment_transactions (id, booking_id, amount, payment_date, payment_mode, reference_number, notes)
        SELECT $1,$2,$3,$4,'online',$5,$6
        WHERE NOT EXISTS (
-         SELECT 1 FROM payment_transactions WHERE reference_number=$5 AND booking_id=$2
+         SELECT 1 FROM payment_transactions WHERE reference_number=$5
        )
        RETURNING id`,
       [txnId, bookingId, String(amount), today, razorpayPaymentId, note]
@@ -116,6 +132,11 @@ async function recordOnlinePaymentTransaction(
     }).catch((e: any) => console.error("[payments] postPaymentJournal failed (non-fatal):", e?.message));
     return insertedId;
   } catch (e: any) {
+    if ((e?.code === "23505") /* unique_violation */) {
+      // The UNIQUE index on reference_number caught a concurrent insert — treat as duplicate
+      console.log(`[payments] payment_transactions: UNIQUE constraint blocked duplicate insert for ${razorpayPaymentId}`);
+      return null;
+    }
     console.error("[payments] payment_transactions insert failed:", e?.message);
     return null;
   }
@@ -154,9 +175,8 @@ export async function processPaymentSuccessNotifications(opts: {
 }) {
   const { booking, isFullyPaid, thisPaymentAmount, newPaidAmount, remainingBalance, invoiceNumber, paymentRef, paymentMode, paymentDate } = opts;
   const finalAmountNum = Number(booking.finalAmount || 0);
-  const siteBase = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // Never use REPLIT_DEV_DOMAIN — if accidentally set on VPS it produces malformed URLs.
+  const siteBase = (process.env.SITE_URL || "https://alburhantravels.com").trim();
   const invoiceUrl = invoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : undefined;
 
   // Auto receipt number: RCP-{bookingNumber}-{last6 of ms timestamp}
@@ -217,33 +237,10 @@ export async function processPaymentSuccessNotifications(opts: {
     console.error("[payments] Payment Receipt PDF generation failed (notifications will still send):", err);
   }
 
-  // ── Auto-send Tax Invoice PDF + Receipt PDF via WhatsApp (fire-and-forget) ─
-  if (attachments.length > 0) {
-    const _attachments   = [...attachments];
-    const _bookingMobile = booking.customerMobile;
-    const _bookingNumber = booking.bookingNumber;
-    const _bookingId     = booking.id;
-    const _customerId    = booking.customerId ?? undefined;
-    (async () => {
-      try {
-        const { sendPDFDocument } = await import("../lib/botbee.js");
-        const waOpts = { eventType: "payment_received", bookingId: _bookingId, customerId: _customerId };
-        for (const att of _attachments) {
-          const label = att.filename.startsWith("TaxInvoice") ? "Tax Invoice" : "Payment Receipt";
-          const r = await sendPDFDocument(
-            _bookingMobile,
-            att.content as Buffer,
-            att.filename,
-            `Your ${label} – Al Burhan Tours & Travels (Booking: ${_bookingNumber})`,
-            waOpts,
-          );
-          console.log(`[payments] WhatsApp ${label} PDF for ${_bookingNumber}: ${r.ok ? "✅ sent" : "❌ " + r.errorMessage}`);
-        }
-      } catch (pdfWaErr: any) {
-        console.error("[payments] WhatsApp PDF delivery failed (non-fatal):", pdfWaErr?.message);
-      }
-    })();
-  }
+  // NOTE: WhatsApp PDF delivery (Tax Invoice + Receipt) is handled by notificationEngine's
+  // WhatsApp attachment IIFE (sendOnChannelWithType → ctx.attachments loop). The attachments
+  // array is passed in triggerWorkflow ctx below. Do NOT add a separate PDF IIFE here — it
+  // would create a second delivery path and the customer would receive duplicate PDFs.
 
   const trigger = isFullyPaid ? "payment_received" : "partial_payment_received";
   const displayAmount = (isFullyPaid ? finalAmountNum : thisPaymentAmount).toLocaleString("en-IN");
@@ -291,22 +288,9 @@ export async function processPaymentSuccessNotifications(opts: {
     }
   });
 
-  // ── Customer payment receipt email (fire-and-forget) ──────────────────────
-  if (booking.customerEmail) {
-    sendPaymentReceipt(booking.customerEmail, {
-      customerName:  booking.customerName,
-      bookingNumber: booking.bookingNumber,
-      packageName:   booking.packageName ?? undefined,
-      paymentAmount: thisPaymentAmount,
-      paymentDate:   new Date(),
-      totalAmount:   finalAmountNum || undefined,
-      paidSoFar:     newPaidAmount,
-      balanceDue:    remainingBalance > 0 ? remainingBalance : undefined,
-    }).then(r => {
-      if (!r.ok) console.error(`[payments] Payment receipt email failed for ${booking.bookingNumber}:`, r.error);
-      else console.log(`[payments] Payment receipt email sent to ${booking.customerEmail} for ${booking.bookingNumber}`);
-    }).catch(err => console.error(`[payments] Payment receipt email error for ${booking.bookingNumber}:`, err?.message));
-  }
+  // NOTE: Email is sent by triggerWorkflow → fireNotificationEvent → notificationEngine above,
+  // with PDF attachments included in ctx.attachments. A separate sendPaymentReceipt() call
+  // was removed to prevent the duplicate email that previously reached every customer twice.
 
   // Auto-generate/refresh Hajj Agreement on every payment (partial or full)
   if (booking.id) {
@@ -507,6 +491,37 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     return;
   }
 
+  // ── EARLY IDEMPOTENCY CHECK: bail out before writing if this paymentId was already recorded ──
+  // Handles the "customer presses back and resubmits" and "webhook fires before verify responds" cases.
+  {
+    const dupTxn = await pool.query(
+      `SELECT id FROM payment_transactions WHERE reference_number=$1 LIMIT 1`,
+      [razorpayPaymentId]
+    );
+    if (dupTxn.rows.length > 0) {
+      console.log(`[verify] IDEMPOTENCY: paymentId ${razorpayPaymentId} already in payment_transactions — returning success without re-processing`);
+      // Return success so the customer's success page renders correctly
+      const currentBooking = await pool.query(`SELECT * FROM bookings WHERE id=$1 LIMIT 1`, [bookingId]);
+      const bk = mapBookingRow(currentBooking.rows[0]);
+      const siteBaseIdm = (process.env.SITE_URL || "https://alburhantravels.com").trim();
+      res.json({
+        success: true,
+        alreadyProcessed: true,
+        invoice: bk.invoiceNumber ? `${siteBaseIdm}/invoice/${bk.bookingNumber}` : null,
+        status: bk.status,
+        isFullyPaid: bk.status === "confirmed",
+        invoiceNumber: bk.invoiceNumber || null,
+        booking: {
+          ...bk,
+          totalAmount: bk.totalAmount ? Number(bk.totalAmount) : null,
+          finalAmount: bk.finalAmount ? Number(bk.finalAmount) : null,
+          paidAmount: bk.paidAmount ? Number(bk.paidAmount) : null,
+        },
+      });
+      return;
+    }
+  }
+
   const finalAmount = Number(existingBooking.finalAmount || 0);
   const previouslyPaid = Number(existingBooking.paidAmount || 0);
   const thisPayment = payAmount ?? (finalAmount - previouslyPaid);
@@ -590,9 +605,8 @@ router.post("/verify", requireAuth as any, async (req: AuthenticatedRequest, res
     console.error("[verify] processPaymentSuccessNotifications failed:", err);
   }
 
-  const siteBase = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : (process.env.SITE_URL || "https://alburhantravels.com");
+  // Never use REPLIT_DEV_DOMAIN — if accidentally set on VPS it produces malformed URLs.
+  const siteBase = (process.env.SITE_URL || "https://alburhantravels.com").trim();
   const invoiceUrl = finalInvoiceNumber ? `${siteBase}/invoice/${booking.bookingNumber}` : null;
 
   res.json({
@@ -1942,16 +1956,31 @@ router.post("/resend-notification/:bookingId", requireAdmin as any, async (req: 
     // ── 6. Agreement (if one exists for this booking) ─────────────────────────
     try {
       const agrQ = await pool.query(
-        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected') ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, agreement_number, status, access_token, access_token_expires_at, created_at
+         FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','rejected','superseded') ORDER BY created_at DESC LIMIT 1`,
         [row.id]
       );
       if (agrQ.rows.length > 0) {
         const agr = agrQ.rows[0];
+        // Ensure the signing URL always carries a valid access_token.
+        // If the stored token is missing or expired, generate a fresh 72-hour token.
+        let signingToken: string = agr.access_token || "";
+        const tokenExpired = agr.access_token_expires_at && new Date() > new Date(agr.access_token_expires_at);
+        if (agr.status !== "signed" && (!signingToken || tokenExpired)) {
+          signingToken = crypto.randomBytes(32).toString("hex");
+          await pool.query(
+            `UPDATE agreements SET access_token=$1, access_token_expires_at=NOW() + INTERVAL '72 hours', updated_at=NOW() WHERE id=$2`,
+            [signingToken, agr.id]
+          );
+        }
+        const agreementUrl = agr.status === "signed"
+          ? `${siteBase}/sign-agreement/${row.booking_number}`
+          : `${siteBase}/sign-agreement/${row.booking_number}?token=${signingToken}`;
         const { sendAgreementReadyTemplate } = await import("../lib/botbee.js");
         const agrResult = await sendAgreementReadyTemplate(row.customer_mobile, {
           customerName: row.customer_name, bookingId: row.booking_number,
           agreementNumber: agr.agreement_number,
-          agreementUrl: `${siteBase}/agreement/${row.booking_number}`,
+          agreementUrl,
         }, { eventType: "agreement_ready", bookingId: row.id, customerId: row.customer_id ?? undefined, forceTemplateApi: true });
         summary.push({ key: "agreement", label: "Agreement", status: agrResult.ok ? "sent" : "failed", reason: agrResult.ok ? undefined : (agrResult.errorMessage || "Send failed") });
       }
@@ -2015,12 +2044,13 @@ router.get("/my-payments/:bookingId", requireAuth as any, async (req: Authentica
   const { bookingId } = req.params;
   try {
     const bRes = await pool.query(
-      `SELECT id, customer_mobile, status FROM bookings WHERE id=$1 LIMIT 1`,
+      `SELECT id, customer_id, status FROM bookings WHERE id=$1 LIMIT 1`,
       [bookingId]
     );
     const bk = bRes.rows[0];
     if (!bk) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (req.user?.role !== "admin" && bk.customer_mobile !== req.user?.mobile) {
+    // Use customer_id equality — mobile string comparison is brittle (country code/format differences)
+    if (req.user?.role !== "admin" && req.user?.role !== "super_admin" && bk.customer_id !== req.user?.id) {
       res.status(403).json({ message: "Access denied" }); return;
     }
     const txRes = await pool.query(
@@ -2059,7 +2089,8 @@ router.get("/receipt-pdf/:bookingId", requireAuth as any, async (req: Authentica
     );
     const row = bRes.rows[0];
     if (!row) { res.status(404).json({ message: "Booking not found" }); return; }
-    if (req.user?.role !== "admin" && row.customer_mobile !== req.user?.mobile) {
+    // Use customer_id equality — mobile string comparison is brittle (country code/format differences)
+    if (req.user?.role !== "admin" && req.user?.role !== "super_admin" && row.customer_id !== req.user?.id) {
       res.status(403).json({ message: "Access denied" }); return;
     }
     const paidAmount = Number(row.paid_amount || 0);

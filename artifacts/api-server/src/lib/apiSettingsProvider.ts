@@ -244,7 +244,7 @@ function buildEnvFallback(provider: ProviderName): ProviderConfig {
         apiKey: process.env.LEMIN_API_KEY,
         extra: {
           user_id: process.env.LEMIN_USER_ID || "",
-          template_id: process.env.LEMIN_TEMPLATE_ID || "1473",
+          template_id: process.env.LEMIN_TEMPLATE_ID || "",  // no hardcoded default — read from rcs_template_mappings
         },
       };
     case "smtp":

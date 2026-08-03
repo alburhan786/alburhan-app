@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("payroll") as any);

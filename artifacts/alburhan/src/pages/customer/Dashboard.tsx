@@ -1210,8 +1210,10 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
     if (win) win.addEventListener("load", () => { win.focus(); win.print(); });
   }
 
-  async function handleShare(rawUrl: string, fileName: string) {
-    const fullUrl = `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
+  async function handleShare(rawUrl: string, fileName: string, secureUrl?: string) {
+    // Prefer secure token URL (never exposes GCS signed URLs externally)
+    const fullUrl = secureUrl
+      || `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
     if (navigator.share) {
       try { await navigator.share({ title: fileName, url: fullUrl }); } catch (_) {}
     } else {
@@ -1447,13 +1449,24 @@ function TravelDocumentsCard({ bookingId, bookingNumber, invoiceNumber, bookingS
                         <span className="text-[10px] font-medium text-muted-foreground">Print</span>
                       </button>
                     )}
-                    <button
-                      onClick={() => handleShare(doc.fileUrl, name)}
-                      className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
-                    >
-                      <Share2 size={15} className={meta.color} />
-                      <span className="text-[10px] font-medium text-muted-foreground">Share</span>
-                    </button>
+                    {doc.accessToken && bookingNumber ? (
+                      <button
+                        onClick={() => handleShare(
+                          doc.fileUrl,
+                          name,
+                          `https://alburhantravels.com/api/documents/public/${bookingNumber}/${doc.documentType}?token=${doc.accessToken}`
+                        )}
+                        className="flex flex-col items-center gap-1 py-2 hover:bg-black/5 transition-colors w-full"
+                      >
+                        <Share2 size={15} className={meta.color} />
+                        <span className="text-[10px] font-medium text-muted-foreground">Share</span>
+                      </button>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 py-2 w-full opacity-30 cursor-not-allowed" title="Share link not yet available">
+                        <Share2 size={15} className={meta.color} />
+                        <span className="text-[10px] font-medium text-muted-foreground">Share</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -2707,6 +2720,9 @@ export default function CustomerDashboard() {
   const [paymentHistory, setPaymentHistory] = useState<Record<string, any[]>>({});
   const [historyLoading, setHistoryLoading] = useState<Record<string, boolean>>({});
   const [showPayHistory, setShowPayHistory] = useState<Record<string, boolean>>({});
+  const [notifHistory, setNotifHistory] = useState<Record<string, any[]>>({});
+  const [notifHistoryLoading, setNotifHistoryLoading] = useState<Record<string, boolean>>({});
+  const [showNotifHistory, setShowNotifHistory] = useState<Record<string, boolean>>({});
   const [downloadingReceipt, setDownloadingReceipt] = useState<Record<string, boolean>>({});
 
   const [profileExt, setProfileExt] = useState<{ blood_group?: string; emergency_contact_name?: string; emergency_contact_mobile?: string }>({});
@@ -2937,6 +2953,26 @@ export default function CustomerDashboard() {
     const nowShown = !showPayHistory[bookingId];
     setShowPayHistory(prev => ({ ...prev, [bookingId]: nowShown }));
     if (nowShown) loadPaymentHistory(bookingId);
+  };
+
+  const loadNotifHistory = async (bookingId: string) => {
+    if (notifHistory[bookingId] !== undefined || notifHistoryLoading[bookingId]) return;
+    setNotifHistoryLoading(prev => ({ ...prev, [bookingId]: true }));
+    try {
+      const res = await fetch(`${BASE_API}/api/notifications/history/${bookingId}`, { credentials: "include" });
+      if (res.ok) {
+        const d = await res.json();
+        setNotifHistory(prev => ({ ...prev, [bookingId]: d.logs || [] }));
+      }
+    } catch { /* silent */ } finally {
+      setNotifHistoryLoading(prev => ({ ...prev, [bookingId]: false }));
+    }
+  };
+
+  const toggleNotifHistory = (bookingId: string) => {
+    const nowShown = !showNotifHistory[bookingId];
+    setShowNotifHistory(prev => ({ ...prev, [bookingId]: nowShown }));
+    if (nowShown) loadNotifHistory(bookingId);
   };
 
   return (
@@ -3280,8 +3316,21 @@ export default function CustomerDashboard() {
                         <p className="font-semibold">{booking.numberOfPilgrims} Person(s)</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Departure Date</p>
-                        <p className="font-semibold">{booking.preferredDepartureDate ? formatDate(booking.preferredDepartureDate) : 'To be confirmed'}</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                          {(booking as any).departureDate ? 'Group Departure' : 'Preferred Departure'}
+                        </p>
+                        <p className="font-semibold">
+                          {(booking as any).departureDate
+                            ? formatDate((booking as any).departureDate)
+                            : booking.preferredDepartureDate
+                              ? formatDate(booking.preferredDepartureDate)
+                              : 'To be confirmed'}
+                        </p>
+                        {(booking as any).returnDate && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Returns {formatDate((booking as any).returnDate)}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Amount</p>
@@ -3643,6 +3692,53 @@ export default function CustomerDashboard() {
                               </div>
                             )}
                           </div>
+
+                          {/* Communications Log toggle */}
+                          <div className="mt-2 border-t border-emerald-200 pt-2">
+                            <button
+                              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+                              onClick={() => toggleNotifHistory(booking.id)}
+                            >
+                              <Bell className="w-3.5 h-3.5" />
+                              {showNotifHistory[booking.id] ? "Hide" : "View"} Communications Log
+                              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showNotifHistory[booking.id] ? "rotate-90" : ""}`} />
+                            </button>
+                            {showNotifHistory[booking.id] && (
+                              <div className="mt-2 space-y-1.5">
+                                {notifHistoryLoading[booking.id] ? (
+                                  <p className="text-xs text-emerald-600 py-2 text-center">Loading…</p>
+                                ) : (notifHistory[booking.id] || []).length === 0 ? (
+                                  <p className="text-xs text-emerald-600 py-2 text-center">No communication records found.</p>
+                                ) : (notifHistory[booking.id] || []).map((log: any) => {
+                                  const channelEmoji: Record<string, string> = {
+                                    whatsapp: "💬", sms: "📱", email: "📧", rcs: "💬", push: "🔔",
+                                  };
+                                  const statusColor: Record<string, string> = {
+                                    sent: "text-emerald-700", delivered: "text-emerald-700",
+                                    read: "text-blue-700", failed: "text-red-700",
+                                    permanently_failed: "text-red-700", skipped: "text-gray-500",
+                                    pending: "text-amber-600", queued: "text-amber-600",
+                                  };
+                                  return (
+                                    <div key={log.id} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2 text-xs border border-emerald-100 gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="shrink-0">{channelEmoji[log.channel] || "📢"}</span>
+                                        <div className="min-w-0">
+                                          <p className="font-semibold text-emerald-900 truncate capitalize">{(log.eventType || log.channel || "notification").replace(/_/g, " ")}</p>
+                                          <p className="text-emerald-600/70">
+                                            {new Date(log.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <span className={`shrink-0 font-semibold capitalize ${statusColor[log.status] || "text-gray-600"}`}>
+                                        {log.status?.replace(/_/g, " ") || "—"}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -3652,7 +3748,7 @@ export default function CustomerDashboard() {
                       const finalAmt  = Number(booking.finalAmount  || 0);
                       const paidAmt   = Number(booking.paidAmount   || 0);
                       const balance   = finalAmt - paidAmt;
-                      const dueDate   = (booking as any).dueDate ? new Date((booking as any).dueDate) : null;
+                      const dueDate   = (booking as any).paymentDueDate ? new Date((booking as any).paymentDueDate) : null;
                       if (balance <= 0 || !['approved','partially_paid'].includes(booking.status)) return null;
 
                       // Calculate next reminder date based on schedule

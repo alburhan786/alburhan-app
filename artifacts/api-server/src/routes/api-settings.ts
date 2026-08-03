@@ -7,6 +7,7 @@ import { auditLog } from "../lib/audit.js";
 import { isPlaceholderKey } from "../lib/keyValidation.js";
 import axios from "axios";
 import nodemailer from "nodemailer";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -21,6 +22,72 @@ function requireSuperAdmin(req: any, res: any, next: any) {
 
 const PROVIDERS = ["botbee", "fast2sms", "lemin", "smtp", "firebase", "razorpay"] as const;
 type Provider = typeof PROVIDERS[number];
+
+/**
+ * Hardcoded test variables for each approved Lemin template ID.
+ * Keys are the EXACT strings Lemin expects (confirmed by live API probe Aug 2026).
+ * This map is authoritative — do NOT rely on rcs_template_mappings.variables_required
+ * for test sends because old DB rows may have incorrect key names.
+ */
+const LEMIN_TEMPLATE_TEST_VARS: Record<string, Record<string, string>> = {
+  // 3651 booking_submitted   — plain "name"
+  "3651": { "name": "Test User" },
+  // 3652 booking_confirmed/approved — plain "name"
+  "3652": { "name": "Test User" },
+  // 3655 pending_payment_reminder — plain "name"
+  "3655": { "name": "Test User" },
+  // 3656 payment_received — plain-English-with-spaces keys (unique to this template)
+  "3656": { "booking id": "TEST-001", "invoice no": "INV-TEST-001", "{{amount}}": "50,000", "{{customer_name}}": "Test User" },
+  // 3657 invoice_ready — double-brace keys
+  "3657": { "{{customer_name}}": "Test User", "{{invoice_number}}": "INV-TEST-001", "{{booking_id}}": "TEST-001", "{{amount}}": "50,000" },
+  // 3659 flight_ticket — double-brace keys + composite departure key
+  "3659": { "{{customer_name}}": "Test User", "{{booking_id}}": "TEST-001", "{{ticket_number}}": "AI-501", "{{flight_number}}": "AI-501", "{{departure_date}} at {{departure_time}}": "01 Jan 2027 at 10:00" },
+  // 3660 visa_ready — double-brace keys
+  "3660": { "{{booking_id}}": "TEST-001", "{{visa_number}}": "V-TEST-2027-001", "{{package_name}}": "Hajj 2027", "{{customer_name}}": "Test User" },
+  // 3661 agreement_ready — hash-bang keys with literal emoji/punctuation prefixes
+  "3661": { "#!name!#": "Test User", ": #!agreement!#": "ABT-AGR-TEST-001", "\uD83D\uDD17 #!download!#": "https://alburhantravels.com/sign-agreement/test", "#!bookingid!#": "TEST-001" },
+  // 3663 login_otp — plain "otp"
+  "3663": { "otp": "123456" },
+};
+
+/**
+ * Returns test variables for a template. Checks the hardcoded map first (by template ID),
+ * then falls back to building from variable-key names if the ID is unknown.
+ * Guaranteed to return a non-empty object for all approved templates.
+ */
+function buildTestVariables(templateId: string, fallbackKeys: string[] = []): Record<string, string> {
+  // Primary: hardcoded map — authoritative, no DB dependency
+  if (LEMIN_TEMPLATE_TEST_VARS[templateId]) {
+    return { ...LEMIN_TEMPLATE_TEST_VARS[templateId] };
+  }
+  // Secondary: build from key names (for unknown templates added after this map was written)
+  const KEY_DEFAULTS: Record<string, string> = {
+    "name": "Test User",
+    "otp": "123456",
+    "booking id": "TEST-001",
+    "invoice no": "INV-TEST-001",
+    "{{customer_name}}": "Test User",
+    "{{booking_id}}": "TEST-001",
+    "{{invoice_number}}": "INV-TEST-001",
+    "{{amount}}": "50,000",
+    "{{visa_number}}": "V-TEST-2027-001",
+    "{{package_name}}": "Hajj 2027",
+    "{{ticket_number}}": "AI-501",
+    "{{flight_number}}": "AI-501",
+    "{{departure_date}} at {{departure_time}}": "01 Jan 2027 at 10:00",
+    "#!name!#": "Test User",
+    ": #!agreement!#": "ABT-AGR-TEST-001",
+    "\uD83D\uDD17 #!download!#": "https://alburhantravels.com/sign-agreement/test",
+    "#!bookingid!#": "TEST-001",
+  };
+  if (fallbackKeys.length === 0) return { "name": "Test User" }; // absolute last resort
+  const out: Record<string, string> = {};
+  for (const k of fallbackKeys) {
+    // Only include key if it has a known mapping — skip placeholder [key] values that Lemin will reject
+    if (KEY_DEFAULTS[k] !== undefined) out[k] = KEY_DEFAULTS[k];
+  }
+  return Object.keys(out).length > 0 ? out : { "name": "Test User" };
+}
 
 // GET /api/api-settings — all providers with masked keys
 router.get("/", requireAdmin as any, requireSuperAdmin, async (_req, res) => {
@@ -142,6 +209,12 @@ router.put("/:provider", requireAdmin as any, requireSuperAdmin, async (req: Aut
 
     // Invalidate cache so next notification uses new settings
     invalidateCache();
+
+    // Also flush FCM credential cache so updated service account takes effect immediately
+    if (provider === "firebase") {
+      const { invalidateFCMCredCache } = await import("../lib/fcm.js");
+      invalidateFCMCredCache();
+    }
 
     // ── Auto-verify Fast2SMS immediately after save: wallet check + real test SMS ──
     let autoTest: Record<string, any> | undefined;
@@ -293,20 +366,47 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        const rcsAgent     = process.env.LEMIN_AGENT     || extra.agent     || "jio";
-        const templateId   = extra.template_id || "1473";
-        if (!leminKey) { result = { ok: false, message: "LEMIN_API_KEY secret not set" }; break; }
-        // Real API call — only mark connected on HTTP 200 + success
+        // ── Resolve + validate template ID (connection-test path) ────────────
+        // Non-numeric values (help text, placeholder) are NEVER used.
+        const NUMERIC_RE_T = /^\d+$/;
+        let templateId = (extra.template_id && NUMERIC_RE_T.test(String(extra.template_id).trim()))
+          ? String(extra.template_id).trim() : "";
+        if (!templateId) {
+          try {
+            const tmplRow = await pool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            const dbTid = String(tmplRow.rows[0]?.template_id || "").trim();
+            templateId = NUMERIC_RE_T.test(dbTid) ? dbTid : "3651";
+          } catch { templateId = "3651"; }
+        }
+        if (!leminKey) { result = { ok: false, message: "User ID (Developer API Key) not set — save settings first" }; break; }
+        // Real API call with test variables so Lemin doesn't reject with "Failed to process single payload"
         const leminEndpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
-        const probePayload = { type: "single", dial_code: dialCode, template: templateId, phone: "9893989786", user_id: leminKey };
+        // Use hardcoded test vars (authoritative); DB variables_required is the fallback
+        let probeVarKeys: string[] = [];
+        try {
+          const pvRow = await pool.query(
+            `SELECT variables_required FROM rcs_template_mappings WHERE template_id=$1 AND enabled=true LIMIT 1`,
+            [templateId]
+          );
+          probeVarKeys = pvRow.rows[0]?.variables_required || [];
+        } catch { /* use hardcoded map */ }
+        const probeVariables = buildTestVariables(templateId, probeVarKeys);
+        const probePayload = {
+          type: "single", dial_code: dialCode, template: templateId,
+          phone: "9893989786", variables: probeVariables, user_id: leminKey,
+        };
         try {
           const resp = await axios.post(leminEndpoint, probePayload, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
           const body = resp.data || {};
-          const ok = resp.status >= 200 && resp.status < 300 && body.success !== false && body.status !== false && !String(body.message || "").toLowerCase().includes("invalid user");
+          const errTxt = String(body.message || body.error || "").toLowerCase();
+          const ok = resp.status >= 200 && resp.status < 300 && body.success !== false && body.status !== false
+            && !errTxt.includes("invalid user") && !errTxt.includes("template not found");
           result = {
             ok,
             message: ok
-              ? `RCS connected — agent: ${rcsAgent}, dial: ${dialCode}`
+              ? `RCS connected — agent: ${rcsAgent}, dial: ${dialCode}, template: ${templateId}`
               : `Lemin error: ${body.message || body.error || `HTTP ${resp.status}`}`,
           };
         } catch (e: any) {
@@ -336,8 +436,19 @@ router.post("/:provider/test", requireAdmin as any, requireSuperAdmin, async (re
         break;
       }
       case "firebase": {
-        if (!apiKey) { result = { ok: false, message: "Firebase Server Key not set" }; break; }
-        result = { ok: true, message: "Firebase credentials present — use Send Test to verify delivery" };
+        // Real credential validation: exchange a Google OAuth2 access token
+        try {
+          const { testFCMConnection } = await import("../lib/fcm.js");
+          const r = await testFCMConnection();
+          result = {
+            ok: r.ok,
+            message: r.ok
+              ? r.message
+              : [r.error, r.hint ? `Hint: ${r.hint}` : ""].filter(Boolean).join(" — "),
+          };
+        } catch (e: any) {
+          result = { ok: false, message: e.message };
+        }
         break;
       }
       case "razorpay": {
@@ -469,63 +580,202 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
         break;
       }
       case "firebase": {
-        if (!apiKey) return void res.json({ ok: false, message: "Firebase Server Key not configured" });
-        const testToken = req.body.device_token;
-        if (!testToken) return void res.json({ ok: false, message: "Provide a device FCM token" });
+        // Uses FCM v1 API — no legacy Server Key needed
+        const deviceToken = req.body.device_token;
+        if (!deviceToken) return void res.json({ ok: false, message: "Provide a device FCM token (copy it from Push Center → This Browser)" });
         channel = "push";
-        recipient = testToken;
-        const endpoint = "https://fcm.googleapis.com/fcm/send";
-        const reqPayload = { to: testToken, notification: { title: "Al Burhan ERP", body: "✅ Firebase Push test from Test API" } };
-        let httpStatus = 0; let respData: any = {};
+        recipient = `${deviceToken.slice(0, 24)}…`;
+        const endpoint = "https://fcm.googleapis.com/v1/projects/{project}/messages:send";
         try {
-          const resp = await axios.post(endpoint, reqPayload, { headers: { Authorization: `key=${apiKey}`, "Content-Type": "application/json" }, timeout: 10000 });
-          httpStatus = resp.status; respData = resp.data;
-          result = { ok: httpStatus === 200, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData };
+          const { sendFCMToToken } = await import("../lib/fcm.js");
+          const r = await sendFCMToToken(deviceToken, {
+            title: "🔔 Al Burhan ERP Test",
+            body:  "✅ Firebase Cloud Messaging v1 — credentials are working!",
+            url:   "/admin/notifications",
+          });
+          result = {
+            ok:              r.ok,
+            provider:        "Firebase FCM v1",
+            endpoint,
+            responsePayload: { messageId: r.messageId, error: r.error, invalidToken: r.invalidToken },
+            message:         r.ok ? `Push delivered — messageId: ${r.messageId}` : undefined,
+            errorMessage:    r.error,
+          };
         } catch (e: any) {
-          const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
-          result = { ok: false, provider: "Firebase", endpoint, httpStatus, requestPayload: reqPayload, responsePayload: respData, errorMessage: respData?.error || e.message };
+          result = { ok: false, provider: "Firebase FCM v1", endpoint, errorMessage: e.message };
         }
         break;
       }
       case "lemin": {
-        if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number" });
-        // Env vars take precedence — never expose key in response/logs
+        if (!mobile) return void res.json({ ok: false, message: "Provide a mobile number to test RCS delivery" });
+
+        // Env vars take precedence over DB; user_id / API key is NEVER returned to caller or logged
         const leminKey     = process.env.LEMIN_API_KEY  || apiKey || extra.user_id || "";
         const leminBaseUrl = process.env.LEMIN_BASE_URL || apiUrl  || "https://rcs.leminai.com";
         const dialCode     = process.env.LEMIN_DIAL_CODE || extra.dial_code || "+91";
-        const rcsAgent     = process.env.LEMIN_AGENT     || extra.agent     || "jio";
-        const templateId   = extra.template_id || "1473";
-        if (!leminKey) return void res.json({ ok: false, message: "LEMIN_API_KEY secret not set" });
-        channel = "rcs";
+
+        // ── Resolve template ID ───────────────────────────────────────────────
+        // Priority: 1) req.body.template_id (test-UI override)
+        //           2) extra.template_id from DB (if numeric-only)
+        //           3) rcs_template_mappings booking_submitted row
+        //           4) hardcoded "3651"
+        // At EVERY step we validate with /^\d+$/ — non-numeric values are NEVER used.
+        const NUMERIC_RE = /^\d+$/;
+        const rawTemplateId =
+          (req.body.template_id && NUMERIC_RE.test(String(req.body.template_id).trim()))
+            ? String(req.body.template_id).trim()
+          : (extra.template_id && NUMERIC_RE.test(String(extra.template_id).trim()))
+            ? String(extra.template_id).trim()
+            : "";
+
+        let templateId = rawTemplateId;
+        if (!templateId) {
+          try {
+            const tmplRow2 = await pool.query(
+              `SELECT template_id FROM rcs_template_mappings WHERE erp_event='booking_submitted' AND enabled=true AND template_id IS NOT NULL LIMIT 1`
+            );
+            const dbTid = String(tmplRow2.rows[0]?.template_id || "").trim();
+            templateId = NUMERIC_RE.test(dbTid) ? dbTid : "3651";
+          } catch { templateId = "3651"; }
+        }
+
+        // Final guard — reject the request if template is still non-numeric (should never reach here,
+        // but explicit check satisfies the requirement and catches future regressions)
+        if (!NUMERIC_RE.test(templateId)) {
+          return void res.json({
+            ok: false,
+            message: `Please enter a valid approved numeric Lemin Template ID. Got: "${templateId}". Use one of your approved IDs (e.g. 3651, 3656, 3657, or 3663).`,
+            hint: "Save a numeric Template ID in the Default Template ID field in Lemin settings, or enter it in the Test Template ID field.",
+          });
+        }
+
+        // ── Pre-send field validation ─────────────────────────────────────────
+        const preValidMissing: string[] = [];
+        if (!dialCode)   preValidMissing.push("dial_code");
+        if (!mobile)     preValidMissing.push("phone");
+        if (!leminKey)   preValidMissing.push("user_id (LEMIN_API_KEY secret — save settings first)");
+        if (preValidMissing.length) {
+          return void res.json({ ok: false, message: `Missing required fields: ${preValidMissing.join(", ")}` });
+        }
+
+        // Normalise phone → exactly 10 digits
+        let rawClean = mobile.replace(/[\s\-\+]/g, "");
+        if (rawClean.startsWith("0")) rawClean = rawClean.slice(1);
+        if (rawClean.startsWith("91") && rawClean.length === 12) rawClean = rawClean.slice(2);
+        const phone = rawClean.slice(-10);
+        if (phone.length !== 10) {
+          return void res.json({ ok: false, message: `Invalid mobile number — expected 10 digits after normalisation, got "${mobile}"` });
+        }
+
+        // ── Build test variables ──────────────────────────────────────────────────
+        // PRIMARY: hardcoded map by template_id — authoritative, zero DB dependency.
+        // FALLBACK: DB variables_required (may have old/wrong key names from v31.0 seed;
+        //           only used when templateId is not in LEMIN_TEMPLATE_TEST_VARS).
+        let dbVarsRequired: string[] = [];
+        try {
+          const vrRow = await pool.query(
+            `SELECT variables_required FROM rcs_template_mappings WHERE template_id=$1 AND enabled=true LIMIT 1`,
+            [templateId]
+          );
+          dbVarsRequired = vrRow.rows[0]?.variables_required || [];
+        } catch { /* use hardcoded map */ }
+        const testVariables = buildTestVariables(templateId, dbVarsRequired);
+
+        // Hard abort — variables MUST be a non-empty object.
+        // Lemin returns "Failed to process single payload" for any request with variables: {} or missing variables.
+        if (Object.keys(testVariables).length === 0) {
+          return void res.json({
+            ok: false,
+            message: `Cannot send: no test variables could be determined for template "${templateId}". Add it to LEMIN_TEMPLATE_TEST_VARS in api-settings.ts.`,
+            debug: { templateId, dbVarsRequired, testVariables },
+          });
+        }
+
+        channel   = "rcs";
         recipient = mobile;
-        const phone = mobile.replace(/\D/g, "").slice(-10);
         const endpoint = `${leminBaseUrl.replace(/\/$/, "")}/api/send/template`;
-        // Safe payload for logging — never include user_id
-        const safePayload = { type: "single", dial_code: dialCode, template: templateId, phone, agent: rcsAgent };
-        const reqPayload  = { ...safePayload, user_id: leminKey };   // key only goes to Lemin
+
+        // safePayload — all fields EXCEPT user_id (safe to log and return to frontend)
+        const safePayload: Record<string, unknown> = {
+          type:      "single",
+          dial_code: dialCode,
+          template:  templateId,
+          phone,
+          variables: testVariables,
+        };
+        // debugPayload — all 6 required Lemin fields, user_id partially masked, shown in UI
+        const maskedKey = leminKey
+          ? `${leminKey.slice(0, 4)}${"*".repeat(Math.max(0, leminKey.length - 8))}${leminKey.slice(-4)}`
+          : "(not set — LEMIN_API_KEY secret missing)";
+        const debugPayload = { ...safePayload, user_id: maskedKey };
+
+        // Pre-send spec validation — every non-variable field must be non-empty
+        const specMissing = (["type","dial_code","template","phone"] as const)
+          .filter(f => { const v = safePayload[f]; return v === undefined || v === null || v === ""; });
+        if (!leminKey) specMissing.push("user_id" as any);
+        if (specMissing.length) {
+          return void res.json({
+            ok: false,
+            message: `Pre-send validation failed — empty required fields: ${specMissing.join(", ")}`,
+            debugPayload,
+          });
+        }
+
+        const reqPayload = { ...safePayload, user_id: leminKey };
         let httpStatus = 0; let respData: any = {};
         try {
+          // Log COMPLETE payload (user_id masked) so it appears in VPS PM2 logs
+          console.log(`[lemin send-test] PAYLOAD: ${JSON.stringify(debugPayload)}`);
           const resp = await axios.post(endpoint, reqPayload, { headers: { "Content-Type": "application/json" }, timeout: 12000 });
           httpStatus = resp.status; respData = resp.data;
-          const errTxt = String(respData?.message || respData?.error || "").toLowerCase();
+          console.log(`[lemin send-test] response HTTP=${httpStatus} body=${JSON.stringify(respData)}`);
+
+          const errTxt     = String(respData?.message || respData?.error || "").toLowerCase();
           const authFailed = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
             || errTxt.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
-          // Connected = Lemin responded and did NOT reject our credentials
-          const ok = httpStatus > 0 && !authFailed;
-          result = { ok, provider: "Lemin AI", endpoint, httpStatus,
-            requestPayload: safePayload,   // user_id intentionally omitted
+          const tplFailed  = errTxt.includes("template not found") || errTxt.includes("template_not_found");
+          const bodyFailed = respData?.success === false || respData?.status === false;
+          const ok = httpStatus >= 200 && httpStatus < 300 && !authFailed && !tplFailed && !bodyFailed;
+
+          const messageId = respData?.data?.id || respData?.data?.message_id
+            || respData?.message_id || respData?.id || respData?.msg_id || undefined;
+
+          // Always return the exact Lemin error string — never wrap in a generic message
+          let errorMessage: string | undefined;
+          if (!ok) {
+            const rawErr = respData?.message || respData?.error || `HTTP ${httpStatus}`;
+            if (authFailed)  errorMessage = `Authentication failed — check LEMIN_API_KEY: ${rawErr}`;
+            else if (tplFailed) errorMessage = `Template ${templateId} not found in this Lemin account — verify rcs_template_mappings has the correct ID`;
+            else             errorMessage = rawErr;
+          }
+
+          result = {
+            ok, provider: "Lemin AI", endpoint, httpStatus, messageId,
+            debugPayload,
+            requestPayload:  safePayload,
             responsePayload: respData,
-            errorMessage: ok ? undefined : (respData?.message || respData?.error || "RCS delivery failed") };
+            errorMessage,
+          };
+          if (ok) {
+            await pool.query(`UPDATE api_settings SET status='connected', last_tested=NOW() WHERE provider='lemin'`).catch(() => {});
+          }
         } catch (e: any) {
           const er = e?.response; httpStatus = er?.status || 0; respData = er?.data || { error: e.message };
-          const errTxt = String(respData?.message || respData?.error || e.message || "").toLowerCase();
+          console.error(`[lemin send-test] ERROR HTTP=${httpStatus} body=${JSON.stringify(respData)}`);
+          const rawErr = respData?.message || respData?.error || e.message;
+          const errTxt = String(rawErr || "").toLowerCase();
           const authFailed = errTxt.includes("invalid user") || errTxt.includes("invalid_user")
             || errTxt.includes("unauthorized") || httpStatus === 401 || httpStatus === 403;
-          result = { ok: httpStatus > 0 && !authFailed, provider: "Lemin AI", endpoint, httpStatus,
+          result = {
+            ok: false, provider: "Lemin AI", endpoint, httpStatus,
+            debugPayload,
             requestPayload: safePayload,
             responsePayload: respData,
             errorCode: String(respData?.code || ""),
-            errorMessage: respData?.message || respData?.error || e.message };
+            errorMessage: authFailed
+              ? `Authentication failed — check LEMIN_API_KEY: ${rawErr}`
+              : rawErr,
+          };
         }
         break;
       }
@@ -560,6 +810,8 @@ router.post("/:provider/send-test", requireAdmin as any, requireSuperAdmin, asyn
 });
 
 // POST /api/api-settings/lemin/set-webhook — register webhook URL with Lemin AI
+// Spec: POST https://rcs.leminai.com/api/webhook/set
+//       Body: { url, agent, active, user_id }
 router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async (req, res) => {
   try {
     const row = await pool.query(`SELECT api_key_encrypted, api_url, extra_fields_encrypted FROM api_settings WHERE provider='lemin' LIMIT 1`);
@@ -570,17 +822,40 @@ router.post("/lemin/set-webhook", requireAdmin as any, requireSuperAdmin, async 
     if (r.extra_fields_encrypted) {
       try { extraFields = JSON.parse(decrypt(r.extra_fields_encrypted)); } catch {}
     }
-    const userId = decryptedKey || extraFields.user_id || "";
-    if (!userId) return void res.json({ ok: false, message: "Developer API Key not set — save settings first" });
-    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhook/rcs";
-    const payload = { url: webhookUrl, agent: "jio", active: true, user_id: userId };
-    const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", payload, {
-      headers: { "Content-Type": "application/json" },
-      timeout: 10000,
-    }).catch((e: any) => e?.response || { data: { error: e.message }, status: 0 });
-    const ok = resp.status >= 200 && resp.status < 300;
-    console.log(`[Lemin] Webhook set result: status=${resp.status} ok=${ok}`, resp.data);
-    res.json({ ok, httpStatus: resp.status, requestPayload: payload, responsePayload: resp.data });
+    // Prefer env var (VPS), fall back to DB-stored value
+    const userId = process.env.LEMIN_API_KEY || decryptedKey || extraFields.user_id || "";
+    if (!userId) return void res.json({ ok: false, message: "User ID (Developer API Key) not set — save settings first" });
+    // Webhook URL: singular /api/webhook path kept for backward compat; plural /api/webhooks/lemin-rcs is the canonical target
+    const webhookUrl = req.body?.url || "https://alburhantravels.com/api/webhooks/lemin-rcs";
+    // user_id sent to Lemin only — NEVER returned in response or logged
+    const safePayload  = { url: webhookUrl, agent: "jio", active: true };
+    const leminPayload = { ...safePayload, user_id: userId };
+    let httpStatus = 0; let respData: any = {};
+    try {
+      const resp = await axios.post("https://rcs.leminai.com/api/webhook/set", leminPayload, {
+        headers: { "Content-Type": "application/json" }, timeout: 10000,
+      });
+      httpStatus = resp.status; respData = resp.data;
+    } catch (e: any) {
+      httpStatus = e?.response?.status || 0;
+      respData   = e?.response?.data   || { error: e.message };
+    }
+    const ok = httpStatus >= 200 && httpStatus < 300;
+    console.log(`[Lemin] Webhook set result: status=${httpStatus} ok=${ok}`, respData);
+    res.json({ ok, httpStatus, webhookUrl, requestPayload: safePayload, responsePayload: respData });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, message: err.message });
+  }
+});
+
+// GET /api/api-settings/lemin/message-status?message_id=XXX — poll delivery status from Lemin
+router.get("/lemin/message-status", requireAdmin as any, requireSuperAdmin, async (req, res) => {
+  const messageId = String(req.query.message_id || "").trim();
+  if (!messageId) return void res.status(400).json({ ok: false, message: "message_id query parameter required" });
+  try {
+    const { refreshMessageStatus } = await import("../lib/rcs.js");
+    const result = await refreshMessageStatus(messageId);
+    res.json({ ok: true, ...result });
   } catch (err: any) {
     res.status(500).json({ ok: false, message: err.message });
   }

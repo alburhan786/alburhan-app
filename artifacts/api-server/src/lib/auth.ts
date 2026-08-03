@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { pool } from "@workspace/db";
+import { DEFAULT_TENANT_ID } from "@workspace/db";
 import { hasPermission, isValidAdminRole, type AdminRole, type Module, type Action } from "./rbac.js";
 
 export interface AuthenticatedRequest extends Request {
@@ -11,6 +12,8 @@ export interface AuthenticatedRequest extends Request {
     name?: string | null;
     email?: string | null;
     assignedGroupIds: string[];
+    /** SaaS Phase 3: tenant this user belongs to. Defaults to Al Burhan UUID. */
+    tenantId?: string;
   };
 }
 
@@ -39,6 +42,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       name: u.name,
       email: u.email,
       assignedGroupIds: Array.isArray(u.assigned_group_ids) ? u.assigned_group_ids : [],
+      // SaaS Phase 3: propagate tenant_id from users table; default to Al Burhan for all existing accounts
+      tenantId: u.tenant_id ?? DEFAULT_TENANT_ID,
     };
     next();
   } catch (err) {

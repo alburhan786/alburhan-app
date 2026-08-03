@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { SendNotificationBody } from "@workspace/api-zod";
 import { requireAdmin, requireAuth, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendEmail } from "../lib/notifications.js";
@@ -109,6 +110,52 @@ router.delete("/my", requireAuth as any, async (req: AuthenticatedRequest, res) 
   if (!userId) { res.status(401).json({ message: "Unauthorized" }); return; }
   await pool.query(`DELETE FROM customer_notifications WHERE customer_id=$1`, [userId]);
   res.json({ success: true });
+});
+
+// ── Customer: comms history for own booking ───────────────────────────────────
+// Returns last 20 notification_logs rows (no request_payload) for a booking.
+// Accessible by the booking owner (mobile match) OR admin.
+router.get("/history/:bookingId", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const { bookingId } = req.params;
+  try {
+    const bRes = await pool.query(
+      `SELECT id, customer_mobile FROM bookings WHERE id=$1 AND deleted_at IS NULL LIMIT 1`,
+      [bookingId]
+    );
+    const bk = bRes.rows[0];
+    if (!bk) { res.status(404).json({ message: "Booking not found" }); return; }
+    if (req.user?.role !== "admin" && bk.customer_mobile !== req.user?.mobile) {
+      res.status(403).json({ message: "Access denied" }); return;
+    }
+    const result = await pool.query(
+      `SELECT id, channel, event_type, status, recipient_mobile,
+              created_at, delivered_at, read_at, failed_at,
+              error_code, provider_message_id
+       FROM   notification_logs
+       WHERE  booking_id = $1
+       ORDER  BY created_at DESC
+       LIMIT  20`,
+      [bookingId]
+    );
+    res.json({
+      logs: result.rows.map((r: any) => ({
+        id:                r.id,
+        channel:           r.channel,
+        eventType:         r.event_type,
+        status:            r.status,
+        recipientMobile:   r.recipient_mobile,
+        createdAt:         r.created_at,
+        deliveredAt:       r.delivered_at,
+        readAt:            r.read_at,
+        failedAt:          r.failed_at,
+        errorCode:         r.error_code,
+        providerMessageId: r.provider_message_id,
+      })),
+    });
+  } catch (err: any) {
+    console.error("[notifications/history] error:", err?.message);
+    res.status(500).json({ message: "Failed to load notification history" });
+  }
 });
 
 export default router;

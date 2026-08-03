@@ -11,6 +11,7 @@ import { randomUUID } from "crypto";
 import { generateTravelItineraryPdf } from "../lib/travelItineraryPdf.js";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

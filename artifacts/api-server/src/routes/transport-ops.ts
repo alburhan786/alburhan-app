@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 const q  = async (t: string, p?: any[]) => (await pool.query(t, p)).rows ?? [];

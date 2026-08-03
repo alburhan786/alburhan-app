@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { pool } from "@workspace/db";
 import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { randomUUID } from "crypto";

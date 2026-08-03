@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { requireAdmin } from "../lib/auth.js";
 import { pool } from "@workspace/db";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -11,6 +12,7 @@ router.get("/search", requireAdmin, async (req, res) => {
     const q = String(req.query.q || "").trim();
     if (!q || q.length < 2) return res.json({ users: [], leads: [] });
     const like = `%${q}%`;
+    const tenantId = getTenantId(req);
     const [usersR, leadsR] = await Promise.all([
       pool.query(`
         SELECT u.id, u.name, u.mobile, u.email, u.created_at,
@@ -18,15 +20,16 @@ router.get("/search", requireAdmin, async (req, res) => {
         FROM users u
         LEFT JOIN customer_profiles cp ON cp.user_id = u.id
         WHERE u.role = 'customer'
+          AND u.tenant_id = $2::uuid
           AND (u.name ILIKE $1 OR u.mobile ILIKE $1 OR u.email ILIKE $1
                OR cp.passport_number ILIKE $1 OR cp.aadhar_number ILIKE $1)
         ORDER BY u.created_at DESC LIMIT 20
-      `, [like]),
+      `, [like, tenantId]),
       pool.query(`
         SELECT id, name, mobile, email, source, status, platform, created_at, lead_score
-        FROM leads WHERE mobile ILIKE $1 OR name ILIKE $1 OR email ILIKE $1
+        FROM leads WHERE tenant_id=$2::uuid AND (mobile ILIKE $1 OR name ILIKE $1 OR email ILIKE $1)
         ORDER BY created_at DESC LIMIT 20
-      `, [like]),
+      `, [like, tenantId]),
     ]);
     res.json({ users: usersR.rows, leads: leadsR.rows });
   } catch (err: any) { res.status(500).json({ message: err.message }); }
@@ -43,6 +46,7 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
   try {
     const pattern = mobileLike(req.params.mobile);
 
+    const tenantId = getTenantId(req);
     const [userR, bookingsR, paymentsR, docsR, msgsInR, msgsOutR,
            leadsR, agreementsR, invoicesR, loyaltyR, timelineR] = await Promise.all([
 
@@ -58,9 +62,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                COALESCE(cp.blood_group, u.blood_group) AS blood_group_full
         FROM users u
         LEFT JOIN customer_profiles cp ON cp.user_id = u.id
-        WHERE u.mobile LIKE $1 AND u.role = 'customer'
+        WHERE u.tenant_id=$2::uuid AND u.mobile LIKE $1 AND u.role = 'customer'
         LIMIT 1
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Bookings
       pool.query(`
@@ -68,9 +72,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                paid_amount, advance_amount, discount_amount, number_of_pilgrims, room_type,
                preferred_departure_date, journey_status, group_id, invoice_number,
                notes, created_at, updated_at
-        FROM bookings WHERE customer_mobile LIKE $1 AND (is_deleted IS NOT TRUE)
+        FROM bookings WHERE tenant_id=$2::uuid AND customer_mobile LIKE $1 AND (is_deleted IS NOT TRUE)
         ORDER BY created_at DESC LIMIT 30
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Payment transactions
       pool.query(`
@@ -79,9 +83,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                b.booking_number, b.package_name
         FROM payment_transactions pt
         JOIN bookings b ON b.id = pt.booking_id
-        WHERE b.customer_mobile LIKE $1 AND (pt.is_deleted IS NOT TRUE)
+        WHERE b.tenant_id=$2::uuid AND b.customer_mobile LIKE $1 AND (pt.is_deleted IS NOT TRUE)
         ORDER BY pt.created_at DESC LIMIT 50
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Documents
       pool.query(`
@@ -89,9 +93,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                b.booking_number
         FROM documents d
         JOIN bookings b ON b.id = d.booking_id
-        WHERE b.customer_mobile LIKE $1
+        WHERE b.tenant_id=$2::uuid AND b.customer_mobile LIKE $1
         ORDER BY d.created_at DESC LIMIT 50
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Incoming messages
       pool.query(`
@@ -104,9 +108,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
       // Outgoing notifications
       pool.query(`
         SELECT id, channel, event_type, message, status, created_at
-        FROM notification_logs WHERE recipient LIKE $1
+        FROM notification_logs WHERE tenant_id=$2::uuid AND recipient LIKE $1
         ORDER BY created_at DESC LIMIT 100
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Leads
       pool.query(`
@@ -114,9 +118,9 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                budget, assigned_to, assigned_name, follow_up_date, notes,
                conversion_booking_id, converted_at, created_at, updated_at,
                lead_score, priority, platform, conversation_count, tags, inbox_status
-        FROM leads WHERE mobile LIKE $1
+        FROM leads WHERE tenant_id=$2::uuid AND mobile LIKE $1
         ORDER BY created_at DESC LIMIT 10
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Agreements
       pool.query(`
@@ -124,10 +128,11 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                a.booking_id, COALESCE(b.booking_number, '') AS booking_number
         FROM agreements a
         LEFT JOIN bookings b ON b.id = a.booking_id
-        WHERE b.customer_mobile LIKE $1
-           OR a.customer_id IN (SELECT id FROM users WHERE mobile LIKE $1)
+        WHERE a.tenant_id=$2::uuid
+          AND (b.customer_mobile LIKE $1
+               OR a.customer_id IN (SELECT id FROM users WHERE tenant_id=$2::uuid AND mobile LIKE $1))
         ORDER BY a.created_at DESC LIMIT 10
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Invoices
       pool.query(`
@@ -136,10 +141,11 @@ router.get("/user/:mobile", requireAdmin, async (req, res) => {
                COALESCE(b.booking_number, '') AS booking_number
         FROM invoices i
         LEFT JOIN bookings b ON b.id = i.booking_id
-        WHERE b.customer_mobile LIKE $1
-           OR i.customer_id IN (SELECT id FROM users WHERE mobile LIKE $1)
+        WHERE i.tenant_id=$2::uuid
+          AND (b.customer_mobile LIKE $1
+               OR i.customer_id IN (SELECT id FROM users WHERE tenant_id=$2::uuid AND mobile LIKE $1))
         ORDER BY i.created_at DESC LIMIT 20
-      `, [pattern]),
+      `, [pattern, tenantId]),
 
       // Loyalty
       pool.query(`

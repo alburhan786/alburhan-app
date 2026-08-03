@@ -76,10 +76,30 @@ export interface ResolvedVars {
 
 // ── Config helpers ────────────────────────────────────────────────────────────
 
-function getLeminKey():   string { return process.env.LEMIN_API_KEY   || ""; }
+function getLeminKey(): string {
+  // 1. Env var (injected at build time for VPS)
+  if (process.env.LEMIN_API_KEY) return process.env.LEMIN_API_KEY;
+  // 2. DB-stored "User ID (Developer API Key)" saved via Admin → API Settings → Lemin AI RCS
+  try {
+    const { getCachedConfig } = require("./apiSettingsProvider.js");
+    const cfg = getCachedConfig("lemin");
+    return cfg.apiKey || cfg.extra?.user_id || "";
+  } catch { return ""; }
+}
 function getLeminBase():  string { return (process.env.LEMIN_BASE_URL  || "https://rcs.leminai.com").replace(/\/$/, ""); }
 function getDialCode():   string { return process.env.LEMIN_DIAL_CODE  || "+91"; }
 function getRcsAgent():   string { return process.env.LEMIN_AGENT      || "jio"; }
+
+/**
+ * Normalise any raw Indian mobile string to exactly 10 digits.
+ * Handles: leading +, spaces, hyphens, leading 0, leading country code 91.
+ */
+function normalizeIndianMobile(raw: string): string {
+  let clean = raw.replace(/[\s\-\+]/g, "");  // strip spaces, hyphens, leading +
+  if (clean.startsWith("0")) clean = clean.slice(1); // remove leading 0
+  if (clean.startsWith("91") && clean.length === 12) clean = clean.slice(2); // strip 91 prefix
+  return clean.slice(-10); // always return last 10 digits
+}
 
 function getSendEndpoint(): string { return `${getLeminBase()}/api/send/template`; }
 function getStatusEndpoint(): string { return `${getLeminBase()}/api/messages/status`; }
@@ -176,14 +196,31 @@ export async function resolveVariables(
     // Agreement
     if (event === "agreement_ready" || !vars.agreement_number) {
       const agrRow = await pool.query(
-        `SELECT id, agreement_number FROM agreements WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 1`,
+        `SELECT a.id, a.agreement_number, b.booking_number
+         FROM agreements a
+         LEFT JOIN bookings b ON b.id = a.booking_id
+         WHERE a.booking_id=$1 ORDER BY a.created_at DESC LIMIT 1`,
         [bookingId]
       ).catch(() => ({ rows: [] }));
       if (agrRow.rows.length) {
         const agr = agrRow.rows[0];
         if (!vars.agreement_number) vars.agreement_number = agr.agreement_number || agr.id?.slice(0,8).toUpperCase() || "";
-        // agreements table has no document_url column — use the public signing link
-        if (!vars.document_url) vars.document_url = `https://alburhantravels.com/sign-agreement/${agr.id}`;
+        // Use booking_number in public signing URL (short, readable, matches what WhatsApp message sends)
+        if (!vars.document_url) {
+          // Always use the booking number in the agreement URL — never the internal UUID.
+          // buildAgreementUrl validates and throws INVALID_AGREEMENT_URL if malformed.
+          if (agr.booking_number) {
+            try {
+              const { buildAgreementUrl } = await import("../routes/agreements.js");
+              vars.document_url = buildAgreementUrl(agr.booking_number);
+            } catch (urlErr) {
+              console.error("[RCS] INVALID_AGREEMENT_URL:", urlErr);
+              vars.document_url = `https://alburhantravels.com/sign-agreement/${encodeURIComponent(agr.booking_number)}`;
+            }
+          } else {
+            console.warn("[RCS] INVALID_AGREEMENT_URL: no booking_number on agreement, omitting document_url");
+          }
+        }
       }
     }
 
@@ -220,8 +257,12 @@ export async function resolveVariables(
   const cn  = vars.customer_name || "";
   const bid = vars.booking_id    || "";
 
-  // Type A — plain "name" (templates 3651/3652/3654/3655)
+  // Type A — plain "name" (templates 3651/3652/3655)
   if (!vars["name"]) vars["name"] = cn;
+
+  // Template 3656 (payment_received) uses unique plain-English keys with spaces
+  if (!vars["booking id"]) vars["booking id"] = bid;
+  if (!vars["invoice no"]) vars["invoice no"] = vars.invoice_number || "";
 
   // Type B — double-brace format (templates 3657/3659/3660)
   if (!vars["{{customer_name}}"]) vars["{{customer_name}}"] = cn;
@@ -397,7 +438,15 @@ export async function sendRCSForEvent(
   mobile: string,
   bookingId?: string,
   ctx: Partial<ResolvedVars> = {},
-  opts: { skipIdempotency?: boolean; customerId?: string; bookingNumber?: string; customerName?: string } = {}
+  opts: {
+    skipIdempotency?: boolean;
+    customerId?: string;
+    bookingNumber?: string;
+    customerName?: string;
+    /** When true, skip internal logRCSNotification call — notificationEngine will log via trackNotification
+     *  to avoid creating two notification_logs rows for the same send. */
+    skipLog?: boolean;
+  } = {}
 ): Promise<RCSResult> {
   const endpoint = getSendEndpoint();
 
@@ -422,9 +471,8 @@ export async function sendRCSForEvent(
     return { ok: false, provider: "LeminAI", endpoint, errorMessage: "LEMIN_API_KEY secret not configured" };
   }
 
-  // 3. Normalize phone
-  const clean = mobile.replace(/\D/g, "");
-  const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean.slice(-10);
+  // 3. Normalize phone — strips spaces/hyphens/+, leading 0, leading 91 → exactly 10 digits
+  const phone = normalizeIndianMobile(mobile);
   if (phone.length !== 10) {
     return { ok: false, provider: "LeminAI", endpoint, errorMessage: `Invalid mobile number: ${mobile}` };
   }
@@ -529,10 +577,10 @@ export async function sendRCSForEvent(
     }
   }
 
-  // 8. Log result
+  // 8. Log result — skip if caller (notificationEngine) will handle logging to avoid duplicate rows
   const customerName  = resolved.customer_name || opts.customerName || "";
   const bookingNumber = resolved.booking_id     || opts.bookingNumber || bookingId || "";
-  const logId = await logRCSNotification({
+  const logId = opts.skipLog ? null : await logRCSNotification({
     event, mobile: phone, templateId, templateName, variables: resolved as Record<string,string>,
     status: lastResult.ok ? "sent" : "failed",
     httpStatus: lastResult.httpStatus,
@@ -591,8 +639,7 @@ export async function sendCustomRCS(opts: {
   const leminKey = getLeminKey();
   if (!leminKey) return { ok: false, provider: "LeminAI", endpoint, errorMessage: "LEMIN_API_KEY not configured" };
 
-  const clean = opts.mobile.replace(/\D/g, "");
-  const phone = clean.startsWith("91") && clean.length === 12 ? clean.slice(2) : clean.slice(-10);
+  const phone = normalizeIndianMobile(opts.mobile);
   const dialCode = getDialCode();
 
   const safePayload: Record<string, unknown> = {
@@ -701,8 +748,11 @@ export async function sendRCSForOTP(
   }
 
   // Payloads — OTP sent to Lemin but NEVER stored in logs
-  const leminPayload  = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp }, user_id: leminKey };
-  const safePayload   = { type: "single", dial_code: dialCode, template: templateId, phone, variables: { otp: "******" } };
+  // Normalise mobile for OTP path
+  const cleanOtp = normalizeIndianMobile(mobile);
+
+  const leminPayload  = { type: "single", dial_code: dialCode, template: templateId, phone: cleanOtp, variables: { otp }, user_id: leminKey };
+  const safePayload   = { type: "single", dial_code: dialCode, template: templateId, phone: cleanOtp, variables: { otp: "******" } };
 
   let lastResult: RCSResult = { ok: false, provider: "LeminAI", endpoint, errorMessage: "Max retries exceeded" };
 

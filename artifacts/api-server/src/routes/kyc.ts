@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, type AuthenticatedRequest } from "../lib/aut
 import multer from "multer";
 import { uploadToGCS } from "../lib/gcsUpload.js";
 import { syncPilgrimsForUser } from "../lib/pilgrimUtils.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),

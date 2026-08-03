@@ -11,6 +11,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { addTimeline } from "../lib/workflowEngine.js";
 import { broadcastToInbox } from "./inbox.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -42,30 +43,68 @@ async function updateDeliveryStatus(
   }
 }
 
-// ── POST /api/webhook/rcs — Lemin AI ──────────────────────────────────────
-router.post("/rcs", async (req, res) => {
-  const body = req.body ?? {};
-  console.log("[Webhook][RCS] Received:", JSON.stringify(body).slice(0, 500));
+// ── Shared Lemin RCS webhook handler ─────────────────────────────────────────
+// Mounted at both /api/webhook/rcs (legacy) and /api/webhooks/lemin-rcs (canonical)
+async function handleLeminRCSWebhook(req: any, res: any) {
+  // Respond immediately — Lemin retries on timeout
+  res.json({ ok: true, received: true });
 
-  // Lemin AI payload shapes vary; normalise the key fields
-  const phone: string = body.phone || body.recipient || body.mobile || "";
-  const event: string = (body.event || body.status || body.type || "").toLowerCase();
+  const body = req.body ?? {};
+  console.log("[Webhook][Lemin-RCS] Received:", JSON.stringify(body).slice(0, 500));
+
+  // Normalise phone: strips spaces/hyphens/+, leading 0, leading 91
+  const rawPhone: string = body.phone || body.recipient || body.mobile || body.to || "";
+  let phone10 = "";
+  if (rawPhone) {
+    let d = rawPhone.replace(/[\s\-\+]/g, "");
+    if (d.startsWith("0")) d = d.slice(1);
+    if (d.startsWith("91") && d.length === 12) d = d.slice(2);
+    phone10 = d.slice(-10);
+  }
+
+  // Lemin AI payload shapes vary; normalise the status field
+  const event: string = (body.event || body.status || body.delivery_status || body.type || "").toLowerCase();
 
   let newStatus: "delivered" | "read" | "failed" | "clicked" | null = null;
   if (event.includes("deliver")) newStatus = "delivered";
   else if (event.includes("read") || event.includes("seen")) newStatus = "read";
   else if (event.includes("click")) newStatus = "clicked";
-  else if (event.includes("fail") || event.includes("error")) newStatus = "failed";
+  else if (event.includes("fail") || event.includes("error") || event.includes("reject")) newStatus = "failed";
 
-  if (phone && newStatus) {
-    const clean = phone.replace(/\D/g, "");
-    const mobile = clean.length === 12 && clean.startsWith("91") ? clean.slice(2) : clean;
-    await updateDeliveryStatus(mobile, "rcs", newStatus, body);
-    console.log(`[Webhook][RCS] ${mobile} → ${newStatus}`);
+  // Prefer message_id-based update (precise) over recipient-based (broad)
+  const messageId: string = body.message_id || body.id || body.msg_id || body.data?.id || "";
+
+  if (messageId && newStatus) {
+    try {
+      await pool.query(
+        `UPDATE notification_logs
+         SET delivery_status = $1,
+             provider_response = COALESCE(provider_response, '{}'::jsonb) || $2::jsonb,
+             last_status_check = NOW(),
+             delivered_at = CASE WHEN $1 IN ('delivered','read') AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+             read_at      = CASE WHEN $1 = 'read' AND read_at IS NULL THEN NOW() ELSE read_at END,
+             updated_at   = NOW()
+         WHERE message_id = $3 AND channel = 'rcs'`,
+        [newStatus, JSON.stringify({ dlr: body, dlr_at: new Date().toISOString() }), messageId]
+      );
+      console.log(`[Webhook][Lemin-RCS] message_id=${messageId} → ${newStatus}`);
+    } catch (err: any) {
+      console.error("[Webhook][Lemin-RCS] DB update failed:", err?.message);
+    }
+  } else if (phone10 && newStatus) {
+    // Fallback: update by recipient when no message_id
+    await updateDeliveryStatus(phone10, "rcs", newStatus, body);
+    console.log(`[Webhook][Lemin-RCS] phone=${phone10} → ${newStatus}`);
   }
+}
 
-  res.json({ ok: true });
-});
+// ── POST /api/webhook/rcs — Lemin AI (legacy path, kept for backward compat) ──
+router.post("/rcs", handleLeminRCSWebhook);
+
+// ── POST /api/webhooks/lemin-rcs — canonical path registered with Lemin AI ───
+// Registered via Admin → API Settings → Lemin AI RCS → Set Webhook
+// This path must match the URL sent in /api/webhook/set: https://alburhantravels.com/api/webhooks/lemin-rcs
+router.post("/lemin-rcs", handleLeminRCSWebhook);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -130,17 +131,19 @@ router.post("/redeem", requireAdmin as any, async (req, res) => {
 });
 
 // Sync loyalty from bookings (auto-calculate)
-router.post("/sync", requireAdmin as any, async (_req, res) => {
+router.post("/sync", requireAdmin as any, async (req, res) => {
   try {
+    const tenantId = getTenantId(req);
     const bookings = await pool.query(`
       SELECT b.customer_id, b.customer_name, b.customer_mobile,
              COUNT(b.id)::int as bookings_count,
              COALESCE(SUM(b.paid_amount::numeric),0) as total_spent
       FROM bookings b
       WHERE b.customer_id IS NOT NULL
+        AND b.tenant_id = $1::uuid
         AND b.status IN ('confirmed','approved','completed','partially_paid')
       GROUP BY b.customer_id, b.customer_name, b.customer_mobile
-    `);
+    `, [tenantId]);
 
     let synced = 0;
     for (const row of bookings.rows) {

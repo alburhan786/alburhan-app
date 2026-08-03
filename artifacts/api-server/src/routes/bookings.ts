@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router, type Request } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { db, pool, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
 import { eq, and, desc, count, sql, isNull, or, ilike } from "drizzle-orm";
 import multer from "multer";
@@ -28,22 +29,23 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireAdmin, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";
 import { auditLog } from "../lib/audit.js";
-import { autoGenerateAgreement } from "./agreements.js";
+import { checkQuota, QuotaExceededError } from "../lib/tenantQuota.js";
+import { autoGenerateAgreement, buildAgreementUrl } from "./agreements.js";
 import { validateDeleteToken } from "./delete-auth.js";
 import {
-  sendBookingApprovalNotification,
+  // sendBookingApprovalNotification — REMOVED 2026-08-02: replaced by triggerWorkflow("booking_approved")
+  // sendPaymentConfirmationNotification — REMOVED 2026-08-02: replaced by triggerWorkflow("payment_received")
   sendBookingConfirmationNotification,
   sendBookingRejectionNotification,
   sendBookingSubmissionNotification,
-  sendPaymentConfirmationNotification,
   sendAdminNewBookingEmail,
   sendJourneyStatusNotification,
   sendWhatsApp,
   sendDLTSMS,
 } from "../lib/notifications.js";
 import {
-  notifyNewBooking,
-  notifyBookingApproved,
+  // notifyNewBooking — REMOVED 2026-08-02: one notification path only (triggerWorkflow)
+  // notifyBookingApproved — REMOVED 2026-08-02: one notification path only (triggerWorkflow)
   notifyBookingRejected,
   notifyBookingCancelled,
 } from "../lib/adminNotifications.js";
@@ -253,35 +255,43 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       invoiceNumber: isPaid ? generateInvoiceNumber() : null,
     }).returning();
 
-    if (isPaid) {
-      sendPaymentConfirmationNotification({
-        mobile: booking.customerMobile,
-        email: booking.customerEmail,
-        customerName: booking.customerName,
-        bookingNumber: booking.bookingNumber,
-        amount: booking.finalAmount ? String(Number(booking.finalAmount).toLocaleString("en-IN")) : "N/A",
-        invoiceNumber: booking.invoiceNumber ?? "",
-      }).catch(console.error);
-    } else {
-      sendBookingApprovalNotification({
-        mobile: booking.customerMobile,
-        email: booking.customerEmail,
-        customerName: booking.customerName,
-        bookingNumber: booking.bookingNumber,
-      }).catch(console.error);
-    }
+    // ── Customer notifications via the central lifecycle orchestrator ──────────
+    // Offline bookings are created by admins with status "approved" or "confirmed"
+    // (never "pending"). Fire the appropriate lifecycle event via triggerWorkflow
+    // so exactly ONE notification path is used — same as online bookings.
+    // Legacy helpers (sendPaymentConfirmationNotification, sendBookingApprovalNotification)
+    // are permanently removed from this path to prevent duplicate/unlogged sends.
+    const siteBaseOffline = process.env.SITE_URL || "https://alburhantravels.com";
+    (async () => {
+      try {
+        const offlineCtx = {
+          bookingId:      booking.id,
+          bookingNumber:  booking.bookingNumber,
+          customerId:     booking.customerId     ?? undefined,
+          customerName:   booking.customerName,
+          customerMobile: booking.customerMobile,
+          customerEmail:  booking.customerEmail  ?? undefined,
+          packageName:    booking.packageName    ?? packageData?.name ?? undefined,
+          amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+          finalAmount:    booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+          invoiceUrl:     `${siteBaseOffline}/invoice/${booking.bookingNumber}`,
+        };
+        if (isPaid) {
+          // Fully-paid offline booking → payment_received (status=confirmed)
+          await triggerWorkflow("payment_received", { ...offlineCtx, invoiceNumber: booking.invoiceNumber ?? undefined });
+        } else {
+          // Approved offline booking → booking_approved (status=approved)
+          await triggerWorkflow("booking_approved", offlineCtx);
+        }
+      } catch (offlineNotifErr) {
+        console.error("[offline-booking] notification triggerWorkflow failed:", offlineNotifErr);
+      }
+    })().catch(console.error);
 
-    notifyNewBooking({
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
-      customerName: booking.customerName,
-      customerMobile: booking.customerMobile,
-      customerEmail: booking.customerEmail,
-      packageName: booking.packageName ?? null,
-      finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
-      numberOfPilgrims: booking.numberOfPilgrims,
-      isOffline: true,
-    });
+    // Auto-generate agreement immediately since offline bookings start as approved/confirmed
+    autoGenerateAgreement(booking.id).catch(err =>
+      console.error("[offline-booking] autoGenerateAgreement failed:", err)
+    );
 
     sendAdminNewBookingEmail({
       bookingId: booking.id,
@@ -295,10 +305,11 @@ router.post("/offline", requireAdmin as any, requirePermission("bookings", "crea
       isOffline: true,
     }).catch(console.error);
 
-    // Auto-generate agreement on booking creation (fire-and-forget)
-    autoGenerateAgreement(booking.id).catch(err =>
-      console.error("[create] autoGenerateAgreement failed:", err)
-    );
+    // NOTE: autoGenerateAgreement is NOT called here.
+    // Agreements must only be generated after admin approval (see the approve route ~line 777)
+    // or after payment (see payments.ts). Calling it at offline booking creation fires
+    // agreement_ready notifications on a still-pending, unapproved booking — a UX bug
+    // that was confirmed and permanently removed on 2026-08-02.
 
     res.status(201).json(formatBooking(booking));
   } catch (err: any) {
@@ -380,13 +391,15 @@ router.post("/bulk-trash", requireAdmin as any, requirePermission("bookings", "d
 });
 
 router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const tenantId = getTenantId(req);
   const parsed = ListBookingsQueryParams.safeParse(req.query);
   const query = parsed.success ? parsed.data : {};
   const page = Number(query.page ?? 1);
   const limit = Number(query.limit ?? 200);
   const offset = (page - 1) * limit;
 
-  const conditions: any[] = [isNull(bookingsTable.deletedAt)];
+  // SaaS Phase 3: scope list to tenant (no-op for Al Burhan; enforces isolation for future tenants)
+  const conditions: any[] = [isNull(bookingsTable.deletedAt), sql`bookings.tenant_id = ${tenantId}::uuid`];
   if (query.status) conditions.push(eq(bookingsTable.status, query.status as any));
   if (req.user?.role !== "admin") {
     conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));
@@ -424,16 +437,86 @@ router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     } catch (_) { /* column may not exist yet on first deploy */ }
   }
 
+  // ── Customer-only supplements: group dates, invoice due date, doc tokens ────
+  // Kept behind the non-admin check so admin list requests are not slowed down
+  // by these extra queries (admin list has up to 200 rows per page).
+  let groupDates: Record<string, { departureDate: string | null; returnDate: string | null }> = {};
+  let paymentDueDates: Record<string, string | null> = {};
+  let bookingDocuments: Record<string, any[]> = {};
+
+  if (req.user?.role !== "admin" && bookingIds.length > 0) {
+    // Actual departure/return dates from the assigned hajj group
+    try {
+      const gdRes = await pool.query(
+        `SELECT b.id, hg.departure_date, hg.return_date
+         FROM   bookings b
+         JOIN   hajj_groups hg ON hg.id = b.group_id
+         WHERE  b.id = ANY($1)
+           AND  hg.departure_date IS NOT NULL`,
+        [bookingIds]
+      );
+      gdRes.rows.forEach((r: any) => {
+        groupDates[r.id] = {
+          departureDate: r.departure_date ?? null,
+          returnDate:    r.return_date    ?? null,
+        };
+      });
+    } catch (_) { /* hajj_groups may not be linked yet */ }
+
+    // Invoice payment due date
+    try {
+      const idRes = await pool.query(
+        `SELECT booking_id, due_date
+         FROM   invoices
+         WHERE  booking_id = ANY($1)`,
+        [bookingIds]
+      );
+      idRes.rows.forEach((r: any) => {
+        paymentDueDates[r.booking_id] = r.due_date ?? null;
+      });
+    } catch (_) { /* invoices table may not have due_date yet */ }
+
+    // Admin-uploaded travel documents with access tokens (latest per type)
+    try {
+      const docRes = await pool.query(
+        `SELECT DISTINCT ON (booking_id, document_type)
+                id, booking_id, document_type, file_name, mime_type, access_token, created_at
+         FROM   documents
+         WHERE  booking_id = ANY($1)
+           AND  uploaded_by = 'admin'
+           AND  is_visible_to_customer = TRUE
+           AND  (is_revoked IS NULL OR is_revoked = FALSE)
+           AND  access_token IS NOT NULL
+         ORDER  BY booking_id, document_type, created_at DESC`,
+        [bookingIds]
+      );
+      docRes.rows.forEach((r: any) => {
+        if (!bookingDocuments[r.booking_id]) bookingDocuments[r.booking_id] = [];
+        bookingDocuments[r.booking_id].push({
+          id:           r.id,
+          documentType: r.document_type,
+          fileName:     r.file_name,
+          mimeType:     r.mime_type,
+          accessToken:  r.access_token,
+        });
+      });
+    } catch (_) { /* access_token column added in v33.0 */ }
+  }
+
   res.json({
     bookings: rows.map(({ booking, package: pkg }) => ({
       ...formatBooking(booking),
-      lastPaymentDate: lastPaymentDates[booking.id] ?? null,
+      lastPaymentDate:  lastPaymentDates[booking.id]  ?? null,
+      departureDate:    groupDates[booking.id]?.departureDate ?? null,
+      returnDate:       groupDates[booking.id]?.returnDate    ?? null,
+      paymentDueDate:   paymentDueDates[booking.id]   ?? null,
+      documents:        bookingDocuments[booking.id]   ?? [],
       packageDetails: pkg ? {
-        duration: pkg.duration,
-        includes: pkg.includes,
-        highlights: pkg.highlights,
+        duration:       pkg.duration,
+        includes:       pkg.includes,
+        highlights:     pkg.highlights,
         departureDates: pkg.departureDates,
-        imageUrl: pkg.imageUrl,
+        imageUrl:       pkg.imageUrl,
       } : null,
     })),
     total: Number(totalCount),
@@ -449,6 +532,23 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     return;
   }
   const data = parsed.data;
+
+  // ── Phase 4: Tenant quota enforcement (fail-open; Al Burhan has unlimited quota) ─
+  try {
+    const tenantId = getTenantId(req);
+    await checkQuota(tenantId, "bookings");
+  } catch (err: any) {
+    if (err instanceof QuotaExceededError) {
+      return void res.status(429).json({
+        message: "Booking quota exceeded for this tenant",
+        code: "QUOTA_EXCEEDED",
+        resource: err.resource,
+        limit: err.maxCount,
+        current: err.currentCount,
+      });
+    }
+    console.warn("[bookings] quota check error (fail-open):", err?.message);
+  }
 
   const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, data.packageId)).limit(1);
   const pkg = pkgs[0];
@@ -486,19 +586,38 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
 
   // ── Customer notifications: WhatsApp → SMS → Email via notification engine ─
   // triggerWorkflow → fireNotificationEvent logs to notification_logs (admin-visible)
+  // IMPORTANT: booking.customerEmail comes from POST body — may be null if form didn't submit it.
+  // Load email from users table when missing so the Email channel doesn't get silently skipped.
   const siteBase = process.env.SITE_URL || "https://alburhantravels.com";
-  triggerWorkflow("new_booking", {
-    bookingId:      booking.id,
-    bookingNumber:  booking.bookingNumber,
-    customerId:     booking.customerId     ?? undefined,
-    customerName:   booking.customerName,
-    customerMobile: booking.customerMobile,
-    customerEmail:  booking.customerEmail  ?? undefined,
-    packageName:    booking.packageName    ?? pkg?.name ?? "Travel Package",
-    amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
-    invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
-    dashboardUrl:   `${siteBase}/customer/dashboard`,
-  }).catch(console.error);
+  (async () => {
+    let customerEmail = booking.customerEmail ?? undefined;
+    if (!customerEmail && booking.customerId) {
+      try {
+        const emailRow = await pool.query(
+          `SELECT email FROM users WHERE id=$1 LIMIT 1`,
+          [booking.customerId]
+        );
+        customerEmail = emailRow.rows[0]?.email ?? undefined;
+        if (customerEmail) console.log(`[bookings] Loaded customer email from users table for ${booking.bookingNumber}: ${customerEmail}`);
+      } catch (e) {
+        console.warn("[bookings] Failed to load customer email for new_booking notification:", e);
+      }
+    }
+    await triggerWorkflow("new_booking", {
+      bookingId:      booking.id,
+      bookingNumber:  booking.bookingNumber,
+      customerId:     booking.customerId     ?? undefined,
+      customerName:   booking.customerName,
+      customerMobile: booking.customerMobile,
+      customerEmail,
+      // SPEC §17: never use generic "Travel Package" fallback in customer-facing messages.
+      // enrichCtxFromDB in fireNotificationEvent will load from packages JOIN if still missing.
+      packageName:    booking.packageName ?? pkg?.name ?? undefined,
+      amount:         booking.finalAmount    ? Number(booking.finalAmount) : undefined,
+      invoiceUrl:     `${siteBase}/invoice/${booking.bookingNumber}`,
+      dashboardUrl:   `${siteBase}/customer/dashboard`,
+    }).catch(console.error);
+  })().catch(console.error);
 
   // Auto-accounting: Dr Accounts Receivable / Cr Sales Revenue (non-fatal)
   if (booking.finalAmount && Number(booking.finalAmount) > 0) {
@@ -511,17 +630,9 @@ router.post("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
     }).catch(() => {});
   }
 
-  notifyNewBooking({
-    bookingId: booking.id,
-    bookingNumber: booking.bookingNumber,
-    customerName: booking.customerName,
-    customerMobile: booking.customerMobile,
-    customerEmail: booking.customerEmail,
-    packageName: booking.packageName ?? pkg?.name ?? null,
-    finalAmount: booking.finalAmount ? Number(booking.finalAmount) : null,
-    numberOfPilgrims: booking.numberOfPilgrims,
-    isOffline: false,
-  });
+  // Legacy notifyNewBooking() (admin SSE dashboard feed) permanently removed from
+  // this path on 2026-08-02 per acceptance requirements: only ONE notification path
+  // allowed. Dashboard live feed uses the admin_notifications table via triggerWorkflow.
 
   sendAdminNewBookingEmail({
     bookingId: booking.id,
@@ -616,15 +727,56 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
   // Invoice is generated only after payment (online or offline).
   (async () => {
     try {
+      // Build agreement URL using the shared helper — never uses REPLIT_DEV_DOMAIN.
+      // This URL is passed as {{5}} (Paymenturllink) in the booking_approved WhatsApp
+      // template because customers must sign the agreement before making payment.
+      let agreementUrl: string | undefined;
+      try { agreementUrl = buildAgreementUrl(updated.bookingNumber); } catch (e) {
+        console.error("[approve] buildAgreementUrl failed:", e);
+      }
+
+      // Enrich packageName and finalAmount via JOIN when the Drizzle returning() row is missing them.
+      // Older or manually-created bookings may have NULL package_name or zero final_amount.
+      // SPEC §17: never send "₹0" or "Hajj/Umrah Package" fallbacks in approval notifications.
+      let packageName = (updated as any).packageName as string | undefined;
+      let finalAmount = (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined;
+      if (!packageName || !finalAmount) {
+        try {
+          const enrichRow = await pool.query<{ package_name: string | null; final_amount: string | null }>(
+            `SELECT COALESCE(NULLIF(b.package_name,''), p.name) AS package_name,
+                    COALESCE(NULLIF(b.final_amount,''), NULLIF(b.total_amount,'')) AS final_amount
+             FROM bookings b
+             LEFT JOIN packages p ON p.id = b.package_id
+             WHERE b.id = $1
+             LIMIT 1`,
+            [updated.id]
+          );
+          if (enrichRow.rows[0]) {
+            const r = enrichRow.rows[0];
+            if (!packageName && r.package_name) packageName = r.package_name;
+            if (!finalAmount && r.final_amount && Number(r.final_amount) > 0) finalAmount = Number(r.final_amount);
+          }
+        } catch (enrichErr) {
+          console.error("[approve] enrich packageName/finalAmount from JOIN failed (non-fatal):", enrichErr);
+        }
+      }
+      if (!packageName) {
+        console.error(`[approve] MISSING_PACKAGE_DATA: booking ${updated.bookingNumber} has no package name — check bookings.package_id FK and packages table`);
+      }
+      if (!finalAmount) {
+        console.warn(`[approve] ZERO_AMOUNT: booking ${updated.bookingNumber} finalAmount is 0 — check bookings.final_amount and package pricing`);
+      }
+
       const ctx = {
         bookingId:      updated.id,
         bookingNumber:  updated.bookingNumber,
         customerName:   (updated.customerName || "").trim(),
         customerMobile: updated.customerMobile,
         customerEmail:  updated.customerEmail ?? undefined,
-        packageName:    (updated as any).packageName ?? undefined,
-        finalAmount:    (updated as any).finalAmount ? Number((updated as any).finalAmount) : undefined,
+        packageName,
+        finalAmount,
         invoiceUrl:     `https://alburhantravels.com/invoice/${updated.bookingNumber}`,
+        agreementUrl,
       };
       console.log(`[PIPELINE:approve-route] ▶ booking_approved triggered | bookingId=${ctx.bookingId} | bookingNumber=${ctx.bookingNumber} | mobile=${ctx.customerMobile} | name="${ctx.customerName}" | package="${ctx.packageName}" | finalAmount=${ctx.finalAmount} | invoiceUrl=${ctx.invoiceUrl}`);
       await triggerWorkflow("booking_approved", ctx);
@@ -634,12 +786,8 @@ router.post("/:id/approve", requireAdmin as any, requirePermission("bookings", "
     }
   })();
 
-  notifyBookingApproved({
-    bookingId: updated.id,
-    bookingNumber: updated.bookingNumber,
-    customerName: updated.customerName,
-    customerMobile: updated.customerMobile,
-  });
+  // Legacy notifyBookingApproved() (admin SSE only) permanently removed from this path
+  // on 2026-08-02 — only ONE notification path allowed (triggerWorkflow above owns all channels).
 
   auditLog({ req, action: "approved", entityTable: "bookings", entityId: updated.id, newValue: { bookingNumber: updated.bookingNumber, status: "approved" } }).catch(() => {});
 
@@ -1042,6 +1190,87 @@ router.post("/:id/send-invoice", requireAdmin as any, async (req: AuthenticatedR
   }
   let b = bookings[0];
 
+  // ── COMPREHENSIVE INVOICE NOTIFICATION VALIDATOR ────────────────────────────
+  // All 8 conditions must pass before any channel is contacted.
+  // Returns a structured list of missing/invalid fields so the admin UI can
+  // display them precisely. Validation failure is also written to notification_logs.
+  {
+    const { pool: pgPool2 } = await import("@workspace/db");
+
+    const invRow = await pgPool2.query(
+      `SELECT id, total, invoice_status, invoice_number FROM invoices
+       WHERE booking_id=$1 AND invoice_status NOT IN ('void','cancelled')
+       ORDER BY created_at ASC LIMIT 1`,
+      [b.id]
+    );
+
+    const baseUrl = (process.env.SITE_URL || "https://alburhantravels.com").trim();
+    const candidateInvoiceUrl = `${baseUrl}/invoice/${b.bookingNumber}`;
+
+    type ValidationFailure = { field: string; reason: string };
+    const failures: ValidationFailure[] = [];
+
+    // 1. Booking exists — already confirmed above
+    // 2. Booking status permits invoice generation
+    const UNPAYABLE_STATUSES = ["pending", "submitted", "rejected", "cancelled"];
+    if (UNPAYABLE_STATUSES.includes(b.status ?? "")) {
+      failures.push({ field: "booking_status", reason: `Booking is in status '${b.status}' — must be approved, partially_paid, or confirmed` });
+    }
+    // 3. Actual invoice record exists
+    if (invRow.rows.length === 0) {
+      failures.push({ field: "invoice_record", reason: "No invoice record found in the system — generate the invoice first" });
+    }
+    // 4. Invoice number present
+    const effectiveInvoiceNumber = invRow.rows[0]?.invoice_number || b.invoiceNumber;
+    if (!effectiveInvoiceNumber || String(effectiveInvoiceNumber).trim() === "") {
+      failures.push({ field: "invoice_number", reason: "Invoice number is blank — the invoice may not have been finalised" });
+    }
+    // 5. Total amount > 0
+    const invoiceTotal = invRow.rows[0] ? Number(invRow.rows[0].total) : 0;
+    const fallbackAmount = Number(b.finalAmount || 0);
+    if (invoiceTotal <= 0 && fallbackAmount <= 0) {
+      failures.push({ field: "total_amount", reason: "Invoice total and booking final amount are both zero or missing" });
+    }
+    // 6. Customer name present
+    if (!b.customerName || String(b.customerName).trim() === "") {
+      failures.push({ field: "customer_name", reason: "Customer name is blank on this booking" });
+    }
+    // 7. Package name present
+    if (!b.packageName || String(b.packageName).trim() === "") {
+      failures.push({ field: "package_name", reason: "Package name is blank — attach a package to the booking first" });
+    }
+    // 8. Invoice URL complete and valid
+    if (!candidateInvoiceUrl.startsWith("https://") || !b.bookingNumber) {
+      failures.push({ field: "invoice_url", reason: `Invoice URL '${candidateInvoiceUrl}' is incomplete or malformed` });
+    }
+
+    if (failures.length > 0) {
+      const summary = failures.map(f => `${f.field}: ${f.reason}`).join("; ");
+      console.error(`[send-invoice] INVOICE_VALIDATION_FAILED for ${b.bookingNumber}: ${summary}`);
+      // Log to notification_logs so the admin dashboard shows the block
+      pgPool2.query(
+        `INSERT INTO notification_logs (id, event_type, channel, recipient, status, booking_id,
+          customer_name, booking_number, error_code, error_message, created_at, updated_at)
+         VALUES ($1,'invoice_generated','admin',$2,'failed',$3,$4,$5,'INVOICE_VALIDATION_FAILED',$6,NOW(),NOW())`,
+        [
+          `inv_val_${Date.now()}`,
+          b.customerMobile,
+          b.id,
+          b.customerName || null,
+          b.bookingNumber || null,
+          summary,
+        ]
+      ).catch(() => {/* non-fatal */});
+
+      res.status(422).json({
+        message: "INVOICE_VALIDATION_FAILED",
+        failures,
+        detail: `Invoice notification blocked — ${failures.length} validation error(s): ${summary}`,
+      });
+      return;
+    }
+  }
+
   if (!b.invoiceNumber) {
     const { pool: pgPool } = await import("@workspace/db");
     const year = new Date().getFullYear();
@@ -1169,6 +1398,12 @@ router.get("/:id/invoice", requireAuth as any, async (req: AuthenticatedRequest,
     return;
   }
   const b = bookings[0];
+  // Ownership check: admin only OR the customer who owns this booking
+  const isAdmin = req.user?.role === "admin" || req.user?.role === "super_admin";
+  if (!isAdmin && (b as any).customerId !== req.user?.id) {
+    res.status(403).json({ message: "Access denied" });
+    return;
+  }
   if (!["confirmed", "partially_paid"].includes(b.status as string)) {
     res.status(400).json({ message: "Invoice only available once a payment has been received" });
     return;

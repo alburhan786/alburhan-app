@@ -66,9 +66,11 @@ import itineraryRouter from "./itinerary.js";
 import e2eRouter from "./e2e.js";
 import errorLogsRouter, { ensureErrorLogTable, errorLogMiddleware } from "./error-logs.js";
 import commsEngineRouter from "./comms-engine.js";
+import commMgmtRouter from "./comm-mgmt.js";
 import commissionsRouter, { ensureCommissionTables } from "./commissions.js";
 import purchaseRouter, { ensurePurchaseTables } from "./purchase.js";
 import financeReportsRouter from "./finance-reports.js";
+import financeRouter from "./finance.js";
 import flightOpsRouter, { ensureFlightOpsTables } from "./flight-ops.js";
 import hotelOpsRouter, { ensureHotelOpsTables } from "./hotel-ops.js";
 import groupOpsRouter, { ensureGroupOpsTables } from "./group-ops.js";
@@ -83,6 +85,7 @@ import { leadEngineRouter } from "./lead-engine.js";
 import inboxRouter from "./inbox.js";
 import customer360Router from "./customer360.js";
 import rcsRouter from "./rcs.js";
+import customerPortalRouter from "./customer-portal.js";
 
 const router: IRouter = Router();
 
@@ -93,7 +96,7 @@ router.get("/", (_req, res) => {
 });
 
 // ── Build fingerprint — confirms which bundle is running on VPS (no auth needed) ──
-const BUILD_STAMP = "2026-08-01-v30.3b-domain-com-db-patch";
+const BUILD_STAMP = "2026-08-01-v30.4-fcm-v1-deploy-fix";
 // Init tables on startup
 ensureCommEventsTable().catch(() => {});
 ensureCommissionTables().catch(() => {});
@@ -369,6 +372,7 @@ router.use("/communication", communicationRouter);
 router.use("/auto-notifications", autoNotificationsRouter);
 router.use("/agreements", agreementsRouter);
 router.use("/customer/journey", customerJourneyRouter);
+router.use("/customer", customerPortalRouter);
 router.use("/support", supportRouter);
 router.use("/enterprise", enterpriseRouter);
 router.use("/marketing", enterpriseRouter);
@@ -382,9 +386,11 @@ router.use("/itinerary", itineraryRouter);
 router.use("/admin/e2e", e2eRouter);
 router.use("/admin/error-logs", errorLogsRouter);
 router.use("/comms", commsEngineRouter);
+router.use("/comm-mgmt", commMgmtRouter);
 router.use("/commissions", commissionsRouter);
 router.use("/purchase", purchaseRouter);
 router.use("/finance-reports", financeReportsRouter);
+router.use("/finance", financeRouter);
 router.use("/flight-ops", flightOpsRouter);
 router.use("/hotel-ops", hotelOpsRouter);
 router.use("/group-ops", groupOpsRouter);
@@ -392,7 +398,17 @@ router.use("/transport-ops", transportOpsRouter);
 router.use("/hr-ops", hrOpsRouter);
 router.use("/executive", executiveDashRouter);
 router.use("/webhook", webhooksRouter);
+// Canonical plural path — Lemin AI webhook registered as /api/webhooks/lemin-rcs
+router.use("/webhooks", webhooksRouter);
 router.use(storageRouter);
+
+// ── AI Automation API (external n8n / service-token integration) ────────────
+import automationRouter from "./automation.js";
+router.use("/automation", automationRouter);
+
+// ── AI Automation Admin (session-auth management UI) ────────────────────────
+import aiAutomationAdminRouter from "./ai-automation-admin.js";
+router.use("/admin/ai-automation", aiAutomationAdminRouter);
 
 // ── Migration diagnostics (router-level, no session required, key-protected) ──
 // These mirror the app-level routes in app.ts. Being in the router guarantees
@@ -710,7 +726,7 @@ router.get("/migrate/booking-diagnostic/:ref", async (req: any, res: any) => {
 
     const [invRes, agRes, wfRes, nlRes, ptRes] = await Promise.all([
       pool.query(`SELECT invoice_number, invoice_status, total, paid, balance, due_date, updated_at FROM invoices WHERE booking_id=$1 LIMIT 1`, [booking.id]),
-      pool.query(`SELECT agreement_number, status, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status!='cancelled' ORDER BY created_at DESC LIMIT 1`, [booking.id]),
+      pool.query(`SELECT agreement_number, status, signed_at, created_at FROM agreements WHERE booking_id=$1 AND status NOT IN ('cancelled','superseded') ORDER BY created_at DESC LIMIT 1`, [booking.id]),
       pool.query(`SELECT trigger_type, status, error_message, created_at FROM workflow_logs WHERE booking_id=$1 ORDER BY created_at DESC LIMIT 20`, [booking.id]),
       pool.query(`SELECT event_type, channel, status, recipient, error_code, provider_response, sent_at FROM notification_logs WHERE booking_id=$1 ORDER BY sent_at DESC LIMIT 20`, [booking.id]),
       pool.query(`SELECT amount, payment_mode, payment_date, reference_number, is_deleted FROM payment_transactions WHERE booking_id=$1 AND is_deleted=false ORDER BY payment_date DESC`, [booking.id]),

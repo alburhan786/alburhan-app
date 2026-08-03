@@ -4,12 +4,14 @@ import * as schema from "./schema";
 import fs from "fs";
 
 // ── Self-contained .env reader ─────────────────────────────────────────────
-// lib/db may be evaluated before index.ts's dotenv calls (CJS init order),
-// so we read the VPS .env directly here to ensure DATABASE_URL is available
-// before Pool is created. We use a minimal .env parser (no dotenv import)
-// to avoid bundling issues.
-(function loadEnvIfMissing() {
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.length > 20) return; // already set
+// lib/db is evaluated before index.ts's dotenv calls (CJS init order), so we
+// read the VPS .env directly here to ensure DATABASE_URL is always taken from
+// the file — not from PM2's potentially stale saved env store.
+// IMPORTANT: do NOT add an early-return guard like "if (process.env.DATABASE_URL) return".
+// PM2 caches env vars across restarts; if db-init rotated the password, PM2's copy
+// is stale even though process.env.DATABASE_URL is non-empty. The .env file is always
+// the source of truth, so we unconditionally read and override it every time.
+(function loadEnvAlwaysOverride() {
   const candidates = [
     "/var/www/alburhan/.env",
     "/var/www/alburhan/api-server/.env",

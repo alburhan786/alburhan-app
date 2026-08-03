@@ -5,6 +5,7 @@ import { eq, asc } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import multer from "multer";
 import { uploadToGCS, deleteFromGCS } from "../lib/gcsUpload.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const uploadImage = multer({
   storage: multer.memoryStorage(),

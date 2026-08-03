@@ -7,6 +7,7 @@ import { auditLog } from "../lib/audit.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendEmail } from "../lib/notifications.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("groups") as any);
@@ -114,7 +115,7 @@ router.post("/:id/confirm", requireAdmin as any, async (req: AuthenticatedReques
        FROM bookings b
        WHERE b.id = ag.booking_id
          AND b.group_id = $2
-         AND ag.status NOT IN ('cancelled','void')
+         AND ag.status NOT IN ('cancelled','void','superseded')
        RETURNING ag.id, ag.status, ag.agreement_number, b.customer_name, b.customer_mobile, b.customer_email, b.booking_number`,
       [flight_info, flight.groupId]
     );

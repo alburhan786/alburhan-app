@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
 import { syncAllJournalEntries } from "../lib/journalHelper.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("accounting") as any);
@@ -95,12 +96,16 @@ router.get("/accounts/:id/ledger", requireAdmin as any, async (req: Authenticate
     else if (from) { params.push(from); dateClause = "AND je.date >= $2"; }
     else if (to) { params.push(to); dateClause = "AND je.date <= $2"; }
 
+    const tenantId = getTenantId(req);
+    params.push(tenantId);
+    const tenantClause = `AND je.tenant_id=$${params.length}::uuid`;
+
     const lines = await q(`
       SELECT je.date, je.entry_number, je.narration AS je_narration, je.reference, je.source,
              jel.debit::numeric AS debit, jel.credit::numeric AS credit, jel.narration AS line_narration
       FROM journal_entry_lines jel
       JOIN journal_entries je ON je.id=jel.journal_entry_id
-      WHERE jel.account_id=$1 ${dateClause}
+      WHERE jel.account_id=$1 ${dateClause} ${tenantClause}
       ORDER BY je.date, je.created_at
     `, params);
 
@@ -200,6 +205,10 @@ router.get("/journal-entries", requireAdmin as any, async (req: AuthenticatedReq
     const d30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const params: any[] = [from || d30, to || today];
     if (source && source !== "all") params.push(source);
+    const tenantId = getTenantId(req);
+    params.unshift(tenantId); // tenantId becomes $1; $1→$2, $2→$3, source→$4
+    const srcClause = source && source !== "all" ? `AND je.source=$${params.length + 1}` : "";
+    if (source && source !== "all") params.push(source);
     const entries = await q(`
       SELECT je.*,
         json_agg(json_build_object(
@@ -210,8 +219,8 @@ router.get("/journal-entries", requireAdmin as any, async (req: AuthenticatedReq
       FROM journal_entries je
       LEFT JOIN journal_entry_lines jel ON jel.journal_entry_id=je.id
       LEFT JOIN accounts a ON a.id=jel.account_id
-      WHERE je.date BETWEEN $1 AND $2
-        ${source && source !== "all" ? "AND je.source=$3" : ""}
+      WHERE je.tenant_id=$1::uuid AND je.date BETWEEN $2 AND $3
+        ${srcClause}
       GROUP BY je.id ORDER BY je.date DESC, je.created_at DESC
     `, params);
     res.json(entries);
@@ -265,15 +274,16 @@ router.get("/cashbook", requireAdmin as any, async (req: AuthenticatedRequest, r
       return void res.json({ rows: [], summary: { totalIn: 0, totalOut: 0, netBalance: 0 }, hint: "Accounts not seeded. Run journal sync." });
     }
 
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT je.date, je.entry_number, je.narration, je.reference, je.source,
         jel.debit::numeric AS cash_in, jel.credit::numeric AS expense,
         CASE WHEN jel.debit > 0 THEN 'receipt' ELSE 'payment' END AS type
       FROM journal_entry_lines jel
       JOIN journal_entries je ON je.id=jel.journal_entry_id
-      WHERE jel.account_id=$1 AND je.date BETWEEN $2 AND $3
+      WHERE jel.account_id=$1 AND je.tenant_id=$4::uuid AND je.date BETWEEN $2 AND $3
       ORDER BY je.date, je.created_at
-    `, [cashAcct.id, dateFrom, dateTo]);
+    `, [cashAcct.id, dateFrom, dateTo, tenantId]);
 
     let balance = 0;
     const withBalance = rows.map(r => {
@@ -302,15 +312,16 @@ router.get("/bankbook", requireAdmin as any, async (req: AuthenticatedRequest, r
       return void res.json({ rows: [], summary: { totalIn: 0, totalOut: 0, netBalance: 0 }, hint: "Accounts not seeded. Run journal sync." });
     }
 
+    const tenantId = getTenantId(req);
     const rows = await q(`
       SELECT je.date, je.entry_number, je.narration, je.reference, je.source,
         jel.debit::numeric AS bank_in, jel.credit::numeric AS expense,
         CASE WHEN jel.debit > 0 THEN 'receipt' ELSE 'payment' END AS type
       FROM journal_entry_lines jel
       JOIN journal_entries je ON je.id=jel.journal_entry_id
-      WHERE jel.account_id=$1 AND je.date BETWEEN $2 AND $3
+      WHERE jel.account_id=$1 AND je.tenant_id=$4::uuid AND je.date BETWEEN $2 AND $3
       ORDER BY je.date, je.created_at
-    `, [bankAcct.id, dateFrom, dateTo]);
+    `, [bankAcct.id, dateFrom, dateTo, tenantId]);
 
     let balance = 0;
     const withBalance = rows.map(r => {
@@ -334,6 +345,7 @@ router.get("/journal", requireAdmin as any, async (req: AuthenticatedRequest, re
     const dateFrom = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const dateTo = to || new Date().toISOString().slice(0, 10);
 
+    const tenantId = getTenantId(req);
     const entries = await q(`
       SELECT je.date, je.entry_number AS reference, je.narration, je.source AS entry_type,
         MAX(CASE WHEN jel.debit > 0 THEN a.name END) AS account_dr,
@@ -346,10 +358,10 @@ router.get("/journal", requireAdmin as any, async (req: AuthenticatedRequest, re
       FROM journal_entries je
       JOIN journal_entry_lines jel ON jel.journal_entry_id=je.id
       JOIN accounts a ON a.id=jel.account_id
-      WHERE je.date BETWEEN $1 AND $2
+      WHERE je.tenant_id=$3::uuid AND je.date BETWEEN $1 AND $2
       GROUP BY je.id, je.date, je.entry_number, je.narration, je.source
       ORDER BY je.date, je.created_at
-    `, [dateFrom, dateTo]);
+    `, [dateFrom, dateTo, tenantId]);
     res.json(entries);
   } catch (err) {
     console.error("[accounting] journal:", err);
@@ -374,7 +386,8 @@ router.get("/payment-entries", requireAdmin as any, async (req: AuthenticatedReq
         JOIN bookings b ON b.id=pt.booking_id
         JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
-      WHERE pt.is_deleted=false AND pt.payment_date::text BETWEEN $1 AND $2
+      WHERE pt.tenant_id=(SELECT tenant_id FROM bookings WHERE id=pt.booking_id LIMIT 1)
+        AND pt.is_deleted=false AND pt.payment_date::text BETWEEN $1 AND $2
         ${mode && mode !== "all" ? "AND pt.payment_mode::text=$3" : ""}
       ORDER BY pt.payment_date DESC, pt.created_at DESC
     `, mode && mode !== "all" ? [dateFrom, dateTo, mode] : [dateFrom, dateTo]);
@@ -396,7 +409,8 @@ router.get("/outstanding", requireAdmin as any, async (req: AuthenticatedRequest
       FROM bookings b
         JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
-      WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
+      WHERE b.tenant_id=(SELECT tenant_id FROM users WHERE id=b.customer_id LIMIT 1)
+        AND b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         AND b.final_amount::numeric > COALESCE(b.paid_amount::numeric,0)
         ${search ? `AND (u.name ILIKE '%'||$1||'%' OR u.mobile ILIKE '%'||$1||'%')` : ""}
       ORDER BY outstanding DESC
@@ -419,7 +433,8 @@ router.get("/ledger", requireAdmin as any, async (req: AuthenticatedRequest, res
       FROM bookings b
         JOIN users u ON u.id=b.customer_id
         LEFT JOIN hajj_groups hg ON hg.id=b.group_id
-      WHERE b.deleted_at IS NULL AND b.final_amount IS NOT NULL
+      WHERE b.tenant_id=(SELECT tenant_id FROM users WHERE id=b.customer_id LIMIT 1)
+        AND b.deleted_at IS NULL AND b.final_amount IS NOT NULL
         ${search ? `AND (u.name ILIKE '%'||$1||'%' OR u.mobile ILIKE '%'||$1||'%' OR b.booking_number ILIKE '%'||$1||'%')` : ""}
       ORDER BY b.created_at DESC LIMIT 500
     `, search ? [search] : []);

@@ -145,6 +145,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       section: "CRM",
       items: [
         { icon: UserCheck,     label: "Customer 360°",           href: "/admin/customer360",       require: ["customers", "view"], aliases: ["360", "customer", "lead", "profile", "history", "customer 360"] },
+        { icon: UserCheck,     label: "Customer Portal Controls", href: "/admin/customer-portal-controls", require: ["customers", "view"], aliases: ["portal", "portal controls", "portal admin", "customer portal", "resources", "orientation"] },
         { icon: Target,        label: "CRM Dashboard",           href: "/admin/crm",               require: ["customers", "view"], aliases: ["crm", "lead", "leads", "pipeline", "sales"] },
         { icon: Handshake,     label: "SRM Dashboard",           href: "/admin/srm",               require: ["accounting","view"], aliases: ["srm", "supplier", "vendor"] },
         { icon: Target,        label: "Leads",                   href: "/admin/leads",             require: ["customers", "view"], aliases: ["lead", "leads", "prospects", "enquiry", "follow-up"] },
@@ -220,6 +221,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
       items: [
         { icon: Sparkles, label: "AI Assistant",          href: "/admin/ai" },
         { icon: Brain,    label: "AI Analytics Dashboard", href: "/admin/ai-ops", require: ["bookings", "view"] },
+        { icon: Bot,      label: "AI Control Center",      href: "/admin/ai-assistant-control", require: ["settings", "edit"], aliases: ["ai control", "ai automation", "n8n", "service token", "ai kill switch", "automation api"] },
       ],
     },
 
@@ -255,6 +257,7 @@ export function buildNavSections(openComplaints = 0): NavSection[] {
         { icon: ClipboardList,label: "Error Logs",               href: "/admin/error-logs",         require: ["users",      "view"], aliases: ["error logs", "api errors", "500 errors", "failed requests", "production errors"] },
         { icon: Activity,     label: "E2E Test Runner",          href: "/admin/e2e-test",           require: ["users",      "view"], aliases: ["e2e", "end to end test", "system test", "integration test", "live test", "workflow test"] },
         { icon: Activity,     label: "OTP Debug",               href: "/admin/otp-debug",         require: ["users",      "view"] },
+        { icon: Shield,       label: "OTP Diagnostics",         href: "/admin/otp-diagnostics",   require: ["users",      "view"], aliases: ["otp diagnostics", "otp health", "sms diagnostics", "whatsapp otp", "login diagnostics"] },
         { icon: MessageSquare,label: "Admin Chat",              href: "/admin/chat",              require: ["customers",  "view"] },
       ],
     },

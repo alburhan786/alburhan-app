@@ -1,6 +1,8 @@
 // Load .env file before anything else (needed for VPS where PM2 doesn't auto-load .env)
 import { config as dotenvConfig } from "dotenv";
+import { fileURLToPath } from "url";
 import fs from "fs";
+import path from "path";
 
 // Try multiple candidate paths — first one that exists wins
 const ENV_CANDIDATES = [
@@ -88,7 +90,14 @@ process.on("unhandledRejection", (reason) => {
 import app from "./app";
 import { db, pool, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
+import { initializeAppLayerContext } from "./lib/tenantRls.js";
 import { ADMIN_MOBILES } from "./routes/auth.js";
+
+// ── SaaS Phase 4 Strict: register 'app_layer' context on every new pool connection ──
+// This is the explicit Phase-3 mode declaration (NOT a silent bypass).
+// Normal pool.query() calls go through this context; Phase-3 WHERE tenant_id clauses
+// provide the actual isolation. See tenantRls.ts for the full design.
+initializeAppLayerContext(pool);
 import { startPaymentReminderCron } from "./jobs/paymentReminder.js";
 import { startFeedbackReminderCron } from "./jobs/feedbackReminder.js";
 import { startAgreementReminderCron } from "./jobs/agreementReminder.js";
@@ -97,6 +106,7 @@ import { startDepartureReminderCron, startDocumentExpiryCron, startReturnAndFeed
 import { DEFAULT_RULES } from "./routes/workflows.js";
 import { runFollowupCron } from "./lib/leadEngine.js";
 import { ensureLeadEnginePhaseBSchema, runLeadReminderCron } from "./lib/leadEnginePhaseB.js";
+import { startGoogleHealthCheckCron } from "./jobs/googleHealthCheck.js";
 
 async function runMigrations() {
   // Session table — must exist BEFORE connect-pg-simple initializes
@@ -1029,10 +1039,29 @@ async function runMigrations() {
       )
     `);
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS idempotency_key TEXT`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_event_idx ON notification_logs(event_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_status_idx ON notification_logs(status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_created_idx ON notification_logs(created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS nl_updated_idx ON notification_logs(updated_at)`);
+    // Before creating the UNIQUE index, remove any duplicate idempotency_key rows
+    // that may exist from before this index was introduced. Keeping the most recent row per key.
+    // Without this step, CREATE UNIQUE INDEX fails silently on a DB with existing duplicates.
+    await pool.query(`
+      DELETE FROM notification_logs
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+                 ROW_NUMBER() OVER (PARTITION BY idempotency_key ORDER BY created_at DESC, id DESC) AS rn
+          FROM notification_logs
+          WHERE idempotency_key IS NOT NULL
+        ) ranked
+        WHERE rn > 1
+      )
+    `);
+    // Partial unique index — prevents duplicate log rows for the same send
+    // (e.g. sms.ts internal log + notificationEngine log, or duplicate webhook calls)
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_notification_logs_idempotency ON notification_logs (idempotency_key) WHERE idempotency_key IS NOT NULL`);
     console.log("[Migration] notification_logs table ensured");
   } catch (err) {
     console.error("[Migration] notification_logs failed:", err);
@@ -2587,6 +2616,83 @@ async function runMigrations() {
     if (nbRows && nbRows > 0)
       console.log(`[Migration] v30.3 updated ${nbRows} recent notification message(s) to .com`);
   } catch (_) {}
+
+  // v30.4 — Migrate Firebase api_settings from legacy Server Key to FCM v1 format.
+  //          CONDITIONAL — only clears values that are genuinely legacy/corrupted;
+  //          preserves valid PEM private keys and service-account JSON.
+  //          Safe to run on every startup.
+  try {
+    // Always clear legacy api_url (FCM v1 uses a fixed endpoint, not configurable)
+    await pool.query(
+      `UPDATE api_settings SET api_url = NULL
+       WHERE provider = 'firebase' AND api_url IS NOT NULL AND api_url != ''`
+    );
+
+    const fbRow = await pool.query(
+      `SELECT api_key_encrypted, extra_fields_encrypted FROM api_settings WHERE provider='firebase'`
+    );
+    if (fbRow.rows[0]) {
+      const row = fbRow.rows[0];
+      const { decrypt } = await import("./lib/encryption.js");
+
+      // ── api_key_encrypted: only clear if NOT a valid PEM or service-account JSON ──
+      if (row.api_key_encrypted) {
+        const keyStr = decrypt(row.api_key_encrypted);
+        const normalized = (keyStr || "").replace(/\\n/g, "\n").trim();
+        const isValidPem  = normalized.startsWith("-----BEGIN PRIVATE KEY-----");
+        let   isValidJson = false;
+        try { const sa = JSON.parse(keyStr); isValidJson = !!(sa && sa.private_key); } catch {}
+
+        if (!isValidPem && !isValidJson) {
+          // Looks like a legacy Server Key or corrupted value — clear it
+          await pool.query(`UPDATE api_settings SET api_key_encrypted = NULL WHERE provider='firebase'`);
+          console.log("[Migration v30.4] Cleared legacy/corrupted Firebase api_key_encrypted");
+        }
+        // else: valid FCM v1 key — silently preserve it
+      }
+
+      // ── extra_fields_encrypted: only clear if it has ONLY legacy sender_id (no modern fields) ──
+      if (row.extra_fields_encrypted) {
+        let extra: Record<string, any> = {};
+        try { extra = JSON.parse(decrypt(row.extra_fields_encrypted)); } catch {}
+        const hasLegacyOnly = extra.sender_id !== undefined &&
+                              !extra.project_id && !extra.client_email;
+        if (hasLegacyOnly) {
+          await pool.query(`UPDATE api_settings SET extra_fields_encrypted = NULL WHERE provider='firebase'`);
+          console.log("[Migration v30.4] Cleared legacy Firebase sender_id extra_fields");
+        }
+        // else: has project_id / client_email — preserve it
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Migration] v30.4 firebase legacy cleanup:", err.message);
+  }
+
+  // v30.5 — One-time clean slate: wipe ALL Firebase credentials (api_key + extra_fields)
+  //          so corrupted values from earlier sessions cannot persist.
+  //          A marker row "_fb_cleared_v305" prevents this from running on subsequent startups.
+  try {
+    const markerCheck = await pool.query(
+      `SELECT 1 FROM api_settings WHERE provider = '_fb_cleared_v305'`
+    );
+    if (!markerCheck.rows.length) {
+      // Clear corrupted credentials
+      await pool.query(
+        `UPDATE api_settings
+         SET api_key_encrypted = NULL, extra_fields_encrypted = NULL
+         WHERE provider = 'firebase'`
+      );
+      // Write the marker so this never runs again
+      await pool.query(
+        `INSERT INTO api_settings (provider, enabled, updated_at, updated_by)
+         VALUES ('_fb_cleared_v305', false, NOW(), 'migration')
+         ON CONFLICT (provider) DO NOTHING`
+      );
+      console.log("[Migration v30.5] Firebase credentials cleared — re-enter via API Settings → Firebase Push (FCM v1)");
+    }
+  } catch (err: any) {
+    console.warn("[Migration v30.5] firebase clean slate:", err.message);
+  }
 }
 
 const rawPort = process.env["PORT"];
@@ -2825,6 +2931,110 @@ async function start() {
     console.log("[Migration] v31.0 rcs_template_mappings seeded");
   } catch (err: any) { console.warn("[Migration] v31.0 rcs_template_mappings:", err.message); }
 
+  // ── v31.1 — Correct approved template IDs + exact Lemin variable key names ──
+  // Variables confirmed by probing each template with the Lemin API (error messages list exact keys).
+  // Key format varies per template family:
+  //   3651/3652/3655 → plain "name"
+  //   3656           → "booking id", "invoice no", "{{amount}}", "{{customer_name}}"
+  //   3657/3659/3660 → "{{double_brace}}" format
+  //   3661           → "#!hash_bang!#" format + emoji prefix variants
+  //   3663           → plain "otp"
+  try {
+    await pool.query(`
+      INSERT INTO rcs_template_mappings
+        (erp_event, template_name, template_id, variables_required, enabled, notes)
+      VALUES
+        ('booking_submitted',        'Booking_Submitted',          '3651',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('booking_confirmed',        'Booking_Approved',           '3652',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('booking_approved',         'Booking_Approved',           '3652',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('payment_received',         'Payment_Received',           '3656',
+          ARRAY['booking id','invoice no','{{amount}}','{{customer_name}}'],
+          true, 'Lemin keys: booking id, invoice no, {{amount}}, {{customer_name}}'),
+        ('pending_payment_reminder', 'Pending_Payment_Reminder',   '3655',
+          ARRAY['name'],
+          true, 'Lemin key: name'),
+        ('invoice_ready',            'Invoice_Generated',          '3657',
+          ARRAY['{{customer_name}}','{{invoice_number}}','{{booking_id}}','{{amount}}'],
+          true, 'Lemin keys: {{customer_name}}, {{invoice_number}}, {{booking_id}}, {{amount}}'),
+        ('flight_ticket',            'Ticket_Issued',              '3659',
+          ARRAY['{{customer_name}}','{{booking_id}}','{{ticket_number}}','{{flight_number}}','{{departure_date}} at {{departure_time}}'],
+          true, 'Lemin keys: {{customer_name}}, {{booking_id}}, {{ticket_number}}, {{flight_number}}, composite departure'),
+        ('visa_ready',               'Visa_Issued',                '3660',
+          ARRAY['{{booking_id}}','{{visa_number}}','{{package_name}}','{{customer_name}}'],
+          true, 'Lemin keys: {{booking_id}}, {{visa_number}}, {{package_name}}, {{customer_name}}'),
+        ('agreement_ready',          'Agreement_Ready',            '3661',
+          ARRAY['#!name!#',': #!agreement!#','🔗 #!download!#','#!bookingid!#'],
+          true, 'Lemin keys: #!name!#, : #!agreement!#, 🔗 #!download!#, #!bookingid!#'),
+        ('login_otp',                'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('otp_login',                'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('customer_login_otp',       'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('admin_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('agent_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('branch_login_otp',         'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('staff_login_otp',          'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('password_reset_otp',       'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL),
+        ('mobile_verification_otp',  'alburhan_login_otp',         '3663', ARRAY['otp'], true, NULL)
+      ON CONFLICT (erp_event) DO UPDATE
+        SET template_id        = EXCLUDED.template_id,
+            template_name      = EXCLUDED.template_name,
+            variables_required = EXCLUDED.variables_required,
+            enabled            = EXCLUDED.enabled,
+            notes              = EXCLUDED.notes,
+            updated_at         = NOW()
+    `);
+    console.log("[Migration] v31.1 rcs_template_mappings corrected — exact Lemin variable keys set");
+  } catch (err: any) { console.warn("[Migration] v31.1 rcs_template_mappings fix:", err.message); }
+
+  // ── v32.0 — Google OAuth: add health columns to oauth_connections + repair stale records ──
+  try {
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS connection_status  TEXT DEFAULT 'unknown'`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_refresh_at    TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_error         TEXT`);
+    await pool.query(`ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS last_api_call_at   TIMESTAMPTZ`);
+    // Repair: google rows with access_token but no refresh_token → reconnect_required
+    await pool.query(`
+      UPDATE oauth_connections
+      SET connection_status = 'reconnect_required',
+          last_error        = 'No refresh token stored — reconnect required'
+      WHERE provider = 'google'
+        AND (refresh_token IS NULL OR refresh_token = '')
+        AND  access_token IS NOT NULL AND access_token != ''
+        AND (connection_status IS NULL OR connection_status IN ('unknown',''))
+    `);
+    // google rows with both tokens → mark connected (health cron will verify)
+    await pool.query(`
+      UPDATE oauth_connections
+      SET connection_status = 'connected'
+      WHERE provider = 'google'
+        AND refresh_token IS NOT NULL AND refresh_token != ''
+        AND (connection_status IS NULL OR connection_status IN ('unknown',''))
+    `);
+    console.log("[Migration] v32.0 oauth_connections Google health columns ensured");
+  } catch (err: any) { console.warn("[Migration] v32.0 google health cols:", err.message); }
+
+  // ── v31.2 — Fix api_settings.extra.template_id for lemin if it contains non-numeric garbage ──
+  // Root cause: admin saved placeholder/help text as the template_id value. Any non-numeric value
+  // is replaced with "3651" (the approved booking_submitted template).
+  try {
+    await pool.query(`
+      UPDATE api_settings
+      SET extra = jsonb_set(extra, '{template_id}', '"3651"'::jsonb)
+      WHERE provider = 'lemin'
+        AND (
+          extra->>'template_id' IS NULL
+          OR extra->>'template_id' = ''
+          OR extra->>'template_id' !~ '^[0-9]+$'
+        )
+    `);
+    console.log("[Migration] v31.2 lemin template_id sanitised — non-numeric values replaced with 3651");
+  } catch (err: any) { console.warn("[Migration] v31.2 lemin template_id fix:", err.message); }
+
   // v31.0 — notification_logs: add RCS tracking columns
   try {
     await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS message_id        TEXT`);
@@ -2838,6 +3048,1026 @@ async function start() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_nl_idempotency ON notification_logs(idempotency_key) WHERE idempotency_key IS NOT NULL`);
     console.log("[Migration] v31.0 notification_logs RCS columns ensured");
   } catch (err: any) { console.warn("[Migration] v31.0 notification_logs cols:", err.message); }
+
+  // v32.0 — notification_logs: provider_message_id, failed_at, error_message columns (Task #327)
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS provider_message_id TEXT`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS failed_at           TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS error_message       TEXT`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_nl_provider_msg ON notification_logs(provider_message_id) WHERE provider_message_id IS NOT NULL`);
+    console.log("[Migration] v32.0 notification_logs provider_message_id/failed_at/error_message ensured");
+  } catch (err: any) { console.warn("[Migration] v32.0 notification_logs cols:", err.message); }
+
+  // ── v33.0 — documents: add access_token for secure public shareable links ───
+  try {
+    await pool.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS access_token TEXT`);
+    await pool.query(`
+      UPDATE documents
+      SET    access_token = gen_random_uuid()::text
+      WHERE  access_token IS NULL
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_docs_access_token
+      ON documents(access_token)
+      WHERE  access_token IS NOT NULL
+    `);
+    console.log("[Migration] v33.0 documents.access_token ensured + backfilled");
+  } catch (err: any) { console.warn("[Migration] v33.0 documents access_token:", err.message); }
+
+  // ── v33.1 — payment_transactions: UNIQUE index on reference_number (concurrent payment dedup) ──
+  // Without this, two concurrent verify+webhook calls for the same Razorpay paymentId can both
+  // pass the application-level WHERE NOT EXISTS check and insert duplicate payment records.
+  // The UNIQUE index is the DB-level safety net that rejects the second insert with code 23505.
+  try {
+    // Deduplicate existing rows before creating the unique index (keeps oldest row per reference_number)
+    const dupPayRows = await pool.query(
+      `SELECT reference_number, MIN(created_at) AS keep_at
+       FROM payment_transactions
+       WHERE reference_number IS NOT NULL
+       GROUP BY reference_number
+       HAVING COUNT(*) > 1`
+    );
+    let dupPayDeleted = 0;
+    for (const row of dupPayRows.rows) {
+      const d = await pool.query(
+        `DELETE FROM payment_transactions
+         WHERE reference_number=$1
+           AND ctid NOT IN (
+             SELECT ctid FROM payment_transactions
+             WHERE reference_number=$1
+             ORDER BY created_at ASC LIMIT 1
+           )`,
+        [row.reference_number]
+      );
+      dupPayDeleted += d.rowCount ?? 0;
+    }
+    if (dupPayDeleted > 0) console.log(`[Migration] v33.1 removed ${dupPayDeleted} duplicate payment_transactions rows`);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_transactions_reference_number
+      ON payment_transactions(reference_number)
+      WHERE reference_number IS NOT NULL
+    `);
+    console.log("[Migration] v33.1 payment_transactions UNIQUE(reference_number) index ensured");
+  } catch (err: any) { console.warn("[Migration] v33.1 payment_transactions unique index:", err.message); }
+
+  // ── v33.2 — notification_logs: add superseded_at/superseded_by for duplicate audit trail ──
+  try {
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS superseded_at  TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS superseded_by  TEXT REFERENCES notification_logs(id) ON DELETE SET NULL`);
+    console.log("[Migration] v33.2 notification_logs superseded_at/superseded_by columns ensured");
+  } catch (err: any) { console.warn("[Migration] v33.2 notification_logs superseded cols:", err.message); }
+
+  // ── v33.3 — notification_logs: soft-mark historical duplicates (no deletes, no resends) ──
+  // For each (booking_id, event_type, channel) group with more than one 'sent' row and no
+  // idempotency_key: keep the oldest row, mark all later ones superseded_by=oldest_id.
+  // This preserves the complete audit trail while making it clear which was the canonical send.
+  try {
+    // Create audit backup table before touching anything
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notification_logs_dup_audit (
+        id            TEXT PRIMARY KEY,
+        snapshot_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        original_id   TEXT NOT NULL,
+        booking_id    TEXT,
+        event_type    TEXT,
+        channel       TEXT,
+        status        TEXT,
+        created_at    TIMESTAMPTZ,
+        superseded_by TEXT,
+        reason        TEXT
+      )
+    `);
+    // Identify true duplicates: same booking+event+channel, status=sent, no idempotency key
+    const dupGroups = await pool.query(`
+      SELECT booking_id, event_type, channel,
+             MIN(id) AS keep_id,
+             ARRAY_AGG(id ORDER BY created_at ASC) AS all_ids
+      FROM notification_logs
+      WHERE status = 'sent'
+        AND idempotency_key IS NULL
+        AND booking_id IS NOT NULL
+        AND superseded_at IS NULL
+      GROUP BY booking_id, event_type, channel
+      HAVING COUNT(*) > 1
+    `);
+    let markedCount = 0;
+    for (const grp of dupGroups.rows) {
+      const keepId: string = grp.keep_id;
+      const laterIds: string[] = (grp.all_ids as string[]).filter((id: string) => id !== keepId);
+      for (const dupId of laterIds) {
+        // Write to audit table first
+        await pool.query(
+          `INSERT INTO notification_logs_dup_audit (id, original_id, booking_id, event_type, channel, status, created_at, superseded_by, reason)
+           SELECT gen_random_uuid()::text, nl.id, nl.booking_id, nl.event_type, nl.channel, nl.status, nl.created_at, $2, 'historical_duplicate_no_idempotency_key'
+           FROM notification_logs nl WHERE nl.id=$1 ON CONFLICT DO NOTHING`,
+          [dupId, keepId]
+        );
+        // Soft-mark as superseded — does NOT change status (row still reads as 'sent' for history)
+        await pool.query(
+          `UPDATE notification_logs SET superseded_at=NOW(), superseded_by=$2, updated_at=NOW()
+           WHERE id=$1 AND superseded_at IS NULL`,
+          [dupId, keepId]
+        );
+        markedCount++;
+      }
+    }
+    console.log(`[Migration] v33.3 notification_logs duplicate audit: ${dupGroups.rows.length} groups, ${markedCount} rows soft-marked superseded`);
+  } catch (err: any) { console.warn("[Migration] v33.3 notification_logs dup cleanup:", err.message); }
+
+  // ── v34.1 — invoices: tax snapshot + payment_status + immutability columns ──
+  try {
+    const cols = [
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tcs_rate NUMERIC(5,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS taxable_amount NUMERIC(12,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS visa_charges NUMERIC(12,2) DEFAULT 0`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS additional_charges NUMERIC(12,2) DEFAULT 0`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS grand_total NUMERIC(12,2)`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS issue_date TIMESTAMPTZ`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_terms TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_name TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS package_name TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS package_type TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS source TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS actor_id TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS void_reason TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_by TEXT`,
+      `ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_void BOOLEAN DEFAULT false`,
+    ];
+    for (const s of cols) await pool.query(s).catch(() => {});
+    // Backfill derived columns for existing rows
+    await pool.query(`UPDATE invoices SET grand_total=total WHERE grand_total IS NULL`).catch(() => {});
+    await pool.query(`UPDATE invoices SET issue_date=invoice_date WHERE issue_date IS NULL`).catch(() => {});
+    await pool.query(`
+      UPDATE invoices SET payment_status=CASE
+        WHEN paid >= total-0.01 THEN 'paid'
+        WHEN paid > 0 THEN 'partially_paid'
+        ELSE 'unpaid'
+      END WHERE payment_status='unpaid' OR payment_status IS NULL`).catch(() => {});
+    // Backfill customer_name / package_name from bookings
+    await pool.query(`
+      UPDATE invoices i SET
+        customer_name=COALESCE(i.customer_name, b.customer_name),
+        package_name=COALESCE(i.package_name, b.package_name)
+      FROM bookings b WHERE b.id=i.booking_id
+        AND (i.customer_name IS NULL OR i.package_name IS NULL)`).catch(() => {});
+    console.log("[Migration] v34.1 invoices extended columns ensured");
+  } catch (err: any) { console.warn("[Migration] v34.1 invoices extension:", err.message); }
+
+  // ── v34.2 — invoice_number_seq + receipt_number_seq + refund_number_seq ───────
+  try {
+    const maxInvRes = await pool.query(`
+      SELECT COALESCE(MAX(CAST(SPLIT_PART(invoice_number,'/',3) AS BIGINT)),0) AS m
+      FROM invoices WHERE invoice_number ~ '^ABT/[0-9]{4}/[0-9]+'`);
+    const invStart = Number(maxInvRes.rows[0]?.m ?? 0) + 1;
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS invoice_number_seq MINVALUE 1`);
+    // Ensure sequence is at least at invStart (setval with is_called=false sets NEXT value)
+    await pool.query(`SELECT setval('invoice_number_seq', GREATEST((SELECT last_value FROM invoice_number_seq), $1), true)`, [invStart]).catch(() => {});
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS receipt_number_seq MINVALUE 1`);
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS refund_number_seq MINVALUE 1`);
+    console.log("[Migration] v34.2 financial sequences ensured (inv_start=%d)", invStart);
+  } catch (err: any) { console.warn("[Migration] v34.2 sequences:", err.message); }
+
+  // ── v34.3 — receipts table ────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id TEXT PRIMARY KEY,
+        receipt_number TEXT UNIQUE NOT NULL,
+        payment_id TEXT UNIQUE NOT NULL,
+        booking_id TEXT NOT NULL,
+        customer_id TEXT,
+        customer_name TEXT,
+        booking_number TEXT,
+        package_name TEXT,
+        payment_date TEXT,
+        payment_method TEXT,
+        reference_number TEXT,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        total_paid NUMERIC(12,2) NOT NULL DEFAULT 0,
+        outstanding_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        received_by TEXT,
+        company_name TEXT NOT NULL DEFAULT 'Al Burhan Tours & Travels',
+        pdf_path TEXT,
+        is_void BOOLEAN NOT NULL DEFAULT false,
+        void_reason TEXT,
+        voided_at TIMESTAMPTZ,
+        voided_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS rec_booking_idx ON receipts(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS rec_payment_idx ON receipts(payment_id)`);
+    console.log("[Migration] v34.3 receipts table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.3 receipts:", err.message); }
+
+  // ── v34.4 — refunds table ─────────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS refunds (
+        id TEXT PRIMARY KEY,
+        refund_number TEXT UNIQUE NOT NULL,
+        booking_id TEXT NOT NULL,
+        payment_id TEXT,
+        amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+        refund_method TEXT NOT NULL DEFAULT 'bank_transfer',
+        refund_reason TEXT NOT NULL,
+        reference_number TEXT,
+        requested_by TEXT,
+        approved_by TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        approved_at TIMESTAMPTZ,
+        processed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ref_booking_idx ON refunds(booking_id)`);
+    console.log("[Migration] v34.4 refunds table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.4 refunds:", err.message); }
+
+  // ── v34.5 — finance_audit_logs table ──────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS finance_audit_logs (
+        id TEXT PRIMARY KEY,
+        action TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT,
+        booking_id TEXT,
+        actor_id TEXT,
+        actor_name TEXT,
+        actor_role TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        old_values JSONB,
+        new_values JSONB,
+        reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_booking_idx ON finance_audit_logs(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_action_idx ON finance_audit_logs(action)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS fal_created_idx ON finance_audit_logs(created_at DESC)`);
+    console.log("[Migration] v34.5 finance_audit_logs table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.5 finance_audit_logs:", err.message); }
+
+  // ── v34.6 — customer_ledger_entries table ──────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_ledger_entries (
+        id TEXT PRIMARY KEY,
+        booking_id TEXT NOT NULL,
+        entry_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        doc_type TEXT NOT NULL,
+        doc_number TEXT,
+        doc_id TEXT,
+        description TEXT NOT NULL,
+        debit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        credit NUMERIC(12,2) NOT NULL DEFAULT 0,
+        running_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        source TEXT,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cle_booking_idx ON customer_ledger_entries(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cle_date_idx ON customer_ledger_entries(booking_id, entry_date ASC)`);
+    console.log("[Migration] v34.6 customer_ledger_entries table ensured");
+  } catch (err: any) { console.warn("[Migration] v34.6 customer_ledger_entries:", err.message); }
+
+  // ── v34.7 — booking_settings: finance columns + bookings.payment_status ───────
+  try {
+    const fCols = [
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS standard_advance_pct NUMERIC(5,2) DEFAULT 50`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS balance_due_after_days INTEGER DEFAULT 50`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS discount_full_payment_required BOOLEAN DEFAULT true`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS block_visa_balance_pending BOOLEAN DEFAULT true`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS default_currency TEXT DEFAULT 'INR'`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS sar_reference_rate NUMERIC(8,2) DEFAULT 25.70`,
+      `ALTER TABLE booking_settings ADD COLUMN IF NOT EXISTS spc_charge NUMERIC(10,2) DEFAULT 5500`,
+    ];
+    for (const s of fCols) await pool.query(s).catch(() => {});
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'`).catch(() => {});
+    // Backfill payment_status from paid_amount vs final_amount
+    await pool.query(`
+      UPDATE bookings SET payment_status = CASE
+        WHEN final_amount IS NULL OR final_amount <= 0 THEN 'unpaid'
+        WHEN COALESCE(paid_amount,0) <= 0 THEN 'unpaid'
+        WHEN COALESCE(paid_amount,0) >= final_amount - 0.01 THEN 'paid'
+        ELSE 'partially_paid'
+      END WHERE payment_status='unpaid' OR payment_status IS NULL`).catch(() => {});
+    console.log("[Migration] v34.7 finance settings columns + bookings.payment_status ensured");
+  } catch (err: any) { console.warn("[Migration] v34.7 finance settings:", err.message); }
+
+  // ── v34.8 — authoritative GST: backfill NULL gst_rate/tcs_rate on bookings ──
+  // The Phase 1 delivery noted ambiguity: some bookings have NULL gst_rate.
+  // These must use the system default from booking_settings, not 0.
+  // This migration writes the system default into each NULL row so the
+  // booking row itself becomes the authoritative snapshot going forward.
+  try {
+    const sysRates = await pool.query(
+      `SELECT gst_rate, tcs_rate, gst_enabled, tcs_enabled FROM booking_settings WHERE id='default' LIMIT 1`
+    );
+    const sysGst = sysRates.rows[0]?.gst_rate ?? 5;
+    const sysTcs = sysRates.rows[0]?.tcs_rate ?? 2;
+
+    // Backfill bookings with NULL gst_rate (use system default as the snapshot)
+    const gstFix = await pool.query(
+      `UPDATE bookings SET gst_rate=$1 WHERE gst_rate IS NULL RETURNING id`,
+      [sysGst]
+    );
+    // Backfill bookings with NULL tcs_rate (keep tcs = 0 if tcs not enabled, else system default)
+    const tcsEnabled = sysRates.rows[0]?.tcs_enabled ?? false;
+    const tcsFillValue = tcsEnabled ? sysTcs : 0;
+    const tcsFix = await pool.query(
+      `UPDATE bookings SET tcs_rate=$1 WHERE tcs_rate IS NULL RETURNING id`,
+      [tcsFillValue]
+    );
+
+    // Backfill existing invoices that have NULL gst_rate (snapshot forward)
+    await pool.query(
+      `UPDATE invoices i SET gst_rate=b.gst_rate, tcs_rate=b.tcs_rate
+       FROM bookings b WHERE b.id=i.booking_id
+         AND (i.gst_rate IS NULL OR i.tcs_rate IS NULL)`
+    ).catch(() => {});
+
+    console.log(`[Migration] v34.8 GST/TCS backfill: ${gstFix.rowCount} bookings fixed gst_rate=${sysGst}, ${tcsFix.rowCount} bookings fixed tcs_rate=${tcsFillValue}`);
+  } catch (err: any) { console.warn("[Migration] v34.8 GST backfill:", err.message); }
+
+  // ── v35.1 — notification_logs: Communication Center required columns ────────
+  try {
+    await pool.query(`
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS canonical_event TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS is_manual_resend BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS original_log_id TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS rendered_preview TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS request_payload_safe JSONB;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS permanently_failed_at TIMESTAMPTZ;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS business_reference TEXT;
+      ALTER TABLE notification_logs ADD COLUMN IF NOT EXISTS scheduled_message_id TEXT;
+    `);
+    // Back-fill canonical_event from event_type for existing rows
+    await pool.query(`
+      UPDATE notification_logs SET canonical_event = event_type
+      WHERE canonical_event IS NULL AND event_type IS NOT NULL
+    `);
+    console.log("[Migration] v35.1 notification_logs communication columns ensured");
+  } catch (err: any) { console.warn("[Migration] v35.1 notification_logs comms cols:", err.message); }
+
+  // ── v35.2 — notification_templates: provider/approval/version columns ───────
+  try {
+    await pool.query(`
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS provider_template_id TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS provider_template_name TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS required_variables JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS optional_variables JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS fallback_template_id TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS last_tested_at TIMESTAMPTZ;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS created_by TEXT;
+      ALTER TABLE notification_templates ADD COLUMN IF NOT EXISTS updated_by TEXT;
+    `);
+    // Back-fill provider_template_id from existing dlt_template_id / botbee_template_id / meta_template_id
+    await pool.query(`
+      UPDATE notification_templates SET
+        provider_template_id = COALESCE(provider_template_id, dlt_template_id, botbee_template_id, meta_template_id)
+      WHERE provider_template_id IS NULL
+        AND (dlt_template_id IS NOT NULL OR botbee_template_id IS NOT NULL OR meta_template_id IS NOT NULL)
+    `).catch(() => {});
+    console.log("[Migration] v35.2 notification_templates approval/version columns ensured");
+  } catch (err: any) { console.warn("[Migration] v35.2 notification_templates:", err.message); }
+
+  // ── v35.3 — communication_event_mappings table ──────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_event_mappings (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        primary_provider TEXT,
+        fallback_provider TEXT,
+        template_id TEXT,
+        fallback_template_id TEXT,
+        retry_max INTEGER NOT NULL DEFAULT 3,
+        retry_policy JSONB NOT NULL DEFAULT '{"delays":[300,1800,7200,43200]}'::jsonb,
+        recipient_type TEXT NOT NULL DEFAULT 'customer',
+        send_timing TEXT NOT NULL DEFAULT 'immediate',
+        attachment_policy TEXT NOT NULL DEFAULT 'link_only',
+        notes TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(event_type, channel)
+      )
+    `);
+    // Seed from notification_settings for backward compat
+    await pool.query(`
+      INSERT INTO communication_event_mappings (id, event_type, channel, enabled, template_id)
+      SELECT
+        'cem_' || event_type || '_' || channel,
+        event_type, channel, enabled, template_id
+      FROM notification_settings
+      ON CONFLICT (event_type, channel) DO NOTHING
+    `).catch(() => {});
+    // Set default providers
+    await pool.query(`
+      UPDATE communication_event_mappings SET primary_provider = 'botbee'  WHERE channel='whatsapp' AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'fast2sms' WHERE channel='sms'      AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'smtp'     WHERE channel='email'    AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'lemin'    WHERE channel='rcs'      AND primary_provider IS NULL;
+      UPDATE communication_event_mappings SET primary_provider = 'fcm'      WHERE channel='push'     AND primary_provider IS NULL;
+    `).catch(() => {});
+    console.log("[Migration] v35.3 communication_event_mappings table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.3 communication_event_mappings:", err.message); }
+
+  // ── v35.4 — communication_status_history ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_status_history (
+        id SERIAL PRIMARY KEY,
+        log_id TEXT NOT NULL REFERENCES notification_logs(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        status_detail TEXT,
+        provider_message_id TEXT,
+        webhook_payload JSONB,
+        actor TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS csh_log_id_idx ON communication_status_history(log_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS csh_created_idx ON communication_status_history(created_at DESC)`);
+    console.log("[Migration] v35.4 communication_status_history table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.4 communication_status_history:", err.message); }
+
+  // ── v35.5 — provider_health_status ──────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS provider_health_status (
+        provider TEXT PRIMARY KEY,
+        channel TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        circuit_state TEXT NOT NULL DEFAULT 'closed',
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_success_at TIMESTAMPTZ,
+        last_failure_at TIMESTAMPTZ,
+        last_failure_reason TEXT,
+        last_test_at TIMESTAMPTZ,
+        last_test_result TEXT,
+        total_sent_24h INTEGER NOT NULL DEFAULT 0,
+        total_failed_24h INTEGER NOT NULL DEFAULT 0,
+        avg_response_ms INTEGER,
+        is_enabled BOOLEAN NOT NULL DEFAULT true,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    // Seed known providers
+    const providers = [
+      ["botbee",    "whatsapp", "BotBee WhatsApp"],
+      ["meta",      "whatsapp", "Meta Cloud API"],
+      ["fast2sms",  "sms",      "Fast2SMS (DLT)"],
+      ["smtp",      "email",    "SMTP Email"],
+      ["lemin",     "rcs",      "Lemin AI / Jio RCS"],
+      ["fcm",       "push",     "Firebase FCM"],
+      ["webpush",   "push",     "Web Push (VAPID)"],
+      ["telegram",  "telegram", "Telegram Bot"],
+    ];
+    for (const [p, ch, dn] of providers) {
+      await pool.query(
+        `INSERT INTO provider_health_status (provider, channel, display_name)
+         VALUES ($1,$2,$3) ON CONFLICT (provider) DO NOTHING`,
+        [p, ch, dn]
+      );
+    }
+    console.log("[Migration] v35.5 provider_health_status table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.5 provider_health_status:", err.message); }
+
+  // ── v35.6 — communication_audit_logs ────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_audit_logs (
+        id SERIAL PRIMARY KEY,
+        action TEXT NOT NULL,
+        actor_id TEXT,
+        actor_role TEXT,
+        entity_type TEXT,
+        entity_id TEXT,
+        old_values JSONB,
+        new_values JSONB,
+        reason TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_action_idx ON communication_audit_logs(action)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_actor_idx  ON communication_audit_logs(actor_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cal_created_idx ON communication_audit_logs(created_at DESC)`);
+    console.log("[Migration] v35.6 communication_audit_logs table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.6 communication_audit_logs:", err.message); }
+
+  // ── v35.7 — communication_schedules ─────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS communication_schedules (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        booking_id TEXT,
+        group_id TEXT,
+        recipient TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        template_id TEXT,
+        scheduled_at TIMESTAMPTZ NOT NULL,
+        timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+        status TEXT NOT NULL DEFAULT 'pending',
+        cancellation_reason TEXT,
+        idempotency_key TEXT UNIQUE,
+        template_version INTEGER NOT NULL DEFAULT 1,
+        context JSONB,
+        created_by TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_scheduled_idx ON communication_schedules(scheduled_at)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_booking_idx   ON communication_schedules(booking_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cs_status_idx    ON communication_schedules(status)`);
+    console.log("[Migration] v35.7 communication_schedules table ensured");
+  } catch (err: any) { console.warn("[Migration] v35.7 communication_schedules:", err.message); }
+
+  // ── v36.1 — orientation_resources table ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orientation_resources (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT DEFAULT 'general',
+        resource_type TEXT DEFAULT 'article',
+        content TEXT,
+        external_url TEXT,
+        file_url TEXT,
+        thumbnail_url TEXT,
+        language TEXT DEFAULT 'en',
+        is_published BOOLEAN DEFAULT true,
+        view_count INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        created_by TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS or_category_idx ON orientation_resources(category)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS or_published_idx ON orientation_resources(is_published)`);
+    console.log("[Migration] v36.1 orientation_resources table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.1 orientation_resources:", err.message); }
+
+  // ── v36.2 — customer_portal_activity table ──────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_portal_activity (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL,
+        booking_id TEXT,
+        action TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpa_customer_idx ON customer_portal_activity(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpa_created_idx  ON customer_portal_activity(created_at DESC)`);
+    console.log("[Migration] v36.2 customer_portal_activity table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.2 customer_portal_activity:", err.message); }
+
+  // ── v36.3 — customer_profile_edits table ────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS customer_profile_edits (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id TEXT NOT NULL,
+        field_name TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        status TEXT DEFAULT 'pending',
+        reviewed_by TEXT,
+        reviewed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpe_customer_idx ON customer_profile_edits(customer_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS cpe_status_idx   ON customer_profile_edits(status)`);
+    console.log("[Migration] v36.3 customer_profile_edits table ensured");
+  } catch (err: any) { console.warn("[Migration] v36.3 customer_profile_edits:", err.message); }
+
+  // ── v36.4 — enhance customer_notifications ──────────────────────────────────
+  try {
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS action_url   TEXT`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS priority      TEXT DEFAULT 'normal'`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS expires_at    TIMESTAMPTZ`);
+    await pool.query(`ALTER TABLE customer_notifications ADD COLUMN IF NOT EXISTS is_archived   BOOLEAN DEFAULT false`);
+    console.log("[Migration] v36.4 customer_notifications enhancement ensured");
+  } catch (err: any) { console.warn("[Migration] v36.4 customer_notifications:", err.message); }
+
+  // ── v37.1 — automation_service_tokens ────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS automation_service_tokens (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        token_name    TEXT NOT NULL,
+        token_hash    TEXT NOT NULL UNIQUE,
+        scopes        JSONB NOT NULL DEFAULT '[]'::jsonb,
+        allowed_ips   JSONB,
+        is_active     BOOLEAN NOT NULL DEFAULT true,
+        expires_at    TIMESTAMPTZ,
+        revoked_at    TIMESTAMPTZ,
+        last_used_at  TIMESTAMPTZ,
+        created_by    TEXT,
+        notes         TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ast_hash_idx ON automation_service_tokens(token_hash)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ast_active_idx ON automation_service_tokens(is_active) WHERE is_active = true`);
+    // Seed N8N token if env var is set and no token exists yet
+    const n8nToken = process.env.N8N_SERVICE_TOKEN;
+    if (n8nToken) {
+      const crypto = await import("crypto");
+      const hash = crypto.createHash("sha256").update(n8nToken).digest("hex");
+      await pool.query(
+        `INSERT INTO automation_service_tokens (id, token_name, token_hash, scopes, is_active, created_by, notes)
+         VALUES (gen_random_uuid()::text, 'n8n-main', $1,
+           '["packages:read","leads:create","leads:update","support:create","conversations:create","knowledge:read"]'::jsonb,
+           true, 'system', 'Auto-seeded from N8N_SERVICE_TOKEN env var')
+         ON CONFLICT (token_hash) DO NOTHING`,
+        [hash]
+      );
+    }
+    console.log("[Migration] v37.1 automation_service_tokens ensured");
+  } catch (err: any) { console.warn("[Migration] v37.1 automation_service_tokens:", err.message); }
+
+  // ── v37.2 — ai_conversations ─────────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_conversations (
+        id                        TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        conversation_key          TEXT NOT NULL UNIQUE,
+        channel                   TEXT NOT NULL,
+        external_contact_id       TEXT,
+        customer_id               TEXT,
+        lead_id                   TEXT,
+        booking_id                TEXT,
+        customer_name             TEXT,
+        mobile_masked             TEXT,
+        language                  TEXT NOT NULL DEFAULT 'en',
+        status                    TEXT NOT NULL DEFAULT 'ai_active'
+                                    CHECK (status IN ('ai_active','human_required','human_active','closed')),
+        last_ai_message_at        TIMESTAMPTZ,
+        last_customer_message_at  TIMESTAMPTZ,
+        closed_at                 TIMESTAMPTZ,
+        created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_key_idx    ON ai_conversations(conversation_key)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_status_idx ON ai_conversations(status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ac_channel_idx ON ai_conversations(channel)`);
+    console.log("[Migration] v37.2 ai_conversations ensured");
+  } catch (err: any) { console.warn("[Migration] v37.2 ai_conversations:", err.message); }
+
+  // ── v37.3 — ai_conversation_messages ─────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_conversation_messages (
+        id                   TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        conversation_id      TEXT NOT NULL REFERENCES ai_conversations(id) ON DELETE CASCADE,
+        direction            TEXT NOT NULL CHECK (direction IN ('inbound','outbound')),
+        sender_type          TEXT NOT NULL CHECK (sender_type IN ('customer','ai','staff','system')),
+        channel              TEXT NOT NULL,
+        message_type         TEXT NOT NULL DEFAULT 'text',
+        message_text         TEXT NOT NULL,
+        provider_message_id  TEXT,
+        request_id           TEXT,
+        ai_model             TEXT,
+        tool_calls           JSONB,
+        confidence           NUMERIC(4,3),
+        created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS acm_conv_idx ON ai_conversation_messages(conversation_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS acm_dir_idx  ON ai_conversation_messages(direction)`);
+    console.log("[Migration] v37.3 ai_conversation_messages ensured");
+  } catch (err: any) { console.warn("[Migration] v37.3 ai_conversation_messages:", err.message); }
+
+  // ── v37.4 — automation_audit_logs ───────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS automation_audit_logs (
+        id           TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        actor_type   TEXT NOT NULL DEFAULT 'service_token',
+        actor_id     TEXT NOT NULL,
+        action       TEXT NOT NULL,
+        entity_type  TEXT NOT NULL,
+        entity_id    TEXT,
+        request_id   TEXT,
+        ip_address   TEXT,
+        before_data  JSONB,
+        after_data   JSONB,
+        result       TEXT NOT NULL DEFAULT 'success' CHECK (result IN ('success','failure')),
+        error_code   TEXT,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_actor_idx  ON automation_audit_logs(actor_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_action_idx ON automation_audit_logs(action, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_entity_idx ON automation_audit_logs(entity_type, entity_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS aal_idem_idx   ON automation_audit_logs((after_data->>'idempotency_key')) WHERE after_data->>'idempotency_key' IS NOT NULL`);
+    console.log("[Migration] v37.4 automation_audit_logs ensured");
+  } catch (err: any) { console.warn("[Migration] v37.4 automation_audit_logs:", err.message); }
+
+  // ── v37.5 — ai_knowledge_base ───────────────────────────────────────────────
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_knowledge_base (
+        id               TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        category         TEXT NOT NULL,
+        question         TEXT NOT NULL,
+        answer           TEXT NOT NULL,
+        language         TEXT NOT NULL DEFAULT 'en',
+        tags             JSONB,
+        sort_order       INTEGER,
+        version          INTEGER NOT NULL DEFAULT 1,
+        status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','archived')),
+        approval_status  TEXT NOT NULL DEFAULT 'pending' CHECK (approval_status IN ('pending','approved','rejected')),
+        approved_by      TEXT,
+        is_active        BOOLEAN NOT NULL DEFAULT true,
+        last_reviewed_at TIMESTAMPTZ,
+        created_by       TEXT,
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_cat_idx    ON ai_knowledge_base(category, sort_order NULLS LAST)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_status_idx ON ai_knowledge_base(status, is_active)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS akb_lang_idx   ON ai_knowledge_base(language)`);
+    // Add DB soft-switch for AI kill switch (admin can toggle without env var change)
+    await pool.query(
+      `INSERT INTO api_settings (key, value, provider, enabled, updated_at)
+       VALUES ('ai_assistant_enabled', 'false', 'ai_automation', false, NOW())
+       ON CONFLICT (key) DO NOTHING`,
+    ).catch(() => {
+      // api_settings may use (provider) as PK — try alternate upsert
+      pool.query(
+        `INSERT INTO api_settings (provider, enabled, updated_at)
+         VALUES ('ai_automation', false, NOW())
+         ON CONFLICT (provider) DO NOTHING`
+      ).catch(() => {});
+    });
+    console.log("[Migration] v37.5 ai_knowledge_base + ai_automation api_settings ensured");
+  } catch (err: any) { console.warn("[Migration] v37.5 ai_knowledge_base:", err.message); }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 2 — Tenant foundation & row-level backfill (v38.1 – v38.9)
+  // AUTHORITATIVE SOURCE: migrations/v38-tenant-foundation.sql
+  // Fixed tenant UUID: 10000000-1000-4000-8000-000000000001 (Al Burhan default)
+  // Columns NULLABLE — NOT NULL enforcement deferred to Phase 3
+  // ══════════════════════════════════════════════════════════════════════════════
+  // NOTE: Everything below is delegated to the SQL file. Do NOT duplicate DDL here.
+  // ── v38: execute SQL migration file (single authoritative path) ──────────────
+  // migrations/v38-tenant-foundation.sql is the single source of truth.
+  // It runs in a transaction: if the v38.9b assertion DO block raises EXCEPTION,
+  // the transaction rolls back and the error surfaces here as CRITICAL.
+  try {
+    // ESM-compatible path: fileURLToPath(import.meta.url) gives the current file's path.
+    // esbuild's banner polyfill (build.ts) ensures import.meta.url resolves correctly
+    // in the CJS bundle via: __importMetaUrl = pathToFileURL(__filename).href
+    //
+    // The build step (build.ts) copies migrations/ → dist/migrations/ so both paths
+    // below exist after a production build. Try production-bundled path first, then
+    // fall back to dev source-tree path.
+    const thisDir = path.dirname(fileURLToPath(import.meta.url));
+    const v38SqlCandidates = [
+      // Production: dist/index.cjs → dist/migrations/ (build.ts copies migrations here)
+      path.join(thisDir, "migrations", "v38-tenant-foundation.sql"),
+      // Development: src/index.ts → src/../migrations/ = artifacts/api-server/migrations/
+      path.join(thisDir, "..", "migrations", "v38-tenant-foundation.sql"),
+    ];
+    let v38Sql: string | null = null;
+    for (const candidate of v38SqlCandidates) {
+      try { v38Sql = fs.readFileSync(candidate, "utf8"); break; } catch {}
+    }
+    if (!v38Sql) {
+      const tried = v38SqlCandidates.join(", ");
+      throw Object.assign(new Error(`SQL file not found in: ${tried}`), { code: "ENOENT" });
+    }
+    await pool.query(v38Sql);
+    console.log("[Migration] v38 tenant foundation SQL executed successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v38 CRITICAL: SQL file not found — tenant foundation unapplied. Build did not copy migrations/.");
+    } else {
+      // RAISE EXCEPTION from the v38.9b assertion DO block surfaces here
+      console.error("[Migration] v38 CRITICAL: tenant foundation migration failed:", err.message);
+    }
+    // Phase 3 middleware will enforce tenant_id != NULL and will surface any incomplete state
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 3 — NOT NULL enforcement (v39.1 – v39.3)
+  // AUTHORITATIVE SOURCE: migrations/v39-tenant-not-null.sql
+  // Phase 2 backfilled all rows; Phase 3 now promotes nullable → NOT NULL.
+  // v39.1 auto-repairs any stray NULLs, v39.2 applies constraints, v39.3 asserts.
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir39 = path.dirname(fileURLToPath(import.meta.url));
+    const v39SqlCandidates = [
+      path.join(thisDir39, "migrations", "v39-tenant-not-null.sql"),
+      path.join(thisDir39, "..", "migrations", "v39-tenant-not-null.sql"),
+    ];
+    let v39Sql: string | null = null;
+    for (const candidate of v39SqlCandidates) {
+      try { v39Sql = fs.readFileSync(candidate, "utf8"); break; } catch {}
+    }
+    if (!v39Sql) {
+      const tried = v39SqlCandidates.join(", ");
+      throw Object.assign(new Error(`v39 SQL not found: ${tried}`), { code: "ENOENT" });
+    }
+    await pool.query(v39Sql);
+    console.log("[Migration] v39 tenant NOT NULL enforcement applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v39 WARNING: SQL file not found — NOT NULL constraints unapplied.");
+    } else {
+      console.error("[Migration] v39 NOT NULL migration result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.1 — Tenant Quota Enforcement (v40-tenant-quotas.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40q = path.dirname(fileURLToPath(import.meta.url));
+    const v40qCandidates = [
+      path.join(thisDir40q, "migrations", "v40-tenant-quotas.sql"),
+      path.join(thisDir40q, "..", "migrations", "v40-tenant-quotas.sql"),
+    ];
+    let v40qSql: string | null = null;
+    for (const c of v40qCandidates) {
+      try { v40qSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40qSql) throw Object.assign(new Error("v40-tenant-quotas.sql not found"), { code: "ENOENT" });
+    await pool.query(v40qSql);
+    console.log("[Migration] v40 tenant quotas applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 quotas WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 quotas result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.2 — Tenant Credential Isolation (v40-tenant-credentials.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40c = path.dirname(fileURLToPath(import.meta.url));
+    const v40cCandidates = [
+      path.join(thisDir40c, "migrations", "v40-tenant-credentials.sql"),
+      path.join(thisDir40c, "..", "migrations", "v40-tenant-credentials.sql"),
+    ];
+    let v40cSql: string | null = null;
+    for (const c of v40cCandidates) {
+      try { v40cSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40cSql) throw Object.assign(new Error("v40-tenant-credentials.sql not found"), { code: "ENOENT" });
+    await pool.query(v40cSql);
+    console.log("[Migration] v40 tenant credentials applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 credentials WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 credentials result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4.3 — PostgreSQL Row Level Security (v40-rls.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir40r = path.dirname(fileURLToPath(import.meta.url));
+    const v40rCandidates = [
+      path.join(thisDir40r, "migrations", "v40-rls.sql"),
+      path.join(thisDir40r, "..", "migrations", "v40-rls.sql"),
+    ];
+    let v40rSql: string | null = null;
+    for (const c of v40rCandidates) {
+      try { v40rSql = fs.readFileSync(c, "utf8"); break; } catch {}
+    }
+    if (!v40rSql) throw Object.assign(new Error("v40-rls.sql not found"), { code: "ENOENT" });
+    await pool.query(v40rSql);
+    console.log("[Migration] v40 RLS policies applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v40 RLS WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v40 RLS result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Strict RLS Hardening (v41-strict-rls.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41r = path.dirname(fileURLToPath(import.meta.url));
+    const v41rCandidates = [
+      path.join(thisDir41r, "migrations", "v41-strict-rls.sql"),
+      path.join(thisDir41r, "..", "migrations", "v41-strict-rls.sql"),
+    ];
+    let v41rSql: string | null = null;
+    for (const c of v41rCandidates) { try { v41rSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41rSql) throw Object.assign(new Error("v41-strict-rls.sql not found"), { code: "ENOENT" });
+    await pool.query(v41rSql);
+    console.log("[Migration] v41 strict RLS applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 strict RLS WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 strict RLS result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Quota Expansion (v41-quota-expansion.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41q = path.dirname(fileURLToPath(import.meta.url));
+    const v41qCandidates = [
+      path.join(thisDir41q, "migrations", "v41-quota-expansion.sql"),
+      path.join(thisDir41q, "..", "migrations", "v41-quota-expansion.sql"),
+    ];
+    let v41qSql: string | null = null;
+    for (const c of v41qCandidates) { try { v41qSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41qSql) throw Object.assign(new Error("v41-quota-expansion.sql not found"), { code: "ENOENT" });
+    await pool.query(v41qSql);
+    console.log("[Migration] v41 quota expansion applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 quota expansion WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 quota expansion result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — Credential Audit (v41-credential-audit.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41c = path.dirname(fileURLToPath(import.meta.url));
+    const v41cCandidates = [
+      path.join(thisDir41c, "migrations", "v41-credential-audit.sql"),
+      path.join(thisDir41c, "..", "migrations", "v41-credential-audit.sql"),
+    ];
+    let v41cSql: string | null = null;
+    for (const c of v41cCandidates) { try { v41cSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41cSql) throw Object.assign(new Error("v41-credential-audit.sql not found"), { code: "ENOENT" });
+    await pool.query(v41cSql);
+    console.log("[Migration] v41 credential audit applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 credential audit WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 credential audit result:", err.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 4 STRICT — UAT Dataset (v41-uat-dataset.sql)
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir41u = path.dirname(fileURLToPath(import.meta.url));
+    const v41uCandidates = [
+      path.join(thisDir41u, "migrations", "v41-uat-dataset.sql"),
+      path.join(thisDir41u, "..", "migrations", "v41-uat-dataset.sql"),
+    ];
+    let v41uSql: string | null = null;
+    for (const c of v41uCandidates) { try { v41uSql = fs.readFileSync(c, "utf8"); break; } catch {} }
+    if (!v41uSql) throw Object.assign(new Error("v41-uat-dataset.sql not found"), { code: "ENOENT" });
+    await pool.query(v41uSql);
+    console.log("[Migration] v41 UAT dataset applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v41 UAT dataset WARNING: SQL file not found");
+    } else {
+      console.error("[Migration] v41 UAT dataset result:", err.message);
+    }
+  }
 
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
@@ -2860,6 +4090,7 @@ async function start() {
     startVisaReminderCron();
     startDailyAdminReportCron();
     startTicketDepartureReminderCron();
+    startGoogleHealthCheckCron();
     // Lead engine follow-up automation — runs every 5 minutes
     setTimeout(() => {
       runFollowupCron().catch(e => console.error("[LeadEngine] Initial cron error:", e));

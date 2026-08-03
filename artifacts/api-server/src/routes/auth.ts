@@ -192,7 +192,7 @@ router.post("/send-otp", async (req, res) => {
   if (smsResult.sent) {
     console.log(`[OTP-SEND] ✓ SMS delivered provider=Fast2SMS route=${smsResult.route || "dlt"} mobile=${cleanMobile}`);
     await logOtpAttempt("sms", "Fast2SMS", "sent", `route=${smsResult.route || "dlt"}`);
-    res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "sms", smsRoute: smsResult.route });
+    res.json({ success: true, message: "OTP sent via SMS", requestId: `otp_${Date.now()}`, isNewUser, channel: "sms", smsRoute: smsResult.route });
     return;
   }
   const sanitizedSmsError = smsResult.error
@@ -211,7 +211,7 @@ router.post("/send-otp", async (req, res) => {
     if (waResult?.ok) {
       console.log(`[OTP-SEND] ✓ WhatsApp session OTP delivered mobile=${cleanMobile}`);
       await logOtpAttempt("whatsapp", "BotBee", "sent", "session message");
-      res.json({ success: true, message: "OTP sent successfully", requestId: `otp_${Date.now()}`, isNewUser, channel: "whatsapp" });
+      res.json({ success: true, message: "SMS unavailable. OTP sent to your WhatsApp", requestId: `otp_${Date.now()}`, isNewUser, channel: "whatsapp" });
       return;
     }
     const waError = waResult?.error || "no active 24h session";
@@ -241,11 +241,16 @@ router.post("/send-otp", async (req, res) => {
     }
   }
 
-  // All channels failed — return error with sanitised provider reason for admin users
+  // All channels failed — log with reference ID, return structured error
+  const referenceId = `otp_fail_${Date.now()}`;
+  console.error(`[OTP-SEND] ALL CHANNELS FAILED mobile=${cleanMobile} ref=${referenceId} smsErr=${sanitizedSmsError}`);
+  await logOtpAttempt("all", "none", "failed", `ref=${referenceId} smsErr=${sanitizedSmsError}`);
   res.json({
     success: false,
+    allChannelsFailed: true,
     message: "OTP delivery failed — please contact support at +91 9893225590",
-    requestId: `otp_${Date.now()}`,
+    referenceId,
+    requestId: referenceId,
     isNewUser,
     ...(isAdmin ? { smsFailReason: sanitizedSmsError } : {}),
   });
@@ -544,6 +549,396 @@ router.patch("/profile", requireAuth as any, async (req: AuthenticatedRequest, r
 router.post("/logout", (req, res) => {
   req.session.destroy(() => {});
   res.json({ message: "Logged out successfully" });
+});
+
+// ── Admin: email-based account recovery (for admin lockout) ──────────────────
+// POST /api/auth/admin-recovery  { mobile }
+// Security design:
+//   - All public non-400 responses are identical (same message, min 1500ms) regardless of
+//     whether mobile is in ADMIN_MOBILES, whether user/role/email exist, or whether SMTP worked.
+//     This prevents both message-based and timing-based account enumeration.
+//   - DB role check (admin/super_admin) is the authoritative gate before issuing any token.
+//   - Per-mobile rate limit: max 3 per hour (DB-backed).
+//   - Per-IP rate limit: max 10 per hour (in-memory, resets on restart).
+//   - Prior unused recovery tokens for the mobile are invalidated before issuing a new one.
+//   - SMTP failure: token invalidated immediately, same generic response returned.
+
+const RECOVERY_GENERIC_MSG = "If this number is registered with admin access and has an email on file, a recovery link has been sent.";
+
+/** In-memory per-IP rate limit: max 10 requests per RECOVERY_IP_WINDOW_MS */
+const RECOVERY_IP_LIMIT    = 10;
+const RECOVERY_IP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const recoveryIpBucket = new Map<string, { count: number; resetAt: number }>();
+function recoveryIpAllowed(ip: string): boolean {
+  const now = Date.now();
+  const entry = recoveryIpBucket.get(ip);
+  if (!entry || now > entry.resetAt) {
+    recoveryIpBucket.set(ip, { count: 1, resetAt: now + RECOVERY_IP_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RECOVERY_IP_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+router.post("/admin-recovery", async (req, res) => {
+  const rawMobile = String(req.body?.mobile || "");
+  const mobile = normaliseIndianMobile(rawMobile);
+  const rejection = rejectMobile(mobile);
+  if (rejection) {
+    res.status(400).json({ message: `Invalid mobile: ${rejection}` });
+    return;
+  }
+
+  // ── Uniform-timing design ─────────────────────────────────────────────────
+  // To prevent timing-based account enumeration, ALL non-400 response paths must do
+  // the SAME work on the request thread. Only two reads happen here for every request:
+  //   1. Per-mobile rate limit count
+  //   2. User eligibility lookup (role + email)
+  // IP throttle is in-memory (constant time). Token creation, invalidation, and SMTP
+  // are all moved off the request thread into setImmediate (fire-and-forget).
+  // Response fires after MIN_RECOVERY_MS from the start of the request.
+  const MIN_RECOVERY_MS = 2000;
+  const tStart = Date.now();
+  const genericReply = async () => {
+    const elapsed = Date.now() - tStart;
+    if (elapsed < MIN_RECOVERY_MS) {
+      await new Promise(r => setTimeout(r, MIN_RECOVERY_MS - elapsed + Math.floor(Math.random() * 300)));
+    }
+    res.json({ ok: true, message: RECOVERY_GENERIC_MSG });
+  };
+
+  try {
+    // ── IN-MEMORY IP throttle (constant time, no DB) ──────────────────────────
+    const clientIp = req.ip || "unknown";
+    if (!recoveryIpAllowed(clientIp)) {
+      console.warn(`[ADMIN-RECOVERY] IP rate limit hit`);
+      return genericReply();
+    }
+
+    // ── READ 1: per-mobile rate limit (same for all mobiles) ──────────────────
+    const [rateRow, userRow] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS cnt FROM otps WHERE mobile=$1 AND purpose='admin_recovery' AND created_at > NOW() - INTERVAL '1 hour'`,
+        [mobile]
+      ),
+      // ── READ 2: user eligibility (same query for all mobiles) ──────────────
+      pool.query(
+        `SELECT id, email, name, role FROM users WHERE mobile=$1 LIMIT 1`,
+        [mobile]
+      ),
+    ]);
+
+    const recentCount = parseInt(rateRow.rows[0]?.cnt || "0", 10);
+    const user = userRow.rows[0];
+    const isEligible = user
+      && (user.role === "admin" || user.role === "super_admin")
+      && !!user.email
+      && recentCount < 3;
+
+    // ── FIRE-AND-FORGET: all state-changing work happens off the request thread ──
+    // This ensures no request-thread DB writes distinguish valid from invalid paths.
+    // Token creation, invalidation, and SMTP run in setImmediate — never awaited here.
+    if (isEligible) {
+      const eligibleUser = user;  // captured for closure
+      const eligibleMobile = mobile;
+      setImmediate(async () => {
+        const maskedMob = `${eligibleMobile.slice(0,2)}*****${eligibleMobile.slice(-3)}`;
+        try {
+          // Invalidate prior unused tokens
+          await pool.query(
+            `UPDATE otps SET used=true WHERE mobile=$1 AND purpose='admin_recovery' AND used=false`,
+            [eligibleMobile]
+          );
+          // Generate and store new hashed recovery token
+          const tokenRaw  = randomBytes(32).toString("hex");
+          const tokenHash = createHash("sha256").update(`recovery:${tokenRaw}`).digest("hex");
+          const tokenId   = randomBytes(8).toString("hex");
+          const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+          await pool.query(
+            `INSERT INTO otps (id, mobile, otp, otp_hash, expires_at, purpose) VALUES ($1,$2,$3,$4,$5,$6)`,
+            [tokenId, eligibleMobile, "[recovery]", tokenHash, expiresAt, "admin_recovery"]
+          );
+          const recoveryUrl = `https://alburhantravels.com/admin/login?rt=${encodeURIComponent(tokenRaw)}&rm=${encodeURIComponent(eligibleMobile)}`;
+          const emailResult = await sendGenericEmail(
+            eligibleUser.email,
+            "Admin Account Recovery — Al Burhan Tours & Travels",
+            `
+              <p>Assalamu Alaikum,</p>
+              <p>A recovery link was requested for your Al Burhan admin account.</p>
+              <p style="margin:24px 0;">
+                <a href="${recoveryUrl}"
+                   style="background:#0B5D3B;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">
+                  ✓ Click to Log In (valid 15 minutes)
+                </a>
+              </p>
+              <p style="font-size:13px;color:#6b7280;">If you did not request this, ignore this email — your account remains secure. This link can only be used once.</p>
+            `,
+            { title: "Admin Account Recovery", preheader: "Secure one-time login link" }
+          );
+          if (!emailResult?.ok) {
+            await pool.query(`UPDATE otps SET used=true WHERE id=$1`, [tokenId]);
+            pool.query(
+              `INSERT INTO notification_logs (id,event_type,channel,recipient,message,status,provider_name,sent_at,created_at)
+               VALUES ($1,'admin_recovery','email',$2,'recovery link failed to send','failed','SMTP',NOW(),NOW())`,
+              [`recovery_${Date.now()}`, `${eligibleMobile.slice(0,2)}XXXXX${eligibleMobile.slice(-3)}`]
+            ).catch(() => {});
+            console.error(`[ADMIN-RECOVERY] SMTP delivery failed for mobile=${maskedMob}: ${emailResult?.error}`);
+          } else {
+            pool.query(
+              `INSERT INTO notification_logs (id,event_type,channel,recipient,message,status,provider_name,sent_at,created_at)
+               VALUES ($1,'admin_recovery','email',$2,'recovery link issued','sent','SMTP',NOW(),NOW())`,
+              [`recovery_${Date.now()}`, `${eligibleMobile.slice(0,2)}XXXXX${eligibleMobile.slice(-3)}`]
+            ).catch(() => {});
+            console.log(`[ADMIN-RECOVERY] Recovery email sent for mobile=${maskedMob}`);
+          }
+        } catch (bgErr: any) {
+          console.error(`[ADMIN-RECOVERY] Background error for mobile=${maskedMob}: ${bgErr.message}`);
+        }
+      });
+    } else if (recentCount >= 3) {
+      console.warn(`[ADMIN-RECOVERY] Per-mobile rate limit hit mobile=${mobile.slice(0,2)}*****${mobile.slice(-3)}`);
+    }
+
+    // Every non-400 path exits here after MIN_RECOVERY_MS — identical on-thread work for all.
+    return genericReply();
+  } catch (err: any) {
+    console.error("[ADMIN-RECOVERY] Failed:", err.message);
+    return genericReply();
+  }
+});
+
+// POST /api/auth/admin-recovery/verify  { token, mobile }
+// Verifies recovery token from email link, creates admin session.
+// Any invalid/expired/missing condition returns the same 401 — no distinguishable messages.
+router.post("/admin-recovery/verify", async (req, res) => {
+  const tokenRaw = String(req.body?.token || "");
+  const rawMobile = String(req.body?.mobile || "");
+  const mobile = normaliseIndianMobile(rawMobile);
+
+  const INVALID = { message: "Recovery link is invalid or has expired. Please request a new one." };
+
+  if (!tokenRaw || mobile.length !== 10) {
+    res.status(401).json(INVALID);
+    return;
+  }
+  try {
+    const tokenHash = createHash("sha256").update(`recovery:${tokenRaw}`).digest("hex");
+    const now = new Date();
+
+    // ── Atomic token consumption: conditional UPDATE ... RETURNING ────────────
+    // Updates exactly one row only when: hash matches, mobile matches, not yet used, not expired.
+    // Concurrent requests using the same link will find used=true on the second attempt.
+    const consumeResult = await pool.query(
+      `UPDATE otps SET used=true
+       WHERE otp_hash=$1 AND purpose='admin_recovery' AND mobile=$2
+         AND used=false AND expires_at > $3
+       RETURNING id, mobile`,
+      [tokenHash, mobile, now]
+    );
+    if (consumeResult.rowCount !== 1) {
+      // Zero rows: token invalid, already consumed, wrong mobile, or expired
+      res.status(401).json(INVALID);
+      return;
+    }
+
+    // ── Now fetch the user — token is already consumed so no concurrency window ──
+    const userRow = await pool.query(
+      `SELECT id AS user_id, mobile, role, name, email FROM users
+       WHERE mobile=$1 AND role IN ('admin','super_admin') LIMIT 1`,
+      [mobile]
+    );
+    const user = userRow.rows[0];
+    if (!user) {
+      // Token was valid but user no longer exists or lost admin role — treat as invalid
+      res.status(401).json(INVALID);
+      return;
+    }
+    const { user_id, role, name, email } = user;
+
+    (req.session as any).userId = user_id;
+
+    // ── Await session persistence before responding ───────────────────────────
+    // The PostgreSQL session store writes asynchronously; if we respond before save()
+    // completes the browser redirect can land before the session row exists.
+    await new Promise<void>((resolve, reject) =>
+      req.session.save((err) => (err ? reject(err) : resolve()))
+    );
+
+    const _ip = req.ip || "unknown";
+    pool.query(
+      `INSERT INTO audit_logs (id, actor_id, actor_name, action, entity_table, entity_id, old_value, new_value, ip, created_at)
+       VALUES (gen_random_uuid()::text, $1, $2, 'created', 'login_attempts', gen_random_uuid()::text, NULL, $3::jsonb, $4, NOW())`,
+      [user_id, mobile, JSON.stringify({ event: "admin_recovery_login", mobile, user_role: role }), _ip]
+    ).catch(() => {});
+
+    console.log(`[ADMIN-RECOVERY] Verified recovery login mobile=${mobile.slice(0,2)}*****${mobile.slice(-3)} userId=${user_id}`);
+    res.json({ ok: true, user: { id: user_id, name, mobile, email, role } });
+  } catch (err: any) {
+    console.error("[ADMIN-RECOVERY-VERIFY] Failed:", err.message);
+    res.status(401).json(INVALID);
+  }
+});
+
+// ── Admin: OTP Diagnostics (provider status, recent logs, stats) ──────────────
+// GET /api/auth/otp-diagnostics  (requires admin session)
+// Provider readiness derives from the same sources the send functions use:
+//   fast2sms — DB key OR FAST2SMS_API_KEY env var
+//   botbee    — DB key OR BOTBEE_API_KEY env var, PLUS phone_number_id must be set
+//   smtp      — DB key OR SMTP_HOST env var present
+router.get("/otp-diagnostics", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+    res.status(403).json({ message: "Admin only" });
+    return;
+  }
+  try {
+    const [provRows, logRows, statsRows] = await Promise.all([
+      // Provider rows from DB (no key values exposed)
+      pool.query(`
+        SELECT provider,
+               (api_key_encrypted IS NOT NULL AND LENGTH(api_key_encrypted) > 10) AS has_db_key,
+               enabled AS is_enabled,
+               (extra_fields_encrypted IS NOT NULL AND LENGTH(extra_fields_encrypted) > 10) AS has_extra
+        FROM api_settings
+        WHERE provider IN ('fast2sms','botbee','smtp')
+      `),
+      // Recent OTP delivery logs — includes login OTP, recovery, and test-channel events
+      pool.query(`
+        SELECT id,
+               CONCAT(LEFT(recipient,2), 'XXXXX', RIGHT(recipient,3)) AS recipient_masked,
+               channel, status, provider_name, message,
+               created_at
+        FROM notification_logs
+        WHERE event_type LIKE '%_login_otp'
+           OR event_type = 'admin_recovery'
+           OR event_type = 'otp_test_channel'
+        ORDER BY created_at DESC
+        LIMIT 50
+      `),
+      // Security stats
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM otps WHERE used=false AND expires_at > NOW() AND purpose != 'admin_recovery') AS active_otps,
+          (SELECT COUNT(*) FROM otps WHERE attempts > 0 AND created_at > NOW() - INTERVAL '1 hour') AS failed_attempts_1h,
+          (SELECT COUNT(*) FROM otps WHERE created_at > NOW() - INTERVAL '30 minutes' AND purpose != 'admin_recovery') AS requests_30m
+      `),
+    ]);
+
+    const dbByProvider: Record<string, any> = {};
+    for (const row of provRows.rows) {
+      dbByProvider[row.provider] = row;
+    }
+
+    // Derive effective readiness from BOTH DB and env vars (same sources the send functions use)
+    const fast2smsReady = !!(dbByProvider["fast2sms"]?.has_db_key || process.env.FAST2SMS_API_KEY);
+    const botbeeKeyReady = !!(dbByProvider["botbee"]?.has_db_key || process.env.BOTBEE_API_KEY);
+    // BotBee also requires phone_number_id (extra_fields) — extra_fields_encrypted presence is a proxy
+    const botbeePhoneIdReady = !!(dbByProvider["botbee"]?.has_extra || process.env.BOTBEE_PHONE_NUMBER_ID);
+    const botbeeReady = botbeeKeyReady && botbeePhoneIdReady;
+    // SMTP requires all three: host + user + password (DB key covers the full config when set;
+    // env fallback requires all of SMTP_HOST, SMTP_USER, and SMTP_PASS to be present)
+    const smtpDbReady = !!dbByProvider["smtp"]?.has_db_key;
+    const smtpEnvReady = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    const smtpReady = smtpDbReady || smtpEnvReady;
+    const smtpEnvNote = !smtpDbReady && !smtpEnvReady
+      ? `Env vars incomplete: ${!process.env.SMTP_HOST ? "SMTP_HOST " : ""}${!process.env.SMTP_USER ? "SMTP_USER " : ""}${!process.env.SMTP_PASS ? "SMTP_PASS" : ""}`.trim()
+      : null;
+
+    res.json({
+      providers: {
+        fast2sms: {
+          label:   "Fast2SMS (SMS/DLT)",
+          ready:   fast2smsReady,
+          enabled: dbByProvider["fast2sms"]?.is_enabled !== false,
+          sources: { db: !!dbByProvider["fast2sms"]?.has_db_key, env: !!process.env.FAST2SMS_API_KEY },
+          note:    fast2smsReady ? null : "API key missing in both DB and FAST2SMS_API_KEY env var",
+        },
+        botbee: {
+          label:   "BotBee (WhatsApp)",
+          ready:   botbeeReady,
+          enabled: dbByProvider["botbee"]?.is_enabled !== false,
+          sources: { db: !!dbByProvider["botbee"]?.has_db_key, env: !!process.env.BOTBEE_API_KEY, phoneIdDb: !!dbByProvider["botbee"]?.has_extra, phoneIdEnv: !!process.env.BOTBEE_PHONE_NUMBER_ID },
+          note:    !botbeeKeyReady ? "API key missing" : !botbeePhoneIdReady ? "Phone Number ID missing in extra_fields" : null,
+        },
+        smtp: {
+          label:   "SMTP (Email)",
+          ready:   smtpReady,
+          enabled: dbByProvider["smtp"]?.is_enabled !== false,
+          sources: { db: smtpDbReady, envHost: !!process.env.SMTP_HOST, envUser: !!process.env.SMTP_USER, envPass: !!process.env.SMTP_PASS },
+          note:    smtpReady ? null : smtpEnvNote || "SMTP credentials missing in both DB and env vars (requires SMTP_HOST + SMTP_USER + SMTP_PASS)",
+        },
+      },
+      recentLogs: logRows.rows,
+      stats: statsRows.rows[0] || {},
+    });
+  } catch (err: any) {
+    console.error("[OTP-DIAG] Failed:", err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Admin: test a single OTP delivery channel ──────────────────────────────────
+// POST /api/auth/otp-test-channel  { channel: "sms"|"whatsapp"|"email", mobile }
+// Uses fixed test OTP "000000" — never stored in otps table, never valid for auth.
+// All test attempts logged to notification_logs with event_type="otp_test_channel".
+router.post("/otp-test-channel", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  if (req.user?.role !== "admin" && req.user?.role !== "super_admin") {
+    res.status(403).json({ message: "Admin only" });
+    return;
+  }
+  const { channel } = req.body;
+  const rawMobile = String(req.body?.mobile || "");
+  const mobile = normaliseIndianMobile(rawMobile);
+  const rejection = rejectMobile(mobile);
+  if (rejection) { res.status(400).json({ message: `Invalid mobile: ${rejection}` }); return; }
+  if (!["sms", "whatsapp", "email"].includes(channel)) {
+    res.status(400).json({ message: "channel must be sms, whatsapp or email" });
+    return;
+  }
+
+  const testOtp   = "000000"; // Fixed — never stored in otps table, never valid for auth
+  const maskedMob = `${mobile.slice(0,2)}XXXXX${mobile.slice(-3)}`;
+
+  const logTest = (ok: boolean, detail: string) =>
+    pool.query(
+      `INSERT INTO notification_logs (id, event_type, channel, recipient, message, status, provider_name, sent_at, created_at)
+       VALUES ($1,'otp_test_channel',$2,$3,$4,$5,$6,NOW(),NOW())`,
+      [`test_${channel}_${Date.now()}`, channel, maskedMob, detail, ok ? "sent" : "failed",
+       channel === "sms" ? "Fast2SMS" : channel === "whatsapp" ? "BotBee" : "SMTP"]
+    ).catch(() => {});
+
+  try {
+    if (channel === "sms") {
+      const r = await sendOtpSMS(mobile, testOtp);
+      await logTest(r.sent, `route=${r.route || "dlt"}${r.error ? ` err=${r.error.slice(0,200)}` : ""}`);
+      res.json({ ok: r.sent, channel, route: r.route, error: r.error });
+      return;
+    }
+    if (channel === "whatsapp") {
+      const { sendText } = await import("../lib/botbee.js");
+      const r = await sendText(mobile, `[Test] Al Burhan OTP diagnostic — this is a test message only.`);
+      const ok = !!r?.ok;
+      await logTest(ok, ok ? "session message" : (r?.error || "no 24h session"));
+      res.json({ ok, channel, error: r?.error });
+      return;
+    }
+    if (channel === "email") {
+      const userRow = await pool.query(`SELECT email, name FROM users WHERE mobile=$1 LIMIT 1`, [mobile]);
+      const email = userRow.rows[0]?.email;
+      if (!email) {
+        await logTest(false, "no email registered for this mobile");
+        res.status(400).json({ ok: false, message: "No email registered for this mobile" });
+        return;
+      }
+      const r = await sendOTPEmail(email, userRow.rows[0]?.name || "Admin", testOtp);
+      await logTest(r.ok, r.ok ? `to=${email.replace(/(.{2})[^@]*(@.*)/, "$1***$2")}` : (r.error || "SMTP error"));
+      res.json({ ok: r.ok, channel, error: r.error });
+      return;
+    }
+  } catch (err: any) {
+    await logTest(false, err.message || "exception");
+    res.status(500).json({ ok: false, channel, error: err.message });
+  }
 });
 
 // ── Admin: reset OTP rate limit for a specific mobile (or all) ───────────────

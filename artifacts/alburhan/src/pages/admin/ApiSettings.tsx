@@ -14,9 +14,10 @@ interface ProviderField {
   key: string;
   label: string;
   placeholder?: string;
-  type?: "text" | "password" | "number" | "url";
+  type?: "text" | "password" | "number" | "url" | "textarea";
   required?: boolean;
   isExtra?: boolean;
+  colSpan?: "full";
 }
 
 interface ProviderDef {
@@ -98,7 +99,7 @@ const PROVIDERS: ProviderDef[] = [
     apiKeyPlaceholder: "Enter your Lemin AI Developer API Key",
     extraFields: [
       { key: "brand_name",             label: "Brand Name",                       placeholder: "Al Burhan Tours & Travels",  isExtra: true },
-      { key: "template_id",            label: "Default Template ID",              placeholder: "1473",                       isExtra: true },
+      { key: "template_id",            label: "Default Template ID",              placeholder: "3651",                       isExtra: true },
       { key: "booking_created_tid",    label: "Booking Created Template ID",      placeholder: "use default",                isExtra: true },
       { key: "booking_confirmed_tid",  label: "Booking Confirmed Template ID",    placeholder: "use default",                isExtra: true },
       { key: "payment_received_tid",   label: "Payment Received Template ID",     placeholder: "use default",                isExtra: true },
@@ -111,7 +112,8 @@ const PROVIDERS: ProviderDef[] = [
       { key: "eid_greeting_tid",       label: "Eid Greeting Template ID",         placeholder: "use default",                isExtra: true },
     ],
     testMessageFields: [
-      { key: "mobile", label: "Test Mobile Number", placeholder: "10-digit number", type: "text" },
+      { key: "mobile",      label: "Test Mobile Number",  placeholder: "10-digit number", type: "text" },
+      { key: "template_id", label: "Test Template ID",    placeholder: "3651 (leave blank to use saved default)", type: "text" },
     ],
   },
   {
@@ -136,20 +138,27 @@ const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "firebase",
-    label: "Firebase Push",
+    label: "Firebase Push (FCM v1)",
     icon: Bell,
-    color: "text-yellow-600",
-    description: "Push notifications via Firebase Cloud Messaging. Used for mobile app alerts.",
-    apiUrlLabel: "FCM Endpoint",
-    apiUrlPlaceholder: "https://fcm.googleapis.com/fcm/send",
-    apiKeyLabel: "Server Key",
-    apiKeyPlaceholder: "Enter Firebase Server Key",
+    color: "text-amber-500",
+    description: "Push notifications via Firebase Cloud Messaging API v1. Authenticate with a service account JSON — no legacy Server Key required.",
+    // No apiUrlLabel — FCM v1 endpoint is fixed (https://fcm.googleapis.com/v1/projects/{id}/messages:send)
+    apiKeyLabel: "Private Key (PEM)",
+    apiKeyPlaceholder: "Auto-filled from service account JSON below — or paste PEM directly",
     extraFields: [
-      { key: "project_id", label: "Project ID", placeholder: "my-firebase-project", isExtra: true },
-      { key: "sender_id", label: "Sender ID", placeholder: "123456789012", isExtra: true },
+      { key: "project_id",   label: "Project ID",    placeholder: "your-firebase-project-id",                                            isExtra: true },
+      { key: "client_email", label: "Client Email",  placeholder: "firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com",           isExtra: true },
+      {
+        key: "service_account_json",
+        label: "Service Account JSON — paste here to auto-fill all fields",
+        placeholder: '{\n  "type": "service_account",\n  "project_id": "your-project-id",\n  "private_key_id": "...",\n  "private_key": "-----BEGIN RSA PRIVATE KEY-----\\n...",\n  "client_email": "firebase-adminsdk-...@your-project.iam.gserviceaccount.com",\n  ...\n}\n\nGet this from Firebase Console → Project Settings → Service Accounts → Generate new private key',
+        type: "textarea",
+        isExtra: true,
+        colSpan: "full",
+      },
     ],
     testMessageFields: [
-      { key: "device_token", label: "Device FCM Token", placeholder: "Paste device token here", type: "text" },
+      { key: "device_token", label: "Device FCM Token (copy from Push Center → This Browser)", placeholder: "Paste FCM token here to send a test push", type: "text" },
     ],
   },
   {
@@ -216,6 +225,7 @@ export default function ApiSettings() {
   const [testAllLoading, setTestAllLoading] = useState(false);
   const [testAllResults, setTestAllResults] = useState<Array<{ channel: string; ok: boolean; provider: string; httpStatus?: number; errorMessage?: string; responsePayload?: unknown }> | null>(null);
   const [fast2smsStatus, setFast2smsStatus] = useState<any>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   async function loadFast2smsStatus() {
@@ -296,10 +306,59 @@ export default function ApiSettings() {
     setSaving(p => ({ ...p, [pid]: true }));
     try {
       const s = states[pid];
+
+      // ── Firebase pre-save validation ────────────────────────────────────────
+      if (pid === "firebase" && s.api_key && !s.api_key.startsWith("****")) {
+        const errors: string[] = [];
+        const pk = s.api_key.replace(/\\n/g, "\n").trim();
+
+        if (!pk.startsWith("-----BEGIN PRIVATE KEY-----")) {
+          errors.push(
+            `Private Key must start with '-----BEGIN PRIVATE KEY-----'. ` +
+            `Got: "${s.api_key.slice(0, 60)}..."`
+          );
+        } else if (!pk.endsWith("-----END PRIVATE KEY-----")) {
+          errors.push("Private Key must end with '-----END PRIVATE KEY-----'");
+        } else if (s.api_key.replace(/\s/g, "").length < 1000) {
+          errors.push(
+            `Private Key is too short (${s.api_key.length} chars). ` +
+            `A valid RSA-2048 service account key is typically >1600 chars.`
+          );
+        }
+
+        const pid2 = s.extra_fields["project_id"] || "";
+        if (pid2 && (pid2.includes('"') || pid2.includes(","))) {
+          errors.push("Project ID must not contain quotes or commas");
+        }
+
+        const email = s.extra_fields["client_email"] || "";
+        if (email && !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(email)) {
+          errors.push(
+            `Client Email must be a service-account address ending in .iam.gserviceaccount.com`
+          );
+        }
+
+        if (errors.length > 0) {
+          setValidationErrors(prev => ({ ...prev, firebase: errors.join(" · ") }));
+          setSaving(p => ({ ...p, [pid]: false }));
+          return;
+        }
+      }
+      setValidationErrors(prev => ({ ...prev, [pid]: "" }));
+
+      // Strip the transient service_account_json textarea from the save body —
+      // it's cleared after parse and should never be persisted long-term
+      const extraToSave =
+        pid === "firebase"
+          ? Object.fromEntries(
+              Object.entries(s.extra_fields).filter(([k]) => k !== "service_account_json")
+            )
+          : s.extra_fields;
+
       const body: any = {
         enabled: s.enabled,
         api_url: s.api_url || null,
-        extra_fields: s.extra_fields,
+        extra_fields: extraToSave,
       };
       // Only include api_key if it was actually typed (non-empty, not a masked placeholder)
       if (s.api_key && !s.api_key.startsWith("****")) body.api_key = s.api_key;
@@ -387,7 +446,7 @@ export default function ApiSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhook/rcs" }),
+        body: JSON.stringify({ url: "https://alburhantravels.com/api/webhooks/lemin-rcs" }),
       });
       const data = await res.json();
       setWebhookResult(data);
@@ -569,28 +628,187 @@ export default function ApiSettings() {
                   {def.extraFields && def.extraFields.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {def.extraFields.map(field => (
-                        <div key={field.key}>
+                        <div
+                          key={field.key}
+                          className={field.colSpan === "full" ? "sm:col-span-2" : ""}
+                        >
                           <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
-                          <div className="relative">
-                            <input
-                              type={field.type === "password" && !showKey[`${provider.id}_${field.key}`] ? "password" : (field.type || "text")}
+                          {field.type === "textarea" ? (
+                            <textarea
+                              rows={8}
                               value={s.extra_fields[field.key] || ""}
                               onChange={e => updateExtra(provider.id, field.key, e.target.value)}
-                              placeholder={s.extra_fields[field.key]?.startsWith("****") ? "Leave blank to keep current" : (field.placeholder || "")}
-                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                              placeholder={field.placeholder || ""}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono resize-y"
+                              spellCheck={false}
                             />
-                            {field.type === "password" && (
-                              <button
-                                type="button"
-                                onClick={() => setShowKey(p => ({ ...p, [`${provider.id}_${field.key}`]: !p[`${provider.id}_${field.key}`] }))}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                              >
-                                {showKey[`${provider.id}_${field.key}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                            )}
-                          </div>
+                          ) : (
+                            <div className="relative">
+                              <input
+                                type={field.type === "password" && !showKey[`${provider.id}_${field.key}`] ? "password" : (field.type || "text")}
+                                value={s.extra_fields[field.key] || ""}
+                                onChange={e => updateExtra(provider.id, field.key, e.target.value)}
+                                placeholder={s.extra_fields[field.key]?.startsWith("****") ? "Leave blank to keep current" : (field.placeholder || "")}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                              />
+                              {field.type === "password" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowKey(p => ({ ...p, [`${provider.id}_${field.key}`]: !p[`${provider.id}_${field.key}`] }))}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                  {showKey[`${provider.id}_${field.key}`] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
+
+                      {/* Firebase: Parse JSON button */}
+                      {provider.id === "firebase" && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const raw = (s.extra_fields["service_account_json"] || "").trim();
+                              if (!raw) {
+                                toast({ title: "Paste service account JSON first", variant: "destructive" });
+                                return;
+                              }
+
+                              // Step 1: parse the JSON — never use regex or line-matching
+                              let parsed: any;
+                              try {
+                                parsed = JSON.parse(raw);
+                              } catch {
+                                toast({
+                                  title: "JSON parse error",
+                                  description: "Could not parse the pasted text as valid JSON. Paste the complete file contents from Firebase Console.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Step 2: verify this is a Firebase service account JSON (not some other JSON)
+                              if (parsed.type !== "service_account") {
+                                toast({
+                                  title: "Wrong JSON type",
+                                  description: `Expected "type": "service_account". Got: "${parsed.type ?? "(missing)"}". Download the file from Firebase Console → Project Settings → Service Accounts → Generate new private key.`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Step 3: extract exactly three fields by name — JSON.parse guarantees
+                              // these are native JS strings (no surrounding quotes, no trailing commas).
+                              // Apply .trim() and unescape \n sequences immediately so field values are clean.
+                              const projectId:   string = (parsed.project_id   ?? "").trim();
+                              const clientEmail: string = (parsed.client_email ?? "").trim();
+                              // Replace escaped \n sequences with real newlines so the PEM is ready to use
+                              const privateKey:  string = (parsed.private_key  ?? "").replace(/\\n/g, "\n").trim();
+
+                              // Step 3: validate each extracted value
+                              if (!projectId) {
+                                toast({ title: "Missing project_id", description: "The JSON has no project_id field.", variant: "destructive" });
+                                return;
+                              }
+                              if (projectId.includes('"') || projectId.includes(",")) {
+                                toast({ title: "Invalid project_id", description: `Must not contain quotes or commas. Got: "${projectId}"`, variant: "destructive" });
+                                return;
+                              }
+                              if (!clientEmail) {
+                                toast({ title: "Missing client_email", description: "The JSON has no client_email field.", variant: "destructive" });
+                                return;
+                              }
+                              if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(clientEmail)) {
+                                toast({ title: "Invalid client_email", description: `Must end in .iam.gserviceaccount.com. Got: "${clientEmail}"`, variant: "destructive" });
+                                return;
+                              }
+                              if (!privateKey) {
+                                toast({ title: "Missing private_key", description: "The JSON has no private_key field.", variant: "destructive" });
+                                return;
+                              }
+                              // privateKey already has real newlines (applied above); just alias for validation checks
+                              const normalizedKey = privateKey;
+                              if (!normalizedKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
+                                toast({
+                                  title: "Invalid private_key",
+                                  description: `Must start with '-----BEGIN PRIVATE KEY-----'. Got: "${normalizedKey.slice(0, 60)}"`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              if (!normalizedKey.endsWith("-----END PRIVATE KEY-----")) {
+                                toast({
+                                  title: "Invalid private_key",
+                                  description: "Must end with '-----END PRIVATE KEY-----'.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              if (privateKey.replace(/\s/g, "").length < 1000) {
+                                toast({
+                                  title: "private_key too short",
+                                  description: `Got ${privateKey.length} chars. A valid RSA-2048 key is typically >1600 chars. Check you pasted the full JSON file.`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Step 4: commit to state — only the three validated fields, nothing else
+                              setStates(prev => ({
+                                ...prev,
+                                firebase: {
+                                  ...prev["firebase"],
+                                  api_key: privateKey,          // private_key (PEM string with \n sequences)
+                                  extra_fields: {
+                                    ...prev["firebase"].extra_fields,
+                                    project_id:           projectId,
+                                    client_email:         clientEmail,
+                                    service_account_json: "",   // clear textarea after successful parse
+                                  },
+                                },
+                              }));
+                              setValidationErrors(prev => ({ ...prev, firebase: "" }));
+                              toast({
+                                title: "✅ Parsed successfully",
+                                description: `Project: ${projectId} · ${clientEmail}`,
+                              });
+                            }}
+                            className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                            Parse JSON → Fill Fields
+                          </button>
+                          <p className="text-[10px] text-gray-400">
+                            Uses <code className="bg-gray-100 px-1 rounded">JSON.parse()</code> to extract exactly <code className="bg-gray-100 px-1 rounded">project_id</code>, <code className="bg-gray-100 px-1 rounded">client_email</code>, and <code className="bg-gray-100 px-1 rounded">private_key</code>.
+                            Validates PEM markers and key length before filling. The textarea is cleared after a successful parse.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Firebase: FCM v1 info banner */}
+                  {provider.id === "firebase" && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 space-y-1.5">
+                      <p className="font-semibold flex items-center gap-1.5">🔐 Firebase Admin SDK (service account) authentication</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-blue-700">
+                        <li>No legacy Server Key required — FCM v1 uses OAuth2 with a service account</li>
+                        <li>Get your JSON from <span className="font-mono font-semibold">Firebase Console → Project Settings → Service Accounts → Generate new private key</span></li>
+                        <li>Alternatively, set environment variables: <span className="font-mono">FIREBASE_PROJECT_ID</span>, <span className="font-mono">FIREBASE_CLIENT_EMAIL</span>, <span className="font-mono">FIREBASE_PRIVATE_KEY</span></li>
+                        <li>After saving, click <strong>Test Connection</strong> to validate credentials against Google OAuth2</li>
+                        <li>Supports <strong>Android</strong> (high-priority), <strong>iOS / APNs</strong>, and <strong>Web Push</strong> in a single message</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Firebase validation error banner */}
+                  {validationErrors[provider.id] && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-start gap-2">
+                      <span className="shrink-0 font-bold mt-0.5">✕</span>
+                      <span>{validationErrors[provider.id]}</span>
                     </div>
                   )}
 
@@ -599,7 +817,7 @@ export default function ApiSettings() {
                     {/* Save */}
                     <button
                       onClick={() => save(provider.id)}
-                      disabled={saving[provider.id]}
+                      disabled={saving[provider.id] || !!validationErrors[provider.id]}
                       className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                     >
                       {saving[provider.id] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -758,8 +976,10 @@ export default function ApiSettings() {
                       {/* Lemin RCS rich result panel */}
                       {provider.id === "lemin" && sendTestResults["lemin"] && (() => {
                         const r = sendTestResults["lemin"];
+                        const dp = r.debugPayload || r.requestPayload;
                         return (
                           <div className={`mt-3 rounded-lg border-2 overflow-hidden ${r.ok ? "border-purple-200 bg-purple-50" : "border-red-200 bg-red-50"}`}>
+                            {/* Header row */}
                             <div className="flex items-center gap-3 px-3 py-2 border-b border-inherit">
                               <span className="text-base">{r.ok ? "✅" : "❌"}</span>
                               <div className="flex-1">
@@ -774,20 +994,58 @@ export default function ApiSettings() {
                               </div>
                               {r.logged && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-medium">📋 Logged</span>}
                             </div>
+
+                            {/* Success: message ID */}
                             {r.messageId && (
                               <div className="flex items-center gap-2 px-3 py-2 border-b border-inherit bg-white/60">
                                 <span className="text-xs font-semibold text-gray-500 shrink-0">Message ID:</span>
                                 <code className="text-xs font-mono text-purple-700 font-bold break-all">{r.messageId}</code>
                               </div>
                             )}
-                            {r.errorMessage && (
-                              <div className="px-3 py-2 border-b border-inherit bg-white/60">
-                                <span className="text-xs font-semibold text-red-600">Error: </span>
-                                <span className="text-xs text-red-700">{r.errorMessage}</span>
+
+                            {/* Error: exact Lemin error string */}
+                            {!r.ok && (r.errorMessage || r.message) && (
+                              <div className="px-3 py-2 border-b border-inherit bg-red-50">
+                                <p className="text-xs font-semibold text-red-700 mb-0.5">Lemin Error</p>
+                                <p className="text-xs text-red-800 font-mono break-all">{r.errorMessage || r.message}</p>
                               </div>
                             )}
+
+                            {/* Complete payload sent to Lemin (all 6 fields, user_id masked) */}
+                            {dp && (
+                              <div className="px-3 py-2 border-b border-inherit">
+                                <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">
+                                  📤 Payload Sent to Lemin
+                                  <span className="ml-1 normal-case font-normal text-gray-400">(user_id partially masked)</span>
+                                </p>
+                                {/* Inline field table for quick scanning */}
+                                <div className="mb-1.5 space-y-0.5">
+                                  {(["type","dial_code","template","phone","user_id"] as const).map(f => (
+                                    <div key={f} className="flex gap-2 text-[10px] font-mono">
+                                      <span className="text-gray-400 w-20 shrink-0">{f}:</span>
+                                      <span className={`font-bold ${!dp[f] ? "text-red-500" : "text-gray-800"}`}>
+                                        {dp[f] ? String(dp[f]) : "⚠ MISSING"}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="flex gap-2 text-[10px] font-mono">
+                                    <span className="text-gray-400 w-20 shrink-0">variables:</span>
+                                    <span className={`font-bold ${!dp.variables || Object.keys(dp.variables).length === 0 ? "text-red-500" : "text-green-700"}`}>
+                                      {!dp.variables || Object.keys(dp.variables).length === 0
+                                        ? "⚠ EMPTY — this causes 'Failed to process single payload'"
+                                        : `{${Object.keys(dp.variables).join(", ")}}`}
+                                    </span>
+                                  </div>
+                                </div>
+                                <pre className="bg-gray-900 text-yellow-200 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                                  {JSON.stringify(dp, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {/* Full Lemin API response */}
                             <div className="px-3 py-2">
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">API Response</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Lemin API Response</p>
                               <pre className="bg-gray-900 text-purple-300 text-[10px] font-mono rounded-lg p-2.5 overflow-auto max-h-36 whitespace-pre-wrap break-all">
                                 {JSON.stringify(r.responsePayload ?? r, null, 2)}
                               </pre>

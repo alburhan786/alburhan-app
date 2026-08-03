@@ -3,6 +3,7 @@ import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendWhatsApp, sendDLTSMS } from "../lib/notifications.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -311,9 +312,10 @@ router.get("/tasks/stats", requireAdmin as any, async (_req: AuthenticatedReques
 //  MARKETING CAMPAIGNS
 // ════════════════════════════════════════════════════════════════════
 
-router.get("/campaigns", requireAdmin as any, async (_req: AuthenticatedRequest, res) => {
+router.get("/campaigns", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
-    const r = await pool.query("SELECT * FROM marketing_campaigns ORDER BY created_at DESC LIMIT 100");
+    const tenantId = getTenantId(req);
+    const r = await pool.query("SELECT * FROM marketing_campaigns WHERE tenant_id=$1::uuid ORDER BY created_at DESC LIMIT 100", [tenantId]);
     res.json(r.rows);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });

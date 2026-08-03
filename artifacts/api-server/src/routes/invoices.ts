@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { generateInvoicePdfBuffer } from "../lib/paymentDocs.js";

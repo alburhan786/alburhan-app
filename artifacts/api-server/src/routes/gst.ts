@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin, requireModuleAccess, type AuthenticatedRequest } from "../lib/auth.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 router.use(requireModuleAccess("gst") as any);
@@ -15,10 +16,12 @@ async function q1(text: string, params?: any[]): Promise<any> {
 // ── GST Summary ───────────────────────────────────────────────────────────────
 router.get("/summary", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { from, to } = req.query as Record<string, string>;
-    const params: any[] = [];
-    let bWhere = `WHERE (is_deleted IS NULL OR is_deleted=false) AND gst_amount IS NOT NULL AND gst_amount > 0`;
-    let eWhere = `WHERE 1=1`;
+    // tenantId is always $1
+    const params: any[] = [tenantId];
+    let bWhere = `WHERE tenant_id=$1::uuid AND (is_deleted IS NULL OR is_deleted=false) AND gst_amount IS NOT NULL AND gst_amount > 0`;
+    let eWhere = `WHERE tenant_id=$1::uuid`;
 
     if (from) {
       params.push(from);
@@ -81,9 +84,10 @@ router.get("/summary", requireAdmin as any, async (req: AuthenticatedRequest, re
 // ── GST Sales Register (Bookings) ────────────────────────────────────────────
 router.get("/sales-register", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
+    const tenantId = getTenantId(req);
     const { from, to } = req.query as Record<string, string>;
-    const params: any[] = [];
-    let where = `WHERE (b.is_deleted IS NULL OR b.is_deleted=false)`;
+    const params: any[] = [tenantId];
+    let where = `WHERE b.tenant_id=$1::uuid AND (b.is_deleted IS NULL OR b.is_deleted=false)`;
     if (from) { params.push(from); where += ` AND DATE(b.created_at)>=$${params.length}`; }
     if (to)   { params.push(to);   where += ` AND DATE(b.created_at)<=$${params.length}`; }
 
@@ -121,8 +125,9 @@ router.get("/sales-register", requireAdmin as any, async (req: AuthenticatedRequ
 router.get("/purchase-register", requireAdmin as any, async (req: AuthenticatedRequest, res) => {
   try {
     const { from, to } = req.query as Record<string, string>;
-    const params: any[] = [];
-    let where = `WHERE (cgst_amount IS NOT NULL OR sgst_amount IS NOT NULL OR igst_amount IS NOT NULL)`;
+    const tenantId = getTenantId(req);
+    const params: any[] = [tenantId];
+    let where = `WHERE e.tenant_id=$1::uuid AND (cgst_amount IS NOT NULL OR sgst_amount IS NOT NULL OR igst_amount IS NOT NULL)`;
     if (from) { params.push(from); where += ` AND date>=$${params.length}`; }
     if (to)   { params.push(to);   where += ` AND date<=$${params.length}`; }
 

@@ -4,6 +4,7 @@ import { requireAuth, type AuthenticatedRequest } from "../lib/auth.js";
 import { sendDocumentToCustomer } from "../lib/documentDelivery.js";
 import { runDepartureReminderCheck } from "../lib/workflowEngine.js";
 import { fireNotificationEvent } from "../lib/notificationEngine.js";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 

@@ -7,6 +7,7 @@ import { sendOtpSMS, sendWhatsApp } from "../lib/notifications.js";
 import { triggerWorkflow } from "../lib/workflowEngine.js";
 import { sendFeedbackReminders } from "../jobs/feedbackReminder.js";
 import * as XLSX from "xlsx";
+import { getTenantId } from "../lib/tenantContext.js";
 
 const router = Router();
 
@@ -300,22 +301,24 @@ router.get(
   "/admin/stats",
   requireAuth as any,
   requireAdmin as any,
-  async (_req, res) => {
-    const [totalRow] = await db.select({ total: count() }).from(feedbackTable);
-    const [avgRow] = await db.select({ avg: avg(feedbackTable.ratingOverall) }).from(feedbackTable);
-    const [complaintsRow] = await db.select({ total: count() }).from(feedbackTable).where(eq(feedbackTable.isComplaint, true));
-    const [openRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "open")));
-    const [inProgressRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "in_review")));
-    const [resolvedRow] = await db.select({ total: count() }).from(feedbackTable).where(eq(feedbackTable.status, "resolved"));
+  async (req, res) => {
+    const tenantId = getTenantId(req);
+    const tFilter = sql`feedback.tenant_id = ${tenantId}::uuid`;
+    const [totalRow] = await db.select({ total: count() }).from(feedbackTable).where(tFilter);
+    const [avgRow] = await db.select({ avg: avg(feedbackTable.ratingOverall) }).from(feedbackTable).where(tFilter);
+    const [complaintsRow] = await db.select({ total: count() }).from(feedbackTable).where(and(tFilter, eq(feedbackTable.isComplaint, true)));
+    const [openRow] = await db.select({ total: count() }).from(feedbackTable).where(and(tFilter, eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "open")));
+    const [inProgressRow] = await db.select({ total: count() }).from(feedbackTable).where(and(tFilter, eq(feedbackTable.isComplaint, true), eq(feedbackTable.status, "in_review")));
+    const [resolvedRow] = await db.select({ total: count() }).from(feedbackTable).where(and(tFilter, eq(feedbackTable.status, "resolved")));
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const [resolvedTodayRow] = await db.select({ total: count() }).from(feedbackTable).where(and(eq(feedbackTable.status, "resolved"), gte(feedbackTable.updatedAt, todayStart)));
+    const [resolvedTodayRow] = await db.select({ total: count() }).from(feedbackTable).where(and(tFilter, eq(feedbackTable.status, "resolved"), gte(feedbackTable.updatedAt, todayStart)));
 
     const ratingDist = await db
       .select({ rating: feedbackTable.ratingOverall, cnt: count() })
       .from(feedbackTable)
-      .where(sql`${feedbackTable.ratingOverall} IS NOT NULL`)
+      .where(and(tFilter, sql`${feedbackTable.ratingOverall} IS NOT NULL`))
       .groupBy(feedbackTable.ratingOverall)
       .orderBy(feedbackTable.ratingOverall);
 
@@ -328,7 +331,7 @@ router.get(
       guide: avg(feedbackTable.ratingGuide),
       visa: avg(feedbackTable.ratingVisaDocumentation),
       overall: avg(feedbackTable.ratingOverall),
-    }).from(feedbackTable);
+    }).from(feedbackTable).where(tFilter);
 
     const byCompanyRaw = await db
       .select({
@@ -337,6 +340,7 @@ router.get(
         avgRating: avg(feedbackTable.ratingOverall),
       })
       .from(feedbackTable)
+      .where(tFilter)
       .groupBy(feedbackTable.companyId);
 
     res.json({
@@ -372,9 +376,10 @@ router.get(
   requireAuth as any,
   requireAdmin as any,
   async (req, res) => {
+    const tenantId = getTenantId(req);
     const { status, companyId, isComplaint, minRating, page = "1", limit = "50" } = req.query as Record<string, string>;
 
-    const conditions = [];
+    const conditions = [sql`feedback.tenant_id = ${tenantId}::uuid`];
     if (status && ["open", "in_review", "resolved", "closed"].includes(status)) {
       conditions.push(eq(feedbackTable.status, status as any));
     }
@@ -392,7 +397,7 @@ router.get(
     const rows = await db
       .select()
       .from(feedbackTable)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(feedbackTable.createdAt))
       .limit(limitNum)
       .offset(offset);
@@ -400,7 +405,7 @@ router.get(
     const [totalRow] = await db
       .select({ total: count() })
       .from(feedbackTable)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+      .where(and(...conditions));
 
     res.json({ data: rows, total: totalRow.total, page: pageNum, limit: limitNum });
   }
@@ -440,12 +445,13 @@ router.get(
   requireAuth as any,
   requireAdmin as any,
   async (req, res) => {
+    const tenantId = getTenantId(req);
     const { status, companyId, isComplaint, minRating } = req.query as Record<string, string>;
 
     // Normalise: frontend sends "in_progress", DB stores "in_review"
     const normaliseStatus = (s: string) => (s === "in_progress" ? "in_review" : s);
 
-    const conditions = [];
+    const conditions = [sql`feedback.tenant_id = ${tenantId}::uuid`];
     if (status && ["open", "in_progress", "in_review", "resolved", "closed"].includes(status)) {
       conditions.push(eq(feedbackTable.status, normaliseStatus(status) as any));
     }
@@ -459,7 +465,7 @@ router.get(
     const rows = await db
       .select()
       .from(feedbackTable)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(feedbackTable.createdAt));
 
     const sheetData = rows.map(r => ({
@@ -510,7 +516,8 @@ router.get(
   "/admin/groups",
   requireAuth as any,
   requireAdmin as any,
-  async (_req, res) => {
+  async (req, res) => {
+    const tenantId = getTenantId(req);
     const groups = await db
       .select({
         id: hajjGroupsTable.id,
@@ -520,6 +527,7 @@ router.get(
         year: hajjGroupsTable.year,
       })
       .from(hajjGroupsTable)
+      .where(sql`hajj_groups.tenant_id = ${tenantId}::uuid`)
       .orderBy(desc(hajjGroupsTable.returnDate));
     res.json(groups);
   }
