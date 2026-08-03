@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import router from "./routes/index.js";
 import { ensureErrorLogTable, errorLogMiddleware } from "./routes/error-logs.js";
+import { attachTenantContext } from "./lib/tenantContext.js";
 import { leadEngineRouter } from "./routes/lead-engine.js";
 import inboxRouter from "./routes/inbox.js";
 import customer360Router from "./routes/customer360.js";
@@ -6105,6 +6106,11 @@ app.use("/api/inbox", inboxRouter as any);
 app.use("/api/customer360", customer360Router as any);
 app.use("/api/customers", customer360Router as any);
 app.use("/api/analytics", analyticsRouter as any);
+
+// ── SaaS Phase 3: Tenant context — must run before all API routes ─────────────
+// attachTenantContext resolves req.tenantId from: service-token → session → default.
+// Never reads tenant identity from body/query/URL params.
+app.use(attachTenantContext as any);
 
 // ── Main API router ───────────────────────────────────────────────────────────
 // Error log middleware (must be before router so it captures 4xx/5xx)

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { scrypt as _scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { pool } from "@workspace/db";

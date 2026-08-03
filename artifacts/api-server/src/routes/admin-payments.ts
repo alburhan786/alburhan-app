@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router, type RequestHandler } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { db, pool, bookingsTable, paymentTransactionsTable, customerProfilesTable } from "@workspace/db";
 import { eq, count, and } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";

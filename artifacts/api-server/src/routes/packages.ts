@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { db, packagesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { CreatePackageBody, ListPackagesQueryParams } from "@workspace/api-zod";

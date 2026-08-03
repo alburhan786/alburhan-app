@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { db, pool, bookingsTable, paymentTransactionsTable, reminderLogsTable } from "@workspace/db";

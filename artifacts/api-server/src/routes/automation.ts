@@ -138,7 +138,7 @@ function requireServiceToken(scope: string) {
     let tok: any;
     try {
       const { rows } = await pool.query(
-        `SELECT id, token_name, scopes, allowed_ips, is_active, expires_at, revoked_at
+        `SELECT id, token_name, scopes, allowed_ips, is_active, expires_at, revoked_at, tenant_id
          FROM automation_service_tokens WHERE token_hash = $1 LIMIT 1`,
         [hash]
       );
@@ -179,7 +179,13 @@ function requireServiceToken(scope: string) {
     pool.query(`UPDATE automation_service_tokens SET last_used_at = NOW() WHERE id = $1`, [tok.id])
       .catch(() => {});
 
-    req.serviceToken = { id: tok.id, name: tok.token_name, scopes };
+    // SaaS Phase 3: attach tenant context from service token
+    req.serviceToken = {
+      id: tok.id,
+      name: tok.token_name,
+      scopes,
+      tenantId: tok.tenant_id ?? "10000000-1000-4000-8000-000000000001",
+    };
     next();
   };
 }

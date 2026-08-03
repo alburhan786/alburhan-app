@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router, type Request } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { db, pool, bookingsTable, packagesTable, usersTable, hajjGroupsTable, customerProfilesTable, paymentTransactionsTable } from "@workspace/db";
 import { eq, and, desc, count, sql, isNull, or, ilike } from "drizzle-orm";
 import multer from "multer";
@@ -389,13 +390,15 @@ router.post("/bulk-trash", requireAdmin as any, requirePermission("bookings", "d
 });
 
 router.get("/", requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  const tenantId = getTenantId(req);
   const parsed = ListBookingsQueryParams.safeParse(req.query);
   const query = parsed.success ? parsed.data : {};
   const page = Number(query.page ?? 1);
   const limit = Number(query.limit ?? 200);
   const offset = (page - 1) * limit;
 
-  const conditions: any[] = [isNull(bookingsTable.deletedAt)];
+  // SaaS Phase 3: scope list to tenant (no-op for Al Burhan; enforces isolation for future tenants)
+  const conditions: any[] = [isNull(bookingsTable.deletedAt), sql`bookings.tenant_id = ${tenantId}::uuid`];
   if (query.status) conditions.push(eq(bookingsTable.status, query.status as any));
   if (req.user?.role !== "admin") {
     conditions.push(eq(bookingsTable.customerMobile, req.user!.mobile));

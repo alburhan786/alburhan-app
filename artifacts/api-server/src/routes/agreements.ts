@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import fs from "fs";
 import path from "path";
 import { pool } from "@workspace/db";

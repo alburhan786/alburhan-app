@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getTenantId } from "../lib/tenantContext.js";
 import { db, pool, hajjGroupsTable, pilgrimsTable, hajjRoomsTable, attendanceLogsTable, attendanceEventsTable } from "@workspace/db";
 import { eq, and, ne, desc, asc, count, max, inArray, sql } from "drizzle-orm";
 import { requireAdmin, requireModuleAccess, requirePermission, type AuthenticatedRequest } from "../lib/auth.js";

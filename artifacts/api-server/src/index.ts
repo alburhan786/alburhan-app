@@ -3872,6 +3872,36 @@ async function start() {
     // Phase 3 middleware will enforce tenant_id != NULL and will surface any incomplete state
   }
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SaaS PHASE 3 — NOT NULL enforcement (v39.1 – v39.3)
+  // AUTHORITATIVE SOURCE: migrations/v39-tenant-not-null.sql
+  // Phase 2 backfilled all rows; Phase 3 now promotes nullable → NOT NULL.
+  // v39.1 auto-repairs any stray NULLs, v39.2 applies constraints, v39.3 asserts.
+  // ══════════════════════════════════════════════════════════════════════════════
+  try {
+    const thisDir39 = path.dirname(fileURLToPath(import.meta.url));
+    const v39SqlCandidates = [
+      path.join(thisDir39, "migrations", "v39-tenant-not-null.sql"),
+      path.join(thisDir39, "..", "migrations", "v39-tenant-not-null.sql"),
+    ];
+    let v39Sql: string | null = null;
+    for (const candidate of v39SqlCandidates) {
+      try { v39Sql = fs.readFileSync(candidate, "utf8"); break; } catch {}
+    }
+    if (!v39Sql) {
+      const tried = v39SqlCandidates.join(", ");
+      throw Object.assign(new Error(`v39 SQL not found: ${tried}`), { code: "ENOENT" });
+    }
+    await pool.query(v39Sql);
+    console.log("[Migration] v39 tenant NOT NULL enforcement applied successfully");
+  } catch (err: any) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      console.error("[Migration] v39 WARNING: SQL file not found — NOT NULL constraints unapplied.");
+    } else {
+      console.error("[Migration] v39 NOT NULL migration result:", err.message);
+    }
+  }
+
   // ── Startup route confirmation ──────────────────────────────────────────────
   // Express 5 initialises the router lazily (no _router until first request),
   // so counting via app._router at startup already shows 0 in dev mode.
